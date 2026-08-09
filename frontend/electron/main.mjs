@@ -55,7 +55,11 @@ const electronDir = path.dirname(fileURLToPath(import.meta.url))
 const frontendRoot = path.resolve(electronDir, '..')
 const projectRoot = path.resolve(process.env.NOTE_APP_PROJECT_ROOT || path.join(frontendRoot, '..'))
 const backendRoot = path.join(projectRoot, 'backend')
-const frontendDist = path.resolve(process.env.NOTE_APP_FRONTEND_DIST || path.join(frontendRoot, 'dist'))
+const packagedBackendName = process.platform === 'win32' ? 'twill-backend.exe' : 'twill-backend'
+const packagedBackend = path.join(process.resourcesPath, 'backend', 'twill-backend', packagedBackendName)
+const frontendDist = path.resolve(process.env.NOTE_APP_FRONTEND_DIST || (
+  app.isPackaged ? path.join(process.resourcesPath, 'frontend-dist') : path.join(frontendRoot, 'dist')
+))
 const appIconPath = path.join(electronDir, 'assets', 'twill-icon.png')
 const options = parseDesktopOptions(process.argv.slice(2))
 const smokeTest = process.argv.includes('--smoke-test')
@@ -136,14 +140,21 @@ async function startOrReuseBackend() {
     throw new Error('프런트엔드 빌드가 없습니다. npm run build 후 다시 실행하세요.')
   }
 
-  const python = resolvePython()
+  const command = app.isPackaged ? packagedBackend : resolvePython()
+  const commandArgs = app.isPackaged
+    ? ['--host', options.backendHost, '--port', String(options.backendPort)]
+    : ['-m', 'uvicorn', 'app.main:app', '--host', options.backendHost, '--port', String(options.backendPort)]
+  if (app.isPackaged && !fs.existsSync(command)) {
+    throw new Error(`패키지에 백엔드 실행 파일이 없습니다: ${command}`)
+  }
   backendProcess = spawn(
-    python,
-    ['-m', 'uvicorn', 'app.main:app', '--host', options.backendHost, '--port', String(options.backendPort)],
+    command,
+    commandArgs,
     {
-      cwd: backendRoot,
+      cwd: app.isPackaged ? path.dirname(packagedBackend) : backendRoot,
       env: {
         ...process.env,
+        ...(app.isPackaged && !process.env.NOTES_DIR ? { NOTES_DIR: path.join(app.getPath('documents'), 'Twill') } : {}),
         NOTE_APP_FRONTEND_DIST: frontendDist,
         NOTE_APP_DESKTOP: '1',
         PYTHONUNBUFFERED: '1',
@@ -173,6 +184,14 @@ async function startOrReuseBackend() {
 
 function stopBackend() {
   if (!backendOwned || !backendProcess || backendProcess.exitCode !== null) return
+  if (process.platform === 'win32') {
+    const processId = backendProcess.pid
+    spawn('taskkill.exe', ['/pid', String(processId), '/t', '/f'], {
+      stdio: 'ignore',
+      windowsHide: true,
+    }).unref()
+    return
+  }
   backendProcess.kill('SIGTERM')
   const processToStop = backendProcess
   const forceTimer = setTimeout(() => {

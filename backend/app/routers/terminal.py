@@ -1,19 +1,62 @@
 """WebSocket ↔ PTY 브리지: 프론트 터미널 패널(xterm.js)용 셸 세션."""
 
 import asyncio
-import fcntl
 import json
 import os
-import pty
 import signal
-import struct
-import termios
+import subprocess
+
+if os.name != "nt":
+    import fcntl
+    import pty
+    import struct
+    import termios
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from .. import config
 
 router = APIRouter(prefix="/api/terminal", tags=["terminal"])
+
+
+async def _terminal_ws_windows(ws: WebSocket) -> None:
+    """Bridge PowerShell over pipes when a Unix PTY is unavailable."""
+    creationflags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+    process = await asyncio.create_subprocess_exec(
+        "powershell.exe",
+        "-NoLogo",
+        "-NoProfile",
+        cwd=config.notes_dir(),
+        stdin=asyncio.subprocess.PIPE,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.STDOUT,
+        creationflags=creationflags,
+    )
+
+    async def pump_output() -> None:
+        assert process.stdout is not None
+        while chunk := await process.stdout.read(65536):
+            await ws.send_bytes(chunk)
+
+    pump = asyncio.create_task(pump_output())
+    try:
+        while True:
+            msg = json.loads(await ws.receive_text())
+            if msg.get("type") == "input" and process.stdin is not None:
+                process.stdin.write(str(msg.get("data", "")).encode())
+                await process.stdin.drain()
+            # Pipe-backed PowerShell has no portable window-resize operation.
+    except (WebSocketDisconnect, RuntimeError, json.JSONDecodeError, OSError):
+        pass
+    finally:
+        pump.cancel()
+        if process.returncode is None:
+            process.terminate()
+        try:
+            await asyncio.wait_for(process.wait(), timeout=2)
+        except asyncio.TimeoutError:
+            process.kill()
+            await process.wait()
 
 
 def _spawn_shell() -> tuple[int, int]:
@@ -37,6 +80,9 @@ def _set_winsize(fd: int, rows: int, cols: int) -> None:
 @router.websocket("/ws")
 async def terminal_ws(ws: WebSocket):
     await ws.accept()
+    if os.name == "nt":
+        await _terminal_ws_windows(ws)
+        return
     pid, fd = _spawn_shell()
     loop = asyncio.get_running_loop()
     out_queue: asyncio.Queue[bytes | None] = asyncio.Queue()

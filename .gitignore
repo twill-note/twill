@@ -43,9 +43,13 @@ AGENTS.md
 /frontend/dist/
 /frontend/coverage/
 /frontend/release/
+/frontend/build/
+/backend/build/
+/.build-cache/
 
 # ── Backend 생성물 ──
 /backend/.venv/
+/window/.bootstrap-env.cmd
 __pycache__/
 *.py[cod]
 .pytest_cache/

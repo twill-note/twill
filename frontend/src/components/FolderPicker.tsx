@@ -47,7 +47,7 @@ export default function FolderPicker({ onClose }: { onClose: () => void }) {
       >
         <div className="border-b border-[#efefed] px-4 py-3">
           <h3 className="text-[15px] font-semibold text-[#37352f]">📂 폴더 열기</h3>
-          <p className="mt-0.5 text-[12px] text-[#9b9a97]">선택한 폴더가 노트 루트가 됩니다 (VSCode의 폴더 열기와 동일)</p>
+          <p className="mt-0.5 text-[12px] text-[#9b9a97]">선택한 폴더를 저장소로 설정합니다</p>
         </div>
 
         <div className="flex gap-1.5 border-b border-[#efefed] px-4 py-2">

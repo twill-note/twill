@@ -1,8 +1,9 @@
 import json
 import os
+import sys
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parents[2]))
 DEFAULT_NOTES_DIR = Path(os.environ.get("NOTES_DIR", REPO_ROOT / "notes")).resolve()
 
 CONFIG_PATH = Path.home() / ".config" / "note-app" / "config.json"

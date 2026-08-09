@@ -737,6 +737,12 @@ function recoveryCopy(kind: NonNullable<AiSession['recovery']>['kind']) {
   }
 }
 
+function shouldOfferCodexUpdate(recovery: NonNullable<AiSession['recovery']>): boolean {
+  if (recovery.kind === 'cli') return true
+  if (recovery.kind !== 'auth' && recovery.kind !== 'backend') return false
+  return /401|unauthorized|model.+not supported|app-server|종료 코드\s*2|codex cli/i.test(recovery.message)
+}
+
 function sessionContextLabel(session: AiSession, scopes: WorkspaceScopeEntry[] = []): string {
   if (session.kind === 'task') return `태스크 · ${pathLabel(session.taskPath || session.title)}`
   const project = session.scopeId
@@ -867,6 +873,7 @@ export default function ByeoriPanel({
   const [usageLimits, setUsageLimits] = useState<AiUsageLimits | null>(null)
   const [loginBusy, setLoginBusy] = useState(false)
   const [loginUrl, setLoginUrl] = useState<string | null>(null)
+  const [cliUpdateBusy, setCliUpdateBusy] = useState(false)
   const [uiError, setUiError] = useState<string | null>(null)
   const [sessionListOpen, setSessionListOpen] = useState(false)
   const [sessionQuery, setSessionQuery] = useState('')
@@ -1383,6 +1390,29 @@ export default function ByeoriPanel({
     ws.onclose = () => setLoginBusy(false)
   }
 
+  const updateCodexCliAndRestart = async () => {
+    const currentVersion = status?.version ? `현재 버전은 ${status.version}입니다.` : '현재 버전을 확인할 수 없습니다.'
+    const ok = await dialog.confirm('Codex CLI를 최신 버전으로 업데이트할까요?', {
+      detail: `${currentVersion}\n\n공식 OpenAI 릴리스에서 Twill 전용 CLI를 설치한 뒤 앱을 재시작합니다. 로그인 정보와 문서는 유지됩니다.`,
+      confirmLabel: '업데이트 및 재시작',
+    })
+    if (!ok) return
+    setCliUpdateBusy(true)
+    setUiError(null)
+    try {
+      await api.ai.updateCodexCli()
+      if (window.noteDesktop?.restartApp) {
+        const restarting = await window.noteDesktop.restartApp()
+        if (restarting) return
+      }
+      window.location.reload()
+    } catch (error) {
+      setUiError((error as Error).message)
+    } finally {
+      setCliUpdateBusy(false)
+    }
+  }
+
   // ── 상태별 화면 ──
   if (!status) {
     return <div className="p-4 text-[12px] text-[#9b9a97]">상태 확인 중…</div>
@@ -1397,9 +1427,16 @@ export default function ByeoriPanel({
         ) : (
           <>
             <p>AI 실행에 필요한 Codex CLI가 설치되어 있지 않습니다.</p>
-            <p className="text-[12px] text-[#9b9a97]">
-              <code className="rounded bg-[#f1f1ef] px-1.5">npm install -g @openai/codex</code> 후 다시 시도하세요.
-            </p>
+            <p className="text-[12px] text-[#9b9a97]">Twill 전용 최신 CLI를 설치하면 앱이 자동으로 재시작됩니다.</p>
+            <button
+              type="button"
+              className="mt-1 rounded-md bg-[#37352f] px-3 py-1.5 text-[12px] font-medium text-white hover:bg-[#2b2925] disabled:opacity-60"
+              onClick={() => void updateCodexCliAndRestart()}
+              disabled={cliUpdateBusy}
+            >
+              {cliUpdateBusy ? 'Codex CLI 업데이트 중…' : 'Codex CLI 설치 및 재시작'}
+            </button>
+            {uiError && <p className="text-[11px] text-[#c92a2a]">{uiError}</p>}
           </>
         )}
       </div>
@@ -1956,6 +1993,22 @@ export default function ByeoriPanel({
                       기본 재시도는 현재 대화의 맥락을 유지합니다. 새 대화는 이전 대화 맥락 없이 이 질문과 첨부 자료만 다시 보냅니다.
                     </p>
                   </>
+                )}
+                {shouldOfferCodexUpdate(active.recovery) && (
+                  <div className="mt-2 rounded border border-current/15 bg-white/55 p-2">
+                    <p className="text-[10px] opacity-80">
+                      이 오류는 오래된 Codex CLI에서 발생할 수 있습니다.
+                      {status?.version ? ` 현재 버전: ${status.version}` : ''}
+                    </p>
+                    <button
+                      type="button"
+                      className="mt-1.5 rounded bg-[#37352f] px-2 py-1 text-[11px] font-medium text-white hover:bg-[#2b2925] disabled:opacity-60"
+                      onClick={() => void updateCodexCliAndRestart()}
+                      disabled={cliUpdateBusy || active.busy}
+                    >
+                      {cliUpdateBusy ? '업데이트 중…' : 'Codex CLI 업데이트 및 재시작'}
+                    </button>
+                  </div>
                 )}
               </div>
               <button

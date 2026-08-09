@@ -4,7 +4,6 @@ from __future__ import annotations
 import json
 import logging
 import re
-import shutil
 import asyncio
 
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
@@ -22,16 +21,18 @@ from ..ai.orchestrator import (
     prompt_runtime_info,
 )
 from ..plugins.codex_assistant.app_server import client as codex_app_server
+from ..plugins.codex_assistant.codex_cli import codex_binary, download_latest_codex_runtime, managed_runtime_dir
 
 log = logging.getLogger("ai_router")
 
 router = APIRouter(prefix="/api/ai", tags=["ai"])
 
 _CODEX_URL_RE = re.compile(r"https?://[\w./%?=&#:_-]+")
+_codex_update_lock = asyncio.Lock()
 
 
 def _codex_binary() -> str:
-    return shutil.which("codex") or "codex"
+    return codex_binary() or "codex"
 
 
 @router.get("/engines")
@@ -48,6 +49,40 @@ async def engine_status():
         return {"available": False, "logged_in": False, "detail": "설치된 AI 엔진이 없습니다", "engine": None}
     st = await engine.status()
     return {**st, "engine": engine.id}
+
+
+@router.post("/codex-cli/update")
+async def update_codex_cli():
+    """공식 OpenAI 릴리스의 최신 Codex CLI를 Twill 전용 폴더에 설치한다."""
+    if orchestrator.has_active_runs():
+        raise HTTPException(
+            status_code=409,
+            detail="실행 중인 Twill AI 요청을 끝내거나 중단한 뒤 Codex CLI를 업데이트해주세요.",
+        )
+    if _codex_update_lock.locked():
+        raise HTTPException(status_code=409, detail="Codex CLI 업데이트가 이미 진행 중입니다.")
+
+    async with _codex_update_lock:
+        # Windows에서는 실행 중인 codex.exe가 관리 런타임 교체를 방해할 수 있다.
+        # 현재 요청이 모두 끝난 상태에서 app-server를 먼저 내리고 새 패키지를 설치한다.
+        await codex_app_server.stop()
+        try:
+            installation = await asyncio.to_thread(
+                download_latest_codex_runtime,
+                managed_runtime_dir(),
+            )
+        except Exception as exc:  # noqa: BLE001
+            log.exception("Codex CLI update failed")
+            raise HTTPException(
+                status_code=502,
+                detail=f"Codex CLI를 업데이트하지 못했습니다: {exc}",
+            ) from exc
+    return {
+        "ok": True,
+        "version": installation.version,
+        "source": installation.source,
+        "restart_required": True,
+    }
 
 
 @router.post("/logout")

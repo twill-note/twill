@@ -3,6 +3,7 @@ import { dialog } from '../dialog'
 import { dbApi } from '../dbschema'
 import { displayCombo, useShortcutStore } from '../shortcuts'
 import { useAppStore, activeTabId, type DocTab } from '../store'
+import { isRepeatedClick } from '../useBackdropDismiss'
 
 /**
  * 메인 화면 상단 바.
@@ -52,7 +53,9 @@ export default function TabBar() {
         className={`flex h-full shrink-0 items-center border-r border-[#e9e9e7] px-2.5 text-[14px] ${
           taskBoardActive ? 'bg-white text-[#37352f]' : 'text-[#7d7c78] hover:bg-[#ececea] hover:text-[#37352f]'
         }`}
-        onClick={() => void toggleBoard('tasks', taskBoardActive)}
+        onClick={(event) => {
+          if (!isRepeatedClick(event)) void toggleBoard('tasks', taskBoardActive)
+        }}
         title={`태스크 보드 ${taskBoardActive ? '닫기' : '열기'} (${displayCombo(bindings.taskBoard)})`}
       >
         📋
@@ -61,7 +64,9 @@ export default function TabBar() {
         className={`flex h-full shrink-0 items-center border-r border-[#e9e9e7] px-2.5 text-[14px] ${
           scopesActive ? 'bg-white text-[#37352f]' : 'text-[#7d7c78] hover:bg-[#ececea] hover:text-[#37352f]'
         }`}
-        onClick={() => void toggleBoard('scopes', scopesActive)}
+        onClick={(event) => {
+          if (!isRepeatedClick(event)) void toggleBoard('scopes', scopesActive)
+        }}
         title={`프로젝트 관리 ${scopesActive ? '닫기' : '열기'} (${displayCombo(bindings.scopes)}) — 코드베이스 경로 관리`}
       >
         🌐
@@ -77,7 +82,11 @@ export default function TabBar() {
         className={`flex h-full shrink-0 items-center border-r border-[#e9e9e7] px-2.5 text-[14px] ${
           view === 'calendar' ? 'bg-white text-[#37352f]' : 'text-[#7d7c78] hover:bg-[#ececea] hover:text-[#37352f]'
         }`}
-        onClick={() => (view === 'calendar' ? closeBoardView() : setView('calendar'))}
+        onClick={(event) => {
+          if (isRepeatedClick(event)) return
+          if (view === 'calendar') closeBoardView()
+          else setView('calendar')
+        }}
         title={`캘린더 ${view === 'calendar' ? '닫기' : '열기'} (${displayCombo(bindings.calendar)})`}
       >
         📅
@@ -86,7 +95,11 @@ export default function TabBar() {
         className={`flex h-full shrink-0 items-center border-r border-[#e9e9e7] px-2.5 text-[14px] ${
           view === 'todos' ? 'bg-white text-[#37352f]' : 'text-[#7d7c78] hover:bg-[#ececea] hover:text-[#37352f]'
         }`}
-        onClick={() => (view === 'todos' ? closeBoardView() : setView('todos'))}
+        onClick={(event) => {
+          if (isRepeatedClick(event)) return
+          if (view === 'todos') closeBoardView()
+          else setView('todos')
+        }}
         title={`할 일 ${view === 'todos' ? '닫기' : '열기'} (${displayCombo(bindings.todos)})`}
       >
         ✅
@@ -95,7 +108,11 @@ export default function TabBar() {
         className={`flex h-full shrink-0 items-center border-r border-[#e9e9e7] px-2.5 text-[14px] ${
           view === 'skillbook' ? 'bg-white text-[#37352f]' : 'text-[#7d7c78] hover:bg-[#ececea] hover:text-[#37352f]'
         }`}
-        onClick={() => (view === 'skillbook' ? closeBoardView() : setView('skillbook'))}
+        onClick={(event) => {
+          if (isRepeatedClick(event)) return
+          if (view === 'skillbook') closeBoardView()
+          else setView('skillbook')
+        }}
         title={`스킬북 ${view === 'skillbook' ? '닫기' : '열기'}`}
       >
         📚

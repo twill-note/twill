@@ -73,6 +73,10 @@
       {
         "from": "build/backend/twill-backend",
         "to": "backend/twill-backend"
+      },
+      {
+        "from": "build/codex-runtime",
+        "to": "codex-runtime"
       }
     ],
     "win": {

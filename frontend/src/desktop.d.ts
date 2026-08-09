@@ -17,6 +17,7 @@ declare global {
       isByeoriWindowOpen: () => Promise<boolean>
       reattachByeoriWindow: () => Promise<boolean>
       openDocumentInMain: (target: DesktopDocumentTarget) => Promise<boolean>
+      restartApp: () => Promise<boolean>
       onByeoriWindowChange: (callback: (open: boolean) => void) => () => void
       onShowByeoriDock: (callback: () => void) => () => void
       onOpenMainDocument: (callback: (target: DesktopDocumentTarget) => void) => () => void

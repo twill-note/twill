@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
 import { APP_UI_FONT_FAMILY, ensureKoreanFontLoaded } from '../fontFamilies'
 import { isDarkTheme, useThemeStore } from '../theme'
+import { useBackdropDismiss } from '../useBackdropDismiss'
 
 /** mermaid 동적 로드 + 캐싱 — 초기 번들 부담 최소화. */
 let mermaidPromise: Promise<typeof import('mermaid').default> | null = null
@@ -117,6 +118,7 @@ export function MermaidExpandButton({ source, className = '' }: { source: string
 
 function MermaidZoomDialog({ source, onClose }: { source: string; onClose: () => void }) {
   const [zoom, setZoom] = useState(1)
+  const dismissFromBackdrop = useBackdropDismiss<HTMLDivElement>(onClose, source)
   const kind = source.trimStart().startsWith('sequenceDiagram') ? '시퀀스 다이어그램' : 'Mermaid 다이어그램'
 
   useEffect(() => {
@@ -140,9 +142,7 @@ function MermaidZoomDialog({ source, onClose }: { source: string; onClose: () =>
     <div
       className="fixed inset-0 z-[150] flex items-center justify-center bg-black/60 p-4"
       role="presentation"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose()
-      }}
+      onClick={dismissFromBackdrop}
     >
       <section
         role="dialog"

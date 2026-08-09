@@ -102,6 +102,7 @@ export default function Sidebar() {
             className="rounded px-1.5 py-0.5 text-[12px] text-[#9b9a97] hover:bg-[#efefed]"
             title="설정 (테마 · 파일 탐색기 · 단축키 · AI)"
             onClick={() => setSettingsOpen(true)}
+            data-testid="workspace-settings-button"
           >
             ⚙️
           </button>

@@ -93,6 +93,12 @@ Microsoft Store에서 **앱 설치 관리자(App Installer)**를 설치 또는 �
 
 인터넷 연결과 방화벽 또는 프록시 설정을 확인한 뒤 같은 실행 스크립트를 다시 실행합니다. 완료된 설치 단계는 재사용됩니다.
 
+### Twill AI에서 401 또는 Codex 호환 오류가 발생함
+
+배포용 Twill에는 빌드 시점의 최신 공식 Codex CLI가 포함되므로 별도의 Node.js 또는 전역 npm 설치가 필요하지 않습니다. Twill AI의 오류 안내에서 **Codex CLI 업데이트 및 재시작**을 누르면 공식 OpenAI 릴리스의 최신 패키지를 Twill 전용 사용자 폴더에 설치하고 앱을 재시작합니다. 로그인 정보와 문서는 유지됩니다.
+
+Codex CLI의 공식 설치 방식은 [OpenAI Codex CLI 문서](https://learn.chatgpt.com/docs/codex/cli)를 참고하세요.
+
 ### 환경을 처음부터 다시 구성하고 싶음
 
 Twill을 모두 종료한 뒤 다음 폴더를 삭제하고 실행 스크립트를 다시 실행합니다.
@@ -127,7 +133,7 @@ cd C:\Users\사용자이름\Desktop\twill\window
 .\build-installer.bat
 ```
 
-빌드 과정은 프런트엔드를 생성하고, Python 백엔드를 PyInstaller 실행 파일로 묶은 뒤, Electron과 함께 NSIS 설치 프로그램으로 패키징합니다. 최초 빌드에는 필요한 도구와 Electron 다운로드 때문에 시간이 걸릴 수 있습니다.
+빌드 과정은 공식 OpenAI 릴리스에서 현재 Windows 아키텍처용 최신 Codex CLI 패키지를 내려받아 SHA-256을 검증하고, 프런트엔드와 Python 백엔드를 Electron/NSIS 설치 프로그램으로 패키징합니다. 최초 빌드에는 필요한 도구와 Electron·Codex 다운로드 때문에 시간이 걸릴 수 있습니다.
 
 완성된 파일은 다음 위치에 생성됩니다.
 
@@ -135,7 +141,7 @@ cd C:\Users\사용자이름\Desktop\twill\window
 frontend\release\Twill-Setup-<버전>.exe
 ```
 
-이 Setup 파일 하나만 배포하면 됩니다. 최종 사용자의 PC에는 Python, Node.js 또는 개발 도구가 설치되어 있지 않아도 됩니다. 설치 마법사에서 설치 위치를 선택할 수 있으며 바탕화면과 시작 메뉴에 Twill 바로가기가 생성됩니다.
+이 Setup 파일 하나만 배포하면 됩니다. 최종 사용자의 PC에는 Python, Node.js, 전역 Codex CLI 또는 개발 도구가 설치되어 있지 않아도 됩니다. 설치 마법사에서 설치 위치를 선택할 수 있으며 바탕화면과 시작 메뉴에 Twill 바로가기가 생성됩니다.
 
 설치형 앱의 기본 노트 저장 위치는 사용자의 문서 폴더 아래입니다.
 
@@ -157,7 +163,7 @@ chmod +x mac/build-installer.sh
 ./mac/build-installer.sh
 ```
 
-스크립트는 현재 Mac의 아키텍처에 맞는 Python 백엔드를 만들고 Electron 앱과 함께 DMG로 패키징합니다. Apple Silicon용 설치본은 Apple Silicon Mac에서, Intel용 설치본은 Intel Mac에서 각각 빌드하는 것이 가장 안전합니다.
+스크립트는 현재 Mac의 아키텍처에 맞는 최신 공식 Codex CLI와 Python 백엔드를 준비하고 Electron 앱과 함께 DMG로 패키징합니다. Apple Silicon용 설치본은 Apple Silicon Mac에서, Intel용 설치본은 Intel Mac에서 각각 빌드하는 것이 가장 안전합니다.
 
 완성된 파일은 다음 위치에 생성됩니다.
 
@@ -165,4 +171,4 @@ chmod +x mac/build-installer.sh
 frontend/release/Twill-<버전>-<아키텍처>.dmg
 ```
 
-DMG 파일 하나를 GitHub Releases에 올리면 됩니다. 사용자는 DMG를 연 뒤 Twill을 Applications 폴더로 끌어 놓아 설치할 수 있습니다.
+DMG 파일 하나를 GitHub Releases에 올리면 됩니다. 사용자는 DMG를 연 뒤 Twill을 Applications 폴더로 끌어 놓아 설치할 수 있으며, 별도의 Codex CLI 설치는 필요하지 않습니다.

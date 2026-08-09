@@ -88,6 +88,7 @@ contextBridge.exposeInMainWorld('noteDesktop', Object.freeze({
   isByeoriWindowOpen: () => ipcRenderer.invoke('desktop:is-byeori-window-open'),
   reattachByeoriWindow: () => ipcRenderer.invoke('desktop:reattach-byeori-window'),
   openDocumentInMain: (target) => ipcRenderer.invoke('desktop:open-main-document', target),
+  restartApp: () => ipcRenderer.invoke('desktop:restart-app'),
   onByeoriWindowChange: (callback) => subscribe(
     'desktop:byeori-window-changed',
     callback,

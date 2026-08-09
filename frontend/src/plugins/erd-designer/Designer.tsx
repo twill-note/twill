@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { dialog } from '../../dialog'
 import { displayCombo } from '../../shortcuts'
+import { useBackdropDismiss } from '../../useBackdropDismiss'
 import { toSql } from './exporter'
 import { parseSqlDdl } from './importer'
 import TableBox from './TableBox'
@@ -1167,6 +1168,7 @@ function TrashIcon() { return <SvgIcon><path d="M3.5 5h9M6.3 3.5h3.4M5 5l.5 7h5l
 // SQL 내보내기 다이얼로그
 // ─────────────────────────────────────────────────────────
 function SqlExportDialog({ sql, filename, onClose }: { sql: string; filename: string; onClose: () => void }) {
+  const dismissFromBackdrop = useBackdropDismiss<HTMLDivElement>(onClose, filename)
   const [copied, setCopied] = useState(false)
   const copy = async () => {
     try {
@@ -1187,7 +1189,7 @@ function SqlExportDialog({ sql, filename, onClose }: { sql: string; filename: st
     URL.revokeObjectURL(url)
   }
   return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50" onClick={onClose}>
+    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50" onClick={dismissFromBackdrop}>
       <div
         className="flex h-[80vh] w-[900px] max-w-[92vw] flex-col overflow-hidden rounded-xl border border-[#e3e2e0] bg-white shadow-2xl"
         onClick={(e) => e.stopPropagation()}
@@ -1224,8 +1226,9 @@ function SqlExportDialog({ sql, filename, onClose }: { sql: string; filename: st
 
 function SqlImportDialog({ onImport, onClose }: { onImport: (sql: string) => boolean; onClose: () => void }) {
   const [sql, setSql] = useState('')
+  const dismissFromBackdrop = useBackdropDismiss<HTMLDivElement>(onClose)
   return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50" onClick={onClose}>
+    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50" onClick={dismissFromBackdrop}>
       <div
         className="flex h-[80vh] w-[900px] max-w-[92vw] flex-col overflow-hidden rounded-xl border border-[#e3e2e0] bg-white shadow-2xl"
         onClick={(e) => e.stopPropagation()}

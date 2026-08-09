@@ -3,6 +3,7 @@ import type { ComponentType } from 'react'
 import { useAiStore } from '../aiStore'
 import { usePluginRegistry } from '../plugins/registry'
 import { SYSTEM_AI_TAB, SYSTEM_TERMINAL_TAB, useAppStore } from '../store'
+import { isRepeatedClick } from '../useBackdropDismiss'
 import ByeoriPanel from './ByeoriPanel'
 import TerminalPanel from './TerminalPanel'
 
@@ -235,7 +236,9 @@ export default function RightDock() {
               aria-pressed={selected}
               aria-controls="right-tool-panel"
               draggable={Boolean(window.noteDesktop && tab.id === SYSTEM_AI_TAB && !byeoriDetached)}
-              onClick={() => toggleTool(tab.id)}
+              onClick={(event) => {
+                if (!isRepeatedClick(event)) toggleTool(tab.id)
+              }}
               onDragStart={(event) => {
                 if (tab.id !== SYSTEM_AI_TAB || byeoriDetached) {
                   event.preventDefault()

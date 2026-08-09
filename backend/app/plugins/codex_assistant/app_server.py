@@ -1,6 +1,6 @@
 """codex app-server 프로세스 관리 + JSON-RPC 클라이언트.
 
-codex 는 `codex app-server --stdio` 로 실행하면 JSON-RPC 2.0 프로토콜을 stdio 로 노출한다.
+codex 는 `codex app-server` 로 실행하면 JSON-RPC 2.0 프로토콜을 stdio 로 노출한다.
 이 프로토콜은 공식 VSCode 확장이 사용하는 것과 동일하며, `item/agentMessage/delta` 같은
 토큰 단위 스트리밍 이벤트를 제공한다.
 
@@ -19,8 +19,9 @@ from collections import deque
 import inspect
 import json
 import logging
-import shutil
 from typing import Any, Callable
+
+from .codex_cli import codex_binary
 
 log = logging.getLogger("plugins.codex_assistant.app_server")
 
@@ -30,6 +31,16 @@ DynamicToolHandler = Callable[[Any], Any]
 
 class AppServerError(RuntimeError):
     pass
+
+
+def _app_server_command(binary: str) -> tuple[str, str]:
+    """Return the Codex app-server command.
+
+    Stdio is the app-server's default transport. Recent CLI versions expose a
+    ``--stdio`` alias, but older supported versions reject that flag, so the bare
+    command is the most broadly compatible form.
+    """
+    return binary, "app-server"
 
 
 # codex app-server 가 클라이언트에게 보내는 승인 요청(id 있는 request) 에 대한 기본 응답.
@@ -77,7 +88,7 @@ class AppServerClient:
             await self._handshake()
 
     async def _spawn(self) -> None:
-        binary = shutil.which("codex")
+        binary = codex_binary()
         if not binary:
             raise AppServerError("codex CLI가 설치되어 있지 않습니다")
         # read loop 사망 후 재시작하는 경우, 이전 프로세스가 살아있으면 고아로 남지 않게 정리
@@ -87,11 +98,10 @@ class AppServerClient:
                 self._proc.terminate()
             except ProcessLookupError:
                 pass
-        # --analytics-default-enabled 는 VSCode 확장이 켜는 옵션과 동일 (자동 opt-out 가능)
+        # app-server의 기본 전송은 stdio다. 최신 버전은 --stdio/--listen도 제공하지만,
+        # 해당 옵션이 없는 구버전과도 호환되도록 bare command를 사용한다.
         proc = await asyncio.create_subprocess_exec(
-            binary,
-            "app-server",
-            "--stdio",
+            *_app_server_command(binary),
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,

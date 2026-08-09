@@ -1,0 +1,449 @@
+@import 'tailwindcss';
+
+:root {
+  --app-ui-font: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    'Pretendard', 'Malgun Gothic', 'Apple SD Gothic Neo', Roboto,
+    'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;
+  --app-emoji-font: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji',
+    'Twemoji Mozilla', sans-serif;
+  --app-mono-font: 'JetBrains Mono', 'D2Coding', 'Cascadia Mono', Consolas,
+    'Noto Sans KR', 'Malgun Gothic', monospace;
+  --ui-scrollbar-thumb: #c7c5bf;
+  --ui-scrollbar-thumb-hover: #9d9a93;
+  --ui-scrollbar-thumb-active: #77746e;
+  --ui-scrollbar-track: transparent;
+  --font-sans: var(--app-ui-font);
+  --font-mono: var(--app-mono-font);
+  font-family: var(--app-ui-font);
+  /* 숫자·기호까지 컬러 이모지 글리프로 바뀌지 않게 일반 텍스트 표현을 유지한다. */
+  font-variant-emoji: normal;
+  color: #37352f;
+}
+
+.native-emoji {
+  font-family: var(--app-emoji-font);
+  font-variant-emoji: emoji;
+}
+
+[data-theme='mint'] {
+  --ui-scrollbar-thumb: #a9c9c3;
+  --ui-scrollbar-thumb-hover: #6daaa0;
+  --ui-scrollbar-thumb-active: #3f887f;
+}
+
+[data-theme='sunset'] {
+  --ui-scrollbar-thumb: #dec0ad;
+  --ui-scrollbar-thumb-hover: #bf8b6d;
+  --ui-scrollbar-thumb-active: #9c6548;
+}
+
+[data-theme='paper'] {
+  --ui-scrollbar-thumb: #c8bda6;
+  --ui-scrollbar-thumb-hover: #9b8c70;
+  --ui-scrollbar-thumb-active: #6f624c;
+}
+
+[data-theme='nord'] {
+  --ui-scrollbar-thumb: #4c566a;
+  --ui-scrollbar-thumb-hover: #67758c;
+  --ui-scrollbar-thumb-active: #88c0d0;
+}
+
+[data-theme='dracula'] {
+  --ui-scrollbar-thumb: #44475a;
+  --ui-scrollbar-thumb-hover: #62657a;
+  --ui-scrollbar-thumb-active: #bd93f9;
+}
+
+[data-theme='rosepine'] {
+  --ui-scrollbar-thumb: #403d52;
+  --ui-scrollbar-thumb-hover: #625d78;
+  --ui-scrollbar-thumb-active: #c4a7e7;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  overflow: hidden;
+}
+
+/* 앱 전체 스크롤바 — OS 오버레이 스크롤바처럼 평소에는 조용하고 상호작용 때만 선명해진다. */
+* {
+  scrollbar-color: var(--ui-scrollbar-thumb) var(--ui-scrollbar-track);
+  scrollbar-width: thin;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track,
+*::-webkit-scrollbar-corner {
+  background: var(--ui-scrollbar-track);
+}
+
+*::-webkit-scrollbar-thumb {
+  min-width: 32px;
+  min-height: 32px;
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background: var(--ui-scrollbar-thumb);
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: var(--ui-scrollbar-thumb-hover);
+}
+
+*::-webkit-scrollbar-thumb:active {
+  background-color: var(--ui-scrollbar-thumb-active);
+}
+
+.desktop-titlebar {
+  app-region: no-drag;
+  -webkit-app-region: no-drag;
+  user-select: none;
+}
+
+.desktop-titlebar__drag-area {
+  app-region: no-drag;
+  -webkit-app-region: no-drag;
+  touch-action: none;
+}
+
+.desktop-titlebar__control,
+.desktop-titlebar__controls {
+  app-region: no-drag;
+  -webkit-app-region: no-drag;
+}
+
+.desktop-resize-handle {
+  position: fixed;
+  z-index: 2147483646;
+  app-region: no-drag;
+  -webkit-app-region: no-drag;
+  touch-action: none;
+  user-select: none;
+}
+
+.desktop-resize-handle--north,
+.desktop-resize-handle--south {
+  right: 18px;
+  left: 18px;
+  height: 10px;
+  cursor: ns-resize;
+}
+
+.desktop-resize-handle--east,
+.desktop-resize-handle--west {
+  top: 18px;
+  bottom: 18px;
+  width: 10px;
+  cursor: ew-resize;
+}
+
+.desktop-resize-handle--north { top: 0; }
+.desktop-resize-handle--south { bottom: 0; }
+.desktop-resize-handle--east { right: 0; }
+.desktop-resize-handle--west { left: 0; }
+
+.desktop-resize-handle--north-east,
+.desktop-resize-handle--north-west,
+.desktop-resize-handle--south-east,
+.desktop-resize-handle--south-west {
+  width: 18px;
+  height: 18px;
+}
+
+.desktop-resize-handle--north-east,
+.desktop-resize-handle--south-west {
+  cursor: nesw-resize;
+}
+
+.desktop-resize-handle--north-west,
+.desktop-resize-handle--south-east {
+  cursor: nwse-resize;
+}
+
+.desktop-resize-handle--north-east { top: 0; right: 0; }
+.desktop-resize-handle--north-west { top: 0; left: 0; }
+.desktop-resize-handle--south-east { right: 0; bottom: 0; }
+.desktop-resize-handle--south-west { bottom: 0; left: 0; }
+
+.desktop-tooltip {
+  position: fixed;
+  z-index: 2147483647;
+  width: max-content;
+  max-width: min(320px, calc(100vw - 16px));
+  padding: 5px 8px;
+  border: 1px solid #44475a;
+  border-radius: 5px;
+  background: #1e1f29;
+  box-shadow: 0 4px 14px rgb(0 0 0 / 35%);
+  color: #f8f8f2;
+  font-family: var(--app-ui-font);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.45;
+  overflow-wrap: break-word;
+  pointer-events: none;
+  white-space: pre-wrap;
+  word-break: keep-all;
+}
+
+/* BlockNote 에디터를 노션 톤으로 정리 */
+.bn-container {
+  height: 100%;
+}
+.bn-root,
+.bn-mantine {
+  --bn-font-family: var(--app-ui-font) !important;
+  --mantine-font-family: var(--app-ui-font) !important;
+  --mantine-font-family-headings: var(--app-ui-font) !important;
+}
+.bn-default-styles,
+.bn-editor,
+.bn-editor .ProseMirror,
+.bn-editor .bn-inline-content {
+  font-family: var(--app-ui-font) !important;
+}
+.bn-editor {
+  padding-inline: 0 !important;
+  background: transparent !important;
+}
+
+/* 코드 블록 — 노션풍 라이트 UI */
+.bn-block-content[data-content-type='codeBlock'] {
+  background-color: #f7f6f3 !important;
+  color: #37352f !important;
+  border-radius: 6px;
+}
+.bn-block-content[data-content-type='codeBlock'] > pre {
+  padding: 34px 16px 24px !important;
+  font-family: var(--app-mono-font) !important;
+  font-size: 12.5px;
+  line-height: 1.7;
+  font-variant-ligatures: none;
+  tab-size: 4;
+}
+.bn-block-content[data-content-type='codeBlock'] > div > select {
+  color: #787774 !important;
+  font-size: 12px !important;
+  top: 10px !important;
+  left: 12px !important;
+  transition: opacity 0.15s !important;
+}
+.bn-block-content[data-content-type='codeBlock']:hover > div > select,
+.bn-block-content[data-content-type='codeBlock'] > div > select:focus {
+  opacity: 1 !important;
+}
+/* shiki 하이라이팅이 없는 일반 텍스트도 어두운 글자색 유지 */
+.bn-block-content[data-content-type='codeBlock'] code {
+  color: #37352f;
+}
+
+/* 인라인 코드 — 노션 스타일 (붉은 텍스트 + 옅은 배경 칩) */
+.bn-inline-content code {
+  font-family: var(--app-mono-font) !important;
+  font-size: 85%;
+  color: #eb5757;
+  background: rgba(135, 131, 120, 0.15);
+  border-radius: 3px;
+  padding: 0.1em 0.35em;
+}
+
+/* 얇은 스크롤바 — 탭 바, 사이드바 등 좁은 UI 에 사용 */
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--ui-scrollbar-thumb) transparent;
+}
+.scrollbar-thin::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: var(--ui-scrollbar-thumb);
+  background-clip: padding-box;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background-color: var(--ui-scrollbar-thumb-hover);
+}
+.scrollbar-thin::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* 스크롤바 완전 숨김 (스크롤은 됨) */
+.scrollbar-none {
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+/* 문서 탭 전용 스와이프바 — 전체 스크롤바 토큰을 공유하되 8px 안에 더 조밀하게 표시한다. */
+.tab-swipebar {
+  touch-action: none;
+}
+
+.tab-swipebar::before {
+  position: absolute;
+  inset: auto 0 0;
+  height: 2px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ui-scrollbar-thumb) 22%, transparent);
+  content: '';
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.tab-swipebar:hover::before,
+.tab-swipebar:focus-visible::before,
+.tab-swipebar:active::before {
+  opacity: 1;
+}
+
+.tab-swipebar__thumb {
+  background: var(--ui-scrollbar-thumb);
+  transition: left 75ms linear, width 75ms linear, height 120ms ease, background-color 120ms ease;
+}
+
+.tab-swipebar:hover .tab-swipebar__thumb,
+.tab-swipebar:focus-visible .tab-swipebar__thumb {
+  height: 4px;
+  background: var(--ui-scrollbar-thumb-hover);
+}
+
+.tab-swipebar:active .tab-swipebar__thumb {
+  height: 4px;
+  background: var(--ui-scrollbar-thumb-active);
+}
+
+/* ─── 벼리 채팅 말풍선 안 Markdown (.chat-md) ───
+   색은 말풍선에서 상속(테마 대응), 배경·경계는 반투명 회색이라 라이트/다크 공용 */
+.chat-md { line-height: 1.55; }
+.chat-md > *:first-child { margin-top: 0; }
+.chat-md > *:last-child { margin-bottom: 0; }
+.chat-md p { margin: 0.4em 0; white-space: pre-wrap; }
+.chat-md h1, .chat-md h2, .chat-md h3, .chat-md h4, .chat-md h5, .chat-md h6 {
+  margin: 0.7em 0 0.35em; font-weight: 600; line-height: 1.3;
+}
+.chat-md h1 { font-size: 1.25em; }
+.chat-md h2 { font-size: 1.15em; }
+.chat-md h3 { font-size: 1.05em; }
+.chat-md h4, .chat-md h5, .chat-md h6 { font-size: 1em; }
+.chat-md ul, .chat-md ol { margin: 0.35em 0; padding-left: 1.4em; }
+.chat-md ul { list-style: disc; }
+.chat-md ol { list-style: decimal; }
+.chat-md li { margin: 0.15em 0; }
+.chat-md li > ul, .chat-md li > ol { margin: 0.1em 0; }
+.chat-md li > p { margin: 0; }
+.chat-md input[type='checkbox'] { margin-right: 0.35em; vertical-align: -1px; }
+.chat-md code {
+  font-family: var(--app-mono-font);
+  font-size: 0.88em; background: rgba(128, 128, 128, 0.14);
+  border-radius: 4px; padding: 0.1em 0.35em;
+}
+.chat-md pre {
+  margin: 0.5em 0; padding: 0.6em 0.75em;
+  background: rgba(128, 128, 128, 0.12); border-radius: 8px; overflow-x: auto;
+}
+.chat-md pre code { background: none; padding: 0; font-size: 0.85em; white-space: pre; }
+.chat-md blockquote {
+  margin: 0.5em 0; padding: 0.1em 0 0.1em 0.75em;
+  border-left: 3px solid rgba(128, 128, 128, 0.35); opacity: 0.92;
+}
+.chat-md table { margin: 0.5em 0; border-collapse: collapse; font-size: 0.95em; display: block; max-width: 100%; overflow-x: auto; }
+.chat-md th, .chat-md td { border: 1px solid rgba(128, 128, 128, 0.3); padding: 0.25em 0.6em; text-align: left; }
+.chat-md th { background: rgba(128, 128, 128, 0.1); font-weight: 600; }
+.chat-md a { text-decoration: underline; text-underline-offset: 2px; }
+.chat-md hr { margin: 0.7em 0; border: none; border-top: 1px solid rgba(128, 128, 128, 0.3); }
+.chat-md strong { font-weight: 600; }
+.chat-mermaid details { position: relative; }
+.chat-mermaid {
+  --chat-mermaid-bg: #ffffff;
+  --chat-mermaid-header-bg: #faf9f7;
+  --chat-mermaid-border: #dcd9d2;
+  --chat-mermaid-text: #37352f;
+  --chat-mermaid-muted: #6f6d68;
+  --chat-mermaid-accent: #7a5eb0;
+  --chat-mermaid-source-bg: #2c2b29;
+  --chat-mermaid-source-text: #f7f7f5;
+  background: var(--chat-mermaid-bg);
+  border-color: var(--chat-mermaid-border);
+  color: var(--chat-mermaid-text);
+}
+.chat-mermaid-header {
+  background: var(--chat-mermaid-header-bg);
+  border-color: var(--chat-mermaid-border);
+  color: var(--chat-mermaid-muted);
+}
+.chat-mermaid summary { list-style: none; }
+.chat-mermaid summary::-webkit-details-marker { display: none; }
+.chat-mermaid-source-toggle { color: var(--chat-mermaid-accent); }
+.chat-mermaid-source-toggle:hover { filter: brightness(0.82); }
+.chat-mermaid svg { max-width: none; height: auto; }
+.mermaid-preview svg,
+.mermaid-preview svg text,
+.mermaid-preview svg tspan,
+.mermaid-preview svg .label,
+.mermaid-preview svg foreignObject,
+.mermaid-preview svg foreignObject * {
+  font-family: var(--app-ui-font) !important;
+}
+.xterm .xterm-accessibility-tree,
+.xterm-char-measure-element {
+  font-family: var(--app-mono-font) !important;
+}
+.chat-mermaid-source {
+  white-space: pre;
+  background: var(--chat-mermaid-source-bg);
+  border-color: var(--chat-mermaid-border);
+  color: var(--chat-mermaid-source-text);
+}
+
+/* Mermaid SVG는 자체 색상을 사용하므로 채팅 카드와 함께 명시적으로 팔레트를 맞춘다. */
+[data-theme='nord'] .chat-mermaid {
+  --chat-mermaid-bg: #2e3440;
+  --chat-mermaid-header-bg: #3b4252;
+  --chat-mermaid-border: #4c566a;
+  --chat-mermaid-text: #eceff4;
+  --chat-mermaid-muted: #d8dee9;
+  --chat-mermaid-accent: #88c0d0;
+  --chat-mermaid-source-bg: #242933;
+  --chat-mermaid-source-text: #eceff4;
+}
+[data-theme='dracula'] .chat-mermaid {
+  --chat-mermaid-bg: #282a36;
+  --chat-mermaid-header-bg: #343746;
+  --chat-mermaid-border: #575b70;
+  --chat-mermaid-text: #f8f8f2;
+  --chat-mermaid-muted: #d7d7cf;
+  --chat-mermaid-accent: #bd93f9;
+  --chat-mermaid-source-bg: #1f2029;
+  --chat-mermaid-source-text: #f8f8f2;
+}
+[data-theme='rosepine'] .chat-mermaid {
+  --chat-mermaid-bg: #191724;
+  --chat-mermaid-header-bg: #26233a;
+  --chat-mermaid-border: #524f67;
+  --chat-mermaid-text: #e0def4;
+  --chat-mermaid-muted: #c4bcd3;
+  --chat-mermaid-accent: #ebbcba;
+  --chat-mermaid-source-bg: #15131e;
+  --chat-mermaid-source-text: #e0def4;
+}

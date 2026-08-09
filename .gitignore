@@ -1,0 +1,70 @@
+# ── 개인 워크스페이스 ──
+# 사용자 문서, 첨부 파일, 태스크/세션, 검색 인덱스가 모두 이 경계 안에 저장된다.
+# README, backend/app/system_manual, skillbook같은 앱 자체 문서는 소스의 일부로 계속 추적한다.
+/notes/
+/.trash/
+AGENTS.md
+
+# 스킬북에서 사용자가 만든 업무 스킬은 개인 데이터로 남긴다.
+# 앱이 기본 제공하는 내장 스킬만 초기 상태로 추적한다.
+/skillbook/skills/*
+!/skillbook/skills/create-system-skill/
+!/skillbook/skills/create-system-skill/**
+!/skillbook/skills/write-project-wiki/
+!/skillbook/skills/write-project-wiki/**
+/skillbook/.trash/
+
+# 앱 구동·사용에 필수가 아닌 로컬 기획/진행 문서(파일은 삭제하지 않는다)
+/PROJECT_STATUS.md
+/REQUIREMENTS.md
+/TODO.md
+/frontend/README.md
+
+# 사용자가 저장소 루트를 워크스페이스로 열었을 때 생성될 수 있는 로컬 상태
+.workspace.json
+.index.db
+.index.db-shm
+.index.db-wal
+
+# ── 로컬 에이전트/에디터 설정 ──
+/.agents/
+/.claude/
+/.codex/
+/.idea/
+/.vscode/
+
+# ── 환경 변수와 비밀값 ──
+.env
+.env.*
+!.env.example
+
+# ── Frontend 생성물 ──
+/frontend/node_modules/
+/frontend/dist/
+/frontend/coverage/
+/frontend/release/
+
+# ── Backend 생성물 ──
+/backend/.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# ── 로컬 런타임/임시 파일 ──
+*.log
+*.pid
+*.tmp
+*.bak
+*~
+
+# ── OS ──
+.DS_Store
+._*
+.AppleDouble
+Thumbs.db
+Desktop.ini
+*:Zone.Identifier

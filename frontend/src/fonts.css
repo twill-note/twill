@@ -1,0 +1,8 @@
+/* Electron/WSLg에도 한글 UI가 안정적으로 보이도록 앱 글꼴을 직접 제공한다. */
+@font-face {
+  font-family: 'Noto Sans KR';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url('../node_modules/@fontsource/noto-sans-kr/files/noto-sans-kr-korean-400-normal.woff2') format('woff2');
+}

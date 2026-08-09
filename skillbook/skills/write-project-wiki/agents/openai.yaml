@@ -1,0 +1,4 @@
+interface:
+  display_name: "프로젝트 위키 작성"
+  short_description: "코드 근거로 프로젝트 위키를 작성하고 검증합니다"
+  default_prompt: "$write-project-wiki를 사용해 이 프로젝트의 대상 기능과 데이터 흐름을 분석하고 위키 문서를 작성해줘."

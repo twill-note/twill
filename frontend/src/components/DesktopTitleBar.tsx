@@ -1,0 +1,120 @@
+import { useEffect, useRef, useState } from 'react'
+import DesktopResizeHandles from './DesktopResizeHandles'
+
+export default function DesktopTitleBar({ title = 'Twill' }: { title?: string }) {
+  const desktop = window.noteDesktop
+  const isMac = desktop?.platform === 'darwin'
+  const [maximized, setMaximized] = useState(false)
+  const dragPointerRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    if (!desktop) return
+    desktop.windowControls.isMaximized().then(setMaximized).catch(() => {})
+    return desktop.windowControls.onMaximizedChange(setMaximized)
+  }, [desktop])
+
+  useEffect(() => () => {
+    desktop?.windowControls.endMove()
+  }, [desktop])
+
+  if (!desktop) return null
+
+  return (
+    <>
+      <DesktopResizeHandles disabled={maximized || isMac} />
+      <header
+        className={`desktop-titlebar flex h-9 shrink-0 items-center border-b border-[#e9e9e7] bg-[#f7f7f5] text-[#5f5e5b] ${
+          isMac ? 'desktop-titlebar--mac' : ''
+        }`}
+      >
+        {isMac && <div className="h-full w-[78px] shrink-0" aria-hidden="true" />}
+        <div
+          className={`desktop-titlebar__drag-area flex min-w-0 flex-1 items-center justify-center text-[12px] font-medium ${
+            isMac ? '' : 'pl-36'
+          }`}
+          onPointerDown={(event) => {
+            if (event.button !== 0 || dragPointerRef.current !== null) return
+            dragPointerRef.current = event.pointerId
+            event.currentTarget.setPointerCapture(event.pointerId)
+            desktop.windowControls.beginMove()
+          }}
+          onPointerUp={(event) => {
+            if (dragPointerRef.current !== event.pointerId) return
+            dragPointerRef.current = null
+            if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+              event.currentTarget.releasePointerCapture(event.pointerId)
+            }
+            desktop.windowControls.endMove()
+          }}
+          onPointerCancel={() => {
+            dragPointerRef.current = null
+            desktop.windowControls.endMove()
+          }}
+          onLostPointerCapture={() => {
+            dragPointerRef.current = null
+            desktop.windowControls.endMove()
+          }}
+          onDoubleClick={() => {
+            dragPointerRef.current = null
+            desktop.windowControls.endMove()
+            void desktop.windowControls.toggleMaximize()
+          }}
+        >
+          <div className="desktop-titlebar__title flex min-w-0 items-center gap-1.5">
+            <svg viewBox="0 0 18 18" className="h-4 w-4 text-[#7c5ce5]" aria-hidden="true">
+              <path d="M4.25 2.75h7.2l2.3 2.35v10.15H4.25z" fill="none" stroke="currentColor" strokeWidth="1.35" strokeLinejoin="round" />
+              <path d="M11.3 2.9v2.45h2.25M6.5 8h5M6.5 10.5h5M6.5 13h3.5" fill="none" stroke="currentColor" strokeWidth="1.15" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <span className="truncate">{title}</span>
+          </div>
+        </div>
+
+        {isMac && <div className="h-full w-[78px] shrink-0" aria-hidden="true" />}
+        {!isMac && <div className="desktop-titlebar__controls flex h-full shrink-0">
+          <button
+            type="button"
+            className="desktop-titlebar__control flex h-full w-12 items-center justify-center hover:bg-[#ececea]"
+            title="최소화"
+            aria-label="창 최소화"
+            onDoubleClick={(event) => event.stopPropagation()}
+            onClick={() => void desktop.windowControls.minimize()}
+          >
+            <svg viewBox="0 0 12 12" className="h-3 w-3" aria-hidden="true">
+              <path d="M2 8.5h8" stroke="currentColor" strokeWidth="1" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            className="desktop-titlebar__control flex h-full w-12 items-center justify-center hover:bg-[#ececea]"
+            title={maximized ? '이전 크기로 복원' : '최대화'}
+            aria-label={maximized ? '창 이전 크기로 복원' : '창 최대화'}
+            onDoubleClick={(event) => event.stopPropagation()}
+            onClick={() => void desktop.windowControls.toggleMaximize()}
+          >
+            {maximized ? (
+              <svg viewBox="0 0 12 12" className="h-3 w-3" aria-hidden="true">
+                <path d="M4 3h5v5M3 4h5v5H3z" fill="none" stroke="currentColor" strokeWidth="1" />
+              </svg>
+            ) : (
+              <svg viewBox="0 0 12 12" className="h-3 w-3" aria-hidden="true">
+                <rect x="2.5" y="2.5" width="7" height="7" fill="none" stroke="currentColor" strokeWidth="1" />
+              </svg>
+            )}
+          </button>
+          <button
+            type="button"
+            className="desktop-titlebar__control flex h-full w-12 items-center justify-center hover:bg-[#c42b1c] hover:text-white"
+            title="닫기"
+            aria-label="창 닫기"
+            onDoubleClick={(event) => event.stopPropagation()}
+            onClick={() => void desktop.windowControls.close()}
+          >
+            <svg viewBox="0 0 12 12" className="h-3 w-3" aria-hidden="true">
+              <path d="m3 3 6 6m0-6L3 9" fill="none" stroke="currentColor" strokeWidth="1" />
+            </svg>
+          </button>
+        </div>}
+      </header>
+    </>
+  )
+}

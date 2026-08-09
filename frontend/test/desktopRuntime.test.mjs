@@ -22,6 +22,19 @@ import {
   readLocalStorageSnapshot,
   writeLocalStorageSnapshot,
 } from '../electron/local-storage.mjs'
+import { npmRunCommand } from '../scripts/npm-command.mjs'
+
+test('Windows npm 스크립트는 cmd.exe를 통해 실행한다', () => {
+  assert.deepEqual(npmRunCommand('build', 'win32', { ComSpec: 'C:\\Windows\\System32\\cmd.exe' }), {
+    command: 'C:\\Windows\\System32\\cmd.exe',
+    args: ['/d', '/s', '/c', 'npm.cmd run build'],
+  })
+  assert.deepEqual(npmRunCommand('build', 'linux', {}), {
+    command: 'npm',
+    args: ['run', 'build'],
+  })
+  assert.throws(() => npmRunCommand('build & whoami', 'win32', {}), TypeError)
+})
 
 test('데스크톱 개발 URL은 백엔드를 중복 실행하지 않는다', () => {
   const options = parseDesktopOptions(['--url=http://127.0.0.1:5173', '--no-backend'], {})

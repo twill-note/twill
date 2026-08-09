@@ -3,6 +3,8 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import { npmRunCommand } from './npm-command.mjs'
+
 const frontendRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const outputs = [path.join(frontendRoot, 'dist', 'index.html'), path.join(frontendRoot, 'dist', 'quick-memo.html')]
 const inputs = [
@@ -38,8 +40,8 @@ if (outputsExist && oldestOutput >= newestInput) {
 }
 
 console.log('[desktop] 변경된 프런트엔드를 빌드합니다.')
-const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm'
-const result = spawnSync(npmCommand, ['run', 'build'], {
+const build = npmRunCommand('build')
+const result = spawnSync(build.command, build.args, {
   cwd: frontendRoot,
   stdio: 'inherit',
   windowsHide: true,

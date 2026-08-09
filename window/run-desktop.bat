@@ -2,8 +2,11 @@
 rem Windows Electron launcher. Electron owns the backend process lifetime.
 setlocal EnableExtensions
 
-pushd "%~dp0" || exit /b 1
-call "%CD%\setup.bat"
+rem This launcher lives in window\. Always run setup and Electron from the
+rem project root so relative backend/frontend paths remain valid.
+for %%I in ("%~dp0..") do set "ROOT_DIR=%%~fI"
+pushd "%ROOT_DIR%" || exit /b 1
+call "%ROOT_DIR%\window\setup.bat"
 if errorlevel 1 (
     popd
     exit /b 1

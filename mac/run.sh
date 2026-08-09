@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# Linux용 노트 앱 실행: backend(8000) + frontend(5173) 동시 구동
+# macOS/Linux용 노트 앱 실행: backend(8000) + frontend(5173) 동시 구동
 set -Eeuo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$ROOT_DIR"
 
 HOST="${NOTE_APP_HOST:-127.0.0.1}"
@@ -10,7 +11,7 @@ BACKEND_PORT="${NOTE_APP_BACKEND_PORT:-8000}"
 FRONTEND_PORT="${NOTE_APP_FRONTEND_PORT:-5173}"
 VENV_PYTHON="$ROOT_DIR/backend/.venv/bin/python"
 
-"$ROOT_DIR/setup.sh"
+"$ROOT_DIR/mac/setup.sh"
 
 BACKEND_PID=""
 FRONTEND_PID=""

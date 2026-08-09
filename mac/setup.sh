@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# Linux용 개발 환경 준비: Python venv와 Node 의존성을 현재 플랫폼에 맞게 설치합니다.
+# macOS/Linux용 개발 환경 준비: Python venv와 Node 의존성을 현재 플랫폼에 맞게 설치합니다.
 set -Eeuo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$ROOT_DIR"
 
 PYTHON_BIN="${PYTHON_BIN:-python3}"

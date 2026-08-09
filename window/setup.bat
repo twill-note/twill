@@ -2,7 +2,10 @@
 rem Windows development environment setup: Python venv and Node dependencies.
 setlocal EnableExtensions
 
-pushd "%~dp0" || exit /b 1
+rem This script lives in window\. Resolve the project root instead of assuming
+rem that the script itself is in the root directory.
+for %%I in ("%~dp0..") do set "ROOT_DIR=%%~fI"
+pushd "%ROOT_DIR%" || exit /b 1
 
 where py >nul 2>nul
 if not errorlevel 1 (

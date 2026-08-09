@@ -11,7 +11,7 @@ export default function SpellcheckToggleButton({ enabled, onToggle }: Props) {
       className={`rounded px-1.5 py-0.5 text-[13px] hover:bg-[#f1f1ef] ${
         enabled ? 'text-[#37352f]' : 'text-[#c8c7c4] line-through'
       }`}
-      title={`맞춤법 검사 (오탈자 빨간 줄) ${enabled ? '끄기' : '켜기'}`}
+      title="맞춤법 검사"
       aria-label={`맞춤법 검사 ${enabled ? '끄기' : '켜기'}`}
       aria-pressed={enabled}
       onClick={onToggle}

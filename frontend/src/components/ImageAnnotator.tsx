@@ -253,7 +253,7 @@ export default function ImageAnnotator({ imageUrl, onSave, onClose }: Props) {
             }`}
             onClick={save}
             disabled={saving || !img}
-            title="⌘S / Ctrl+S"
+            title="저장"
           >
             {saving ? '저장 중…' : '저장 (⌘S)'}
           </button>
@@ -386,7 +386,7 @@ export default function ImageAnnotator({ imageUrl, onSave, onClose }: Props) {
                   className="rounded border border-[#e3e2e0] px-2 py-1 text-[12px] text-[#5f5e5b] hover:bg-[#f1f1ef] disabled:opacity-40"
                   onClick={undo}
                   disabled={items.length === 0}
-                  title="⌘Z / Ctrl+Z"
+                  title="되돌리기"
                 >
                   ↶ 실행 취소 ({items.length})
                 </button>

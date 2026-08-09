@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { dialog } from '../dialog'
 import { dbApi } from '../dbschema'
-import { displayCombo, useShortcutStore } from '../shortcuts'
 import { useAppStore, activeTabId, type DocTab } from '../store'
 import { isRepeatedClick } from '../useBackdropDismiss'
 
@@ -29,7 +28,6 @@ export default function TabBar() {
   const closeTab = useAppStore((s) => s.closeTab)
   const closeBoardView = useAppStore((s) => s.closeBoardView)
   const reorderTabs = useAppStore((s) => s.reorderTabs)
-  const bindings = useShortcutStore((s) => s.bindings)
   const [dragOverId, setDragOverId] = useState<string | null>(null)
   const [pinMenu, setPinMenu] = useState<{ x: number; y: number; path: string } | null>(null)
 
@@ -56,7 +54,7 @@ export default function TabBar() {
         onClick={(event) => {
           if (!isRepeatedClick(event)) void toggleBoard('tasks', taskBoardActive)
         }}
-        title={`태스크 보드 ${taskBoardActive ? '닫기' : '열기'} (${displayCombo(bindings.taskBoard)})`}
+        title="태스크 보드"
       >
         📋
       </button>
@@ -67,14 +65,14 @@ export default function TabBar() {
         onClick={(event) => {
           if (!isRepeatedClick(event)) void toggleBoard('scopes', scopesActive)
         }}
-        title={`프로젝트 관리 ${scopesActive ? '닫기' : '열기'} (${displayCombo(bindings.scopes)}) — 코드베이스 경로 관리`}
+        title="프로젝트 관리"
       >
         🌐
       </button>
       <button
         className="flex h-full shrink-0 items-center border-r border-[#e9e9e7] px-2.5 text-[14px] text-[#7d7c78] hover:bg-[#ececea] hover:text-[#37352f]"
         onClick={() => openToday().catch((e) => dialog.alert((e as Error).message))}
-        title={`오늘의 노트 (${displayCombo(bindings.todayNote)}) — 없으면 생성`}
+        title="오늘의 노트"
       >
         ☀️
       </button>
@@ -87,7 +85,7 @@ export default function TabBar() {
           if (view === 'calendar') closeBoardView()
           else setView('calendar')
         }}
-        title={`캘린더 ${view === 'calendar' ? '닫기' : '열기'} (${displayCombo(bindings.calendar)})`}
+        title="캘린더"
       >
         📅
       </button>
@@ -100,7 +98,7 @@ export default function TabBar() {
           if (view === 'todos') closeBoardView()
           else setView('todos')
         }}
-        title={`할 일 ${view === 'todos' ? '닫기' : '열기'} (${displayCombo(bindings.todos)})`}
+        title="할 일"
       >
         ✅
       </button>
@@ -113,12 +111,12 @@ export default function TabBar() {
           if (view === 'skillbook') closeBoardView()
           else setView('skillbook')
         }}
-        title={`스킬북 ${view === 'skillbook' ? '닫기' : '열기'}`}
+        title="스킬북"
       >
         📚
       </button>
       {/* 📌 고정된 노트 — 자주 쓰는 노트 바로가기 (우클릭: 고정 해제, Alt+1~9) */}
-      {pinnedNotes.map((path, i) => {
+      {pinnedNotes.map((path) => {
         const active = view === 'editor' && currentPath === path
         return (
           <button
@@ -131,7 +129,7 @@ export default function TabBar() {
               e.preventDefault()
               setPinMenu({ x: e.clientX, y: e.clientY, path })
             }}
-            title={`${path}${i < 9 ? ` (Alt+${i + 1})` : ''} — 우클릭: 고정 해제`}
+            title={path}
           >
             <span className="text-[10px]">📌</span>
             <span className="truncate">{noteLabel(path)}</span>

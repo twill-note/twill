@@ -75,7 +75,7 @@ export default function Sidebar() {
       <div
         className="absolute inset-y-0 right-0 z-10 w-1 cursor-col-resize hover:bg-[#4a9eff]/60"
         onPointerDown={onResizeStart}
-        title="드래그로 폭 조절"
+        title="패널 너비 조절"
       />
       <div className="flex items-center justify-between px-3 pt-3 pb-1">
         <h1 className="truncate text-[14px] font-semibold text-[#37352f]" title={root ?? undefined}>
@@ -84,7 +84,7 @@ export default function Sidebar() {
         <div className="flex shrink-0 gap-0.5">
           <button
             className="rounded px-1.5 py-0.5 text-[12px] text-[#9b9a97] hover:bg-[#efefed]"
-            title="폴더 열기 (노트 루트 변경)"
+            title="폴더 열기"
             onClick={() => setPickerOpen(true)}
           >
             📂
@@ -92,7 +92,7 @@ export default function Sidebar() {
           {/* 이모지 아이콘으로 통일 (⟳·⚙ 텍스트 글리프는 다른 버튼과 스타일이 달라 이질감) */}
           <button
             className="rounded px-1.5 py-0.5 text-[12px] text-[#9b9a97] hover:bg-[#efefed]"
-            title="재색인"
+            title="새로고침"
             onClick={handleReindex}
             disabled={reindexing}
           >
@@ -100,7 +100,7 @@ export default function Sidebar() {
           </button>
           <button
             className="rounded px-1.5 py-0.5 text-[12px] text-[#9b9a97] hover:bg-[#efefed]"
-            title="설정 (테마 · 파일 탐색기 · 단축키 · AI)"
+            title="설정"
             onClick={() => setSettingsOpen(true)}
             data-testid="workspace-settings-button"
           >
@@ -157,7 +157,7 @@ export default function Sidebar() {
             className="flex w-full items-center gap-1 text-left text-[11px] font-medium tracking-wide text-[#9b9a97] hover:text-[#5f5e5b]"
             onClick={toggleTags}
             aria-expanded={!tagsCollapsed}
-            title={tagsCollapsed ? '태그 펼치기' : '태그 접기'}
+            title="태그"
           >
             <span aria-hidden="true">{tagsCollapsed ? '▸' : '▾'}</span>
             태그

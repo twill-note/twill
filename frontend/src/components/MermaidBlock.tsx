@@ -158,7 +158,7 @@ function MermaidZoomDialog({ source, onClose }: { source: string; onClose: () =>
             className="rounded px-2 py-1 text-[14px] text-[#5f5e5b] hover:bg-[#ececea]"
             onClick={() => setZoom((value) => Math.max(0.5, value - 0.25))}
             disabled={zoom <= 0.5}
-            title="축소 (Ctrl/Cmd+-)"
+            title="축소"
           >
             −
           </button>
@@ -166,7 +166,7 @@ function MermaidZoomDialog({ source, onClose }: { source: string; onClose: () =>
             type="button"
             className="min-w-14 rounded px-2 py-1 text-[11px] tabular-nums text-[#5f5e5b] hover:bg-[#ececea]"
             onClick={() => setZoom(1)}
-            title="100%로 초기화"
+            title="크기 초기화"
           >
             {Math.round(zoom * 100)}%
           </button>
@@ -175,7 +175,7 @@ function MermaidZoomDialog({ source, onClose }: { source: string; onClose: () =>
             className="rounded px-2 py-1 text-[14px] text-[#5f5e5b] hover:bg-[#ececea]"
             onClick={() => setZoom((value) => Math.min(2.5, value + 0.25))}
             disabled={zoom >= 2.5}
-            title="확대 (Ctrl/Cmd++)"
+            title="확대"
           >
             +
           </button>
@@ -185,7 +185,7 @@ function MermaidZoomDialog({ source, onClose }: { source: string; onClose: () =>
             className="flex h-7 w-7 items-center justify-center rounded text-[18px] text-[#787774] hover:bg-[#ececea] hover:text-[#37352f]"
             onClick={onClose}
             aria-label="확대 보기 닫기"
-            title="닫기 (Esc)"
+            title="닫기"
           >
             ×
           </button>

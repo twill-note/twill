@@ -736,7 +736,7 @@ export default function ErdDesigner({
             type="button"
             className="rounded-md border border-amber-300 bg-amber-50 px-2 py-1 text-[11px] font-medium text-amber-700 hover:bg-amber-100"
             onClick={() => void refreshFromDisk()}
-            title="외부에서 변경된 파일을 다시 불러옵니다"
+            title="다시 불러오기"
           >
             외부 변경됨
           </button>
@@ -748,7 +748,7 @@ export default function ErdDesigner({
           className="grid h-8 w-8 place-items-center rounded-md border border-[#e3e2e0] text-[#5f5e5b] hover:bg-[#f1f1ef] disabled:cursor-not-allowed disabled:text-[#c9c8c4]"
           onClick={() => void refreshFromDisk()}
           disabled={!savedPath || refreshing}
-          title={savedPath ? '파일에서 다시 불러오기' : '저장한 뒤 다시 불러올 수 있습니다'}
+          title="다시 불러오기"
           aria-label="ERD 새로고침"
         >
           <RefreshIcon spinning={refreshing} />
@@ -765,7 +765,7 @@ export default function ErdDesigner({
           }`}
           onClick={() => { void save('manual') }}
           disabled={saving || (!dirty && !pathEditing && !!savedPath)}
-          title={`저장 (${displayCombo('Mod+KeyS')})`}
+          title="저장"
         >
           {saving ? '저장 중…' : `저장 (${displayCombo('Mod+KeyS')})`}
         </button>
@@ -931,14 +931,14 @@ export default function ErdDesigner({
               <button
                 className="rounded px-2 py-1 text-[#5f5e5b] hover:bg-[#f1f1ef]"
                 onClick={() => setDdlImportOpen(true)}
-                title="SQL DDL의 테이블과 관계를 현재 설계에 추가"
+                title="SQL DDL 가져오기"
               >
                 📥 DDL 가져오기
               </button>
               <button
                 className="rounded px-2 py-1 text-[#5f5e5b] hover:bg-[#f1f1ef]"
                 onClick={() => setSqlOpen(true)}
-                title="현재 테이블과 관계를 SQL DDL로 한 번에 내보내기"
+                title="SQL DDL 내보내기"
               >
                 📤 DDL 내보내기
               </button>

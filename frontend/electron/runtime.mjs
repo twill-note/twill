@@ -37,6 +37,13 @@ export function parseDesktopOptions(argv, env = process.env) {
   }
 }
 
+export function backendPortCandidates(preferred, count = 20) {
+  const first = Number.isInteger(preferred) && preferred > 0 && preferred <= 65535 ? preferred : 8000
+  const limit = Math.max(1, Math.min(Number.isInteger(count) ? count : 20, 100))
+  return Array.from({ length: limit }, (_, index) => first + index)
+    .filter((port) => port <= 65535)
+}
+
 export function isSafeExternalUrl(raw) {
   try {
     return ['http:', 'https:', 'mailto:'].includes(new URL(raw).protocol)

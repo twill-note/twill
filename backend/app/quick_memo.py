@@ -257,7 +257,12 @@ def _write_temp(path: Path, contents: str, source: _FileSnapshot) -> Path:
     fd, tmp_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
     try:
         if source.mode is not None:
-            os.fchmod(fd, source.mode)
+            if hasattr(os, "fchmod"):
+                os.fchmod(fd, source.mode)
+            else:
+                # Windows does not expose fchmod; chmod on the named temp file
+                # preserves the source permissions before the atomic replace.
+                os.chmod(tmp_name, source.mode)
         with os.fdopen(fd, "wb") as tmp:
             fd = -1
             tmp.write(contents.encode("utf-8"))

@@ -115,7 +115,7 @@ def _create_scope_for_section(name: str) -> str:
     post = frontmatter.Post("", project="", label=name, path="")
     p.write_text(frontmatter.dumps(post) + "\n", encoding="utf-8")
     try:
-        indexer.index_file(str(p.relative_to(root)))
+        indexer.index_file(p.relative_to(root).as_posix())
     except Exception:  # noqa: BLE001
         pass
     return p.stem
@@ -335,7 +335,7 @@ def _read_scopes_db(dir_rel: str = "scopes") -> list[dict]:
                 "label": str(props.get("label") or p.stem),
                 "path": str(path_obj),
                 "project": str(props.get("project") or ""),
-                "note_path": str(p.relative_to(root)),
+                "note_path": p.relative_to(root).as_posix(),
             }
         )
     return out
@@ -629,7 +629,7 @@ def _scope_deletion_inspection(scope_id: str) -> dict[str, Any]:
     blockers: dict[str, dict[str, str]] = {}
     for path, post in task_cards:
         if str(post.get("status") or "") == "running":
-            rel = str(path.relative_to(root))
+            rel = path.relative_to(root).as_posix()
             blockers[rel] = {
                 "path": rel,
                 "title": str(post.get("title") or path.stem),
@@ -885,19 +885,19 @@ def delete_scope(scope_id: str):
         # 검색 인덱스 갱신 실패는 원본 데이터 트랜잭션을 되돌릴 이유가 없다. watcher가 뒤에서
         # 다시 동기화하므로 best-effort로 처리한다.
         try:
-            indexer.remove(str(row_path.relative_to(root)))
+            indexer.remove(row_path.relative_to(root).as_posix())
         except Exception:  # noqa: BLE001
             pass
         for path, _post in inspection["task_cards"]:
             try:
-                indexer.index_file(str(path.relative_to(root)))
+                indexer.index_file(path.relative_to(root).as_posix())
             except Exception:  # noqa: BLE001
                 pass
 
         return {
             "scope_id": inspection["scope_id"],
             "label": inspection["label"],
-            "trashed_to": str(trash_path.relative_to(root)),
+            "trashed_to": trash_path.relative_to(root).as_posix(),
             "sections_removed": preview["section_count"],
             "task_scopes_released": preview["task_count"],
             "sessions_released": session_count,

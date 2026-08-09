@@ -38,7 +38,7 @@ def _relevant(root: Path, raw: str) -> str | None:
         return None
     if any(part.startswith(".") or part in config.EXCLUDED_DIRS for part in rel.parts):
         return None
-    return str(rel)
+    return rel.as_posix()
 
 
 def _apply_to_index(change: Change, rel: str, root: Path) -> None:

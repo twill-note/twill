@@ -5,6 +5,7 @@ import test from 'node:test'
 import path from 'node:path'
 
 import {
+  backendPortCandidates,
   backendPythonCandidates,
   desktopWindowChromeOptions,
   isSafeExternalUrl,
@@ -56,6 +57,11 @@ test('백엔드 포트 환경변수를 반영한다', () => {
   assert.equal(options.backendPort, 18000)
 })
 
+test('기본 포트가 점유되면 이어지는 로컬 포트를 후보로 사용한다', () => {
+  assert.deepEqual(backendPortCandidates(8000, 4), [8000, 8001, 8002, 8003])
+  assert.deepEqual(backendPortCandidates(65534, 4), [65534, 65535])
+})
+
 test('Electron 설정 스냅샷은 문자열 localStorage 값만 안전하게 보존한다', () => {
   const normalized = normalizeLocalStorageSnapshot({
     'app-theme': 'nord',
@@ -80,7 +86,11 @@ test('Electron 설정 스냅샷을 버전 문서로 저장하고 다시 읽는�
       'app-theme': 'nord',
       'editor-width': 'wide',
     })
-    assert.equal(fs.statSync(filePath).mode & 0o777, 0o600)
+    // Windows does not expose POSIX mode bits and reports the file as 0666
+    // even though the snapshot remains inside the per-user app-data folder.
+    if (process.platform !== 'win32') {
+      assert.equal(fs.statSync(filePath).mode & 0o777, 0o600)
+    }
   } finally {
     fs.rmSync(directory, { recursive: true, force: true })
   }

@@ -133,6 +133,9 @@ def full_scan() -> int:
     db.clear_all()
     count = 0
     for p in iter_note_files():
-        index_file(str(p.relative_to(notes_dir())))
+        # Database paths are workspace-relative URL-style paths.  Using str()
+        # here stored backslashes on Windows, so queries such as `tasks/%`
+        # could not find task-board cards after a full scan.
+        index_file(p.relative_to(notes_dir()).as_posix())
         count += 1
     return count

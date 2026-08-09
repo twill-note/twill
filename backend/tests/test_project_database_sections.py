@@ -22,13 +22,17 @@ class ProjectSectionTests(unittest.TestCase):
         self.temp_dir.cleanup()
 
     def test_new_section_creates_project_folder_without_database_folder(self):
-        section = create_project_section(CreateProjectSectionRequest(name="주문 서비스"))["section"]
+        with patch("app.routers.workspace.indexer.index_file") as index_file:
+            section = create_project_section(CreateProjectSectionRequest(name="주문 서비스"))["section"]
 
         self.assertEqual(["주문 서비스"], section["items"])
         self.assertNotIn("database_dir", section)
         self.assertTrue((self.root / "주문 서비스").is_dir())
         self.assertFalse((self.root / "주문 서비스" / "database").exists())
         self.assertEqual([], list(self.root.rglob("*.erd.json")))
+        scope_note = self.root / "scopes" / f"{section['scope_id']}.md"
+        self.assertTrue(scope_note.is_file())
+        index_file.assert_called_once_with(f"scopes/{scope_note.name}")
 
     def test_legacy_database_directory_setting_is_removed_without_deleting_files(self):
         workspace = self.root / ".workspace.json"

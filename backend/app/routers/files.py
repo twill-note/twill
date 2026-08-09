@@ -108,7 +108,10 @@ def resolve_path(rel: str) -> Path:
 
 
 def rel_str(p: Path) -> str:
-    return str(p.resolve().relative_to(notes_dir().resolve()))
+    # API와 SQLite에는 운영체제와 무관한 워크스페이스 상대 경로를 저장한다.
+    # Windows의 역슬래시를 그대로 쓰면 `tasks/%`, `scopes/%` 조회에서
+    # 방금 생성한 행이 누락된다.
+    return p.resolve().relative_to(notes_dir().resolve()).as_posix()
 
 
 def _special_note_kind(path: Path) -> str | None:
@@ -506,7 +509,7 @@ def delete_entry(path: str):
     dst = trash_one(p)
     if comp is not None:
         trash_one(comp)
-    return {"trashed_to": str(dst.relative_to(notes_dir()))}
+    return {"trashed_to": dst.relative_to(notes_dir()).as_posix()}
 
 
 @router.post("/import")

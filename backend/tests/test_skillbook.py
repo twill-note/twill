@@ -96,7 +96,10 @@ class SkillBookTests(unittest.TestCase):
             skillbook.read_skillbook_component("skillbook:sample-skill", "../secret.txt")
         target = skill_dir / "target.txt"
         target.write_text("본문", encoding="utf-8")
-        (skill_dir / "linked.txt").symlink_to(target)
+        try:
+            (skill_dir / "linked.txt").symlink_to(target)
+        except OSError as exc:
+            self.skipTest(f"symlink creation is not available: {exc}")
         with self.assertRaises(skillbook.SkillBookValidationError):
             skillbook.read_skillbook_component("skillbook:sample-skill", "linked.txt")
 

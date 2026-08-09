@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { app, BrowserWindow, dialog, ipcMain, Menu, screen, shell } from 'electron'
 
 import {
+  backendPortCandidates,
   backendPythonCandidates,
   desktopWindowChromeOptions,
   isSafeExternalUrl,
@@ -99,6 +100,15 @@ async function probe(url) {
   }
 }
 
+async function endpointResponds(url) {
+  try {
+    await fetch(url, { signal: AbortSignal.timeout(1_000) })
+    return true
+  } catch {
+    return false
+  }
+}
+
 async function probeNoteFrontend(baseUrl) {
   try {
     const response = await fetch(`${baseUrl}/`, { signal: AbortSignal.timeout(1_000) })
@@ -130,11 +140,23 @@ function resolvePython() {
 }
 
 async function startOrReuseBackend() {
-  const baseUrl = `http://${options.backendHost}:${options.backendPort}`
-  if (await probe(`${baseUrl}/api/workspace`)) {
-    console.log(`[desktop] 실행 중인 백엔드를 재사용합니다: ${baseUrl}`)
-    return baseUrl
+  let selected = null
+  for (const port of backendPortCandidates(options.backendPort)) {
+    const candidate = `http://${options.backendHost}:${port}`
+    if (await probe(`${candidate}/api/workspace`)) {
+      if (await probeNoteFrontend(candidate)) {
+        console.log(`[desktop] 실행 중인 백엔드를 재사용합니다: ${candidate}`)
+        return candidate
+      }
+      console.warn(`[desktop] 화면을 제공하지 않는 기존 백엔드를 건너뜁니다: ${candidate}`)
+      continue
+    }
+    if (await endpointResponds(candidate)) continue
+    selected = { baseUrl: candidate, port }
+    break
   }
+  if (!selected) throw new Error('사용 가능한 로컬 백엔드 포트를 찾지 못했습니다.')
+  const { baseUrl, port } = selected
 
   if (!fs.existsSync(path.join(frontendDist, 'index.html'))) {
     throw new Error('프런트엔드 빌드가 없습니다. npm run build 후 다시 실행하세요.')
@@ -142,8 +164,8 @@ async function startOrReuseBackend() {
 
   const command = app.isPackaged ? packagedBackend : resolvePython()
   const commandArgs = app.isPackaged
-    ? ['--host', options.backendHost, '--port', String(options.backendPort)]
-    : ['-m', 'uvicorn', 'app.main:app', '--host', options.backendHost, '--port', String(options.backendPort)]
+    ? ['--host', options.backendHost, '--port', String(port)]
+    : ['-m', 'uvicorn', 'app.main:app', '--host', options.backendHost, '--port', String(port)]
   if (app.isPackaged && !fs.existsSync(command)) {
     throw new Error(`패키지에 백엔드 실행 파일이 없습니다: ${command}`)
   }

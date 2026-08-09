@@ -91,7 +91,7 @@ def capture_task_source(path: str) -> dict:
         card_path.write_text(frontmatter.dumps(post) + "\n", encoding="utf-8")
 
     root = config.notes_dir().resolve()
-    relative = str(card_path.relative_to(root))
+    relative = card_path.relative_to(root).as_posix()
     title = _card_title(post, card_path)
     scope_id = str(post.get("scope") or "").strip() or None
     section_id = str(post.get("section_id") or "").strip() or None
@@ -168,7 +168,7 @@ def _task_source_runtime(source: object) -> tuple[dict | None, dict | None, bool
 
     path, post = found
     root = config.notes_dir().resolve()
-    current_path = str(path.relative_to(root))
+    current_path = path.relative_to(root).as_posix()
     current_title = _card_title(post, path)
     changed = saved.get("last_path") != current_path or saved.get("last_title") != current_title
     if changed:
@@ -239,7 +239,7 @@ def _migrate_legacy_task_runs(data: dict) -> bool:
             "run_id": path.stem,
             "status": status,
             "message": _run_message(status),
-            "run_log_path": str(path.relative_to(root)),
+            "run_log_path": path.relative_to(root).as_posix(),
             "task_path": task_path,
             "task_status": "blocked" if status in {"cancelled", "error"} else "verify",
             "completed_at": completed_at,

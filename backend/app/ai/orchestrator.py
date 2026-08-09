@@ -190,7 +190,7 @@ def _write_run_log(
     p.write_text(frontmatter.dumps(post) + "\n", encoding="utf-8")
 
     # 인덱서 등록
-    rel = str(p.relative_to(root))
+    rel = p.relative_to(root).as_posix()
     try:
         indexer.index_file(rel)
     except Exception:  # noqa: BLE001
@@ -297,7 +297,7 @@ def _collect_batch_handoff(task_path: str | None, task_meta: dict, board_dir: st
 
     predecessors: list[tuple[int, str, str, list[str], str]] = []
     for p in sorted(board.glob("*.md")):
-        rel = str(p.relative_to(config.notes_dir()))
+        rel = p.relative_to(config.notes_dir()).as_posix()
         if rel == task_path:
             continue
         try:
@@ -473,7 +473,7 @@ def _task_card_paths(board_dir: str) -> set[str]:
         return set()
     if not board.is_dir():
         return set()
-    return {str(path.relative_to(root)) for path in board.glob("*.md") if path.is_file()}
+    return {path.relative_to(root).as_posix() for path in board.glob("*.md") if path.is_file()}
 
 
 def _link_new_task_cards_to_session(
@@ -812,7 +812,7 @@ def _resolve_mentions(text: str, mention_paths: list[str] | None = None) -> tupl
             body = candidate.read_text(encoding="utf-8", errors="ignore")
         except OSError:
             continue
-        rel = str(candidate.relative_to(config.notes_dir().resolve()))
+        rel = candidate.relative_to(config.notes_dir().resolve()).as_posix()
         resolved.append(rel)
         # 4KB 로 잘라서 붙임 (지나치게 큰 파일 방지)
         if len(body) > 4000:
@@ -1016,7 +1016,7 @@ def _read_current_doc(current_path: str | None, max_chars: int = 4000) -> tuple[
         body = p.read_text(encoding="utf-8", errors="ignore")
     except OSError:
         return "", "", ""
-    rel = str(p.relative_to(ws.resolve()))
+    rel = p.relative_to(ws.resolve()).as_posix()
     truncated = body if len(body) <= max_chars else body[:max_chars] + "\n\n… (이하 생략)"
     return p.stem, rel, truncated
 
@@ -1152,7 +1152,7 @@ def _to_workspace_rel(raw: str | None) -> str | None:
     if not p.is_absolute():
         p = ws / p
     try:
-        return str(p.resolve().relative_to(ws.resolve()))
+        return p.resolve().relative_to(ws.resolve()).as_posix()
     except (OSError, ValueError):
         return None
 
@@ -1168,7 +1168,7 @@ def _display_change_path(raw: str | None, cwd: str) -> str:
     if workspace_rel:
         return workspace_rel
     try:
-        return str(path.resolve().relative_to(Path(cwd).resolve()))
+        return path.resolve().relative_to(Path(cwd).resolve()).as_posix()
     except (OSError, ValueError):
         return path.name or "파일"
 
@@ -1279,7 +1279,7 @@ def _workspace_relative_path(raw: str | None) -> str | None:
     if not path.is_absolute():
         path = root / path
     try:
-        return str(path.resolve().relative_to(root))
+        return path.resolve().relative_to(root).as_posix()
     except (OSError, ValueError):
         return None
 

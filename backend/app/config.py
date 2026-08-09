@@ -99,6 +99,9 @@ def ensure_dirs() -> None:
     notes_dir().mkdir(parents=True, exist_ok=True)
     assets_dir().mkdir(parents=True, exist_ok=True)
     trash_dir().mkdir(parents=True, exist_ok=True)
+    from . import onboarding
+
+    onboarding.seed_if_empty(notes_dir())
 
 
 _load()

@@ -270,7 +270,7 @@ export const api = {
         '/api/workspace/remove-folder',
         json('POST', { path }),
       ),
-    /** 사이드바 섹션 (루트 항목 그룹핑). */
+    /** 사이드바 프로젝트 (서버의 기존 sections 계약과 호환). */
     getSections: () => request<{ sections: Section[] }>('/api/workspace/sections'),
     putSections: (sections: Section[]) =>
       request<{ sections: Section[] }>(
@@ -279,6 +279,28 @@ export const api = {
       ),
     createProjectSection: (name: string) =>
       request<{ section: Section }>('/api/workspace/sections/project', json('POST', { name })),
+    /** 기존 문서·태스크·대화를 유지한 채 프로젝트의 코드·분석 경로만 연결한다. */
+    setProjectPath: (sectionId: string, path: string) =>
+      request<{
+        section: Section
+        path: string
+        agents_path: string
+        agents_created: boolean
+      }>(
+        `/api/workspace/sections/${encodeURIComponent(sectionId)}/project-path`,
+        json('PUT', { path }),
+      ),
+    renameProject: (sectionId: string, name: string) =>
+      request<{ section: Section }>(
+        `/api/workspace/sections/${encodeURIComponent(sectionId)}/name`,
+        json('PUT', { name }),
+      ),
+    /** 프로젝트 관리 행에서 바꾼 이름을 연결된 사이드바 프로젝트에도 반영한다. */
+    renameScopeProject: (scopeId: string, name: string) =>
+      request<{ section: Section }>(
+        `/api/workspace/scopes/${encodeURIComponent(scopeId)}/name`,
+        json('PUT', { name }),
+      ),
     /** 프로젝트 경로의 실제 AGENTS.md를 보장하고 내부 편집기용 절대 경로를 반환한다. */
     ensureScopeAgents: (scopeId: string) =>
       request<WorkspaceScopeAgents>(
@@ -360,10 +382,6 @@ export const api = {
     gitMetadataAccess: () => request<AiGitMetadataAccess>('/api/ai/git-metadata-access'),
     setGitMetadataAccess: (enabled: boolean) =>
       request<AiGitMetadataAccess>('/api/ai/git-metadata-access', json('PUT', { enabled })),
-    approveMemoryReview: (payload: { session_id: string; run_id: string; bullets: string[] }) =>
-      request<AiMemoryReviewSaveResult>('/api/ai/memory-reviews/approve', json('POST', payload)),
-    discardMemoryReview: (payload: { session_id: string; run_id: string }) =>
-      request<{ discarded: boolean; run_id: string }>('/api/ai/memory-reviews/discard', json('POST', payload)),
     listSessions: () => request<{ sessions: AiSessionMeta[] }>('/api/ai/sessions'),
     createSession: (payload: {
       kind: 'chat' | 'task'
@@ -490,18 +508,11 @@ export type AiSessionMeta = {
   batch_id?: string
   batch_order?: number
   last_run?: AiSessionLastRun | null
-  memory_review?: AiMemoryReview | null
-  memory_saved?: AiMemoryReviewSaveResult | null
+  memory_saved?: AiMemorySaveResult | null
+  memory_error?: { run_id: string; message: string } | null
 }
 
-export type AiMemoryReview = {
-  run_id: string
-  bullets: string[]
-  section_id?: string | null
-  scope_id?: string | null
-}
-
-export type AiMemoryReviewSaveResult = {
+export type AiMemorySaveResult = {
   saved: boolean
   already_saved?: boolean
   run_id: string
@@ -527,6 +538,13 @@ export type AiTaskSourceStatus = {
   path: string | null
   /** available이면 최신 제목, deleted이면 마지막으로 확인한 제목. */
   title: string
+  /** 최신 카드/섹션으로 다시 해석한 프로젝트. 세션의 고정 스냅샷과는 별개다. */
+  scope_id?: string | null
+  section_id?: string | null
+  /** 최신 카드 프로젝트와 세션 시작 시 고정한 프로젝트가 다른지. */
+  scope_mismatch?: boolean
+  /** 최신 카드의 프로젝트를 해석할 수 없을 때의 해결 안내. */
+  scope_error?: string | null
 }
 
 export type AiSessionActiveRun = {
@@ -566,6 +584,7 @@ export type WorkspaceScopeEntry = {
   id: string
   label: string
   path: string
+  has_path: boolean
   project: string
   note_path: string
 }
@@ -575,6 +594,7 @@ export type WorkspaceScopeAgents = {
   label: string
   path: string
   created: boolean
+  internal?: boolean
 }
 
 export type WorkspaceScopeDeletionPreview = {
@@ -601,8 +621,6 @@ export type WorkspaceCodexDefaults = {
   memories_ref: string
   default_model: string
   default_effort: string
-  memory_mode: 'off' | 'review' | 'auto'
-  learn_from_chat: boolean
 }
 
 export type WorkspaceSettings = {

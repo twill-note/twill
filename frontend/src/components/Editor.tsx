@@ -1390,7 +1390,15 @@ function ImageAnnotateButton({ wrapperRef, editor }: { wrapperRef: React.RefObje
       }
       const imgEl = block.querySelector('img') as HTMLImageElement | null
       if (!imgEl || !imgEl.src) return
-      const blockId = block.getAttribute('data-id') ?? ''
+      // data-content-type은 BlockNote의 콘텐츠 노드이고 실제 블록 id는 상위 wrapper에 있다.
+      // 빈 id로 updateBlock을 호출하면 "블록을 찾을 수 없음" 오류가 발생한다.
+      const blockContainer = block.closest('[data-id]') as HTMLElement | null
+      const blockId = blockContainer?.getAttribute('data-id') ?? ''
+      if (!blockId) {
+        setPos(null)
+        setTarget(null)
+        return
+      }
       const wRect = wrapper.getBoundingClientRect()
       const rect = imgEl.getBoundingClientRect()
       setPos({ top: rect.top - wRect.top + 6, left: rect.right - wRect.left - 64 })
@@ -1404,10 +1412,10 @@ function ImageAnnotateButton({ wrapperRef, editor }: { wrapperRef: React.RefObje
     if (!modal) return
     try {
       editor.updateBlock(modal.blockId, { props: { url: newUrl } })
+      setModal(null)
     } catch (e) {
-      dialog.alert('블록 갱신 실패: ' + (e as Error).message)
+      void dialog.alert('블록 갱신 실패: ' + (e as Error).message)
     }
-    setModal(null)
   }
 
   return (

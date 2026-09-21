@@ -7,13 +7,18 @@ import path from 'node:path'
 import {
   backendPortCandidates,
   backendPythonCandidates,
+  desktopAppProfile,
+  desktopCommandPath,
   desktopWindowChromeOptions,
+  frontendRevisionFromHtml,
+  isExpectedFrontendHtml,
   isSafeExternalUrl,
   normalizeLocalAppUrl,
   parseDesktopOptions,
   popoutWindowBounds,
   restoredWindowBoundsForDrag,
   selectWslgOzonePlatform,
+  versionedLocalAppUrl,
   windowBoundsFromResize,
   windowPositionFromDrag,
   windowsWorkAreaForDisplay,
@@ -48,6 +53,59 @@ test('기본 데스크톱 모드는 로컬 백엔드를 직접 관리한다', ()
   assert.equal(options.manageBackend, true)
   assert.equal(options.backendHost, '127.0.0.1')
   assert.equal(options.backendPort, 8000)
+})
+
+test('개발 Electron은 설치 앱과 별도 프로필을 사용한다', () => {
+  assert.deepEqual(desktopAppProfile(false, '/Users/test/Library/Application Support'), {
+    name: 'Twill Development',
+    userDataPath: path.join('/Users/test/Library/Application Support', 'Twill Development'),
+  })
+  assert.deepEqual(desktopAppProfile(true, '/Users/test/Library/Application Support'), {
+    name: 'Twill',
+    userDataPath: null,
+  })
+})
+
+test('macOS 데스크톱 앱은 Finder PATH에 없는 Codex 설치 경로를 보충한다', () => {
+  const commandPath = desktopCommandPath('/usr/bin:/bin', 'darwin', '/Users/test')
+  assert.deepEqual(commandPath.split(':'), [
+    '/usr/bin',
+    '/bin',
+    '/opt/homebrew/bin',
+    '/usr/local/bin',
+    '/Users/test/.local/bin',
+    '/Users/test/.npm-global/bin',
+    '/Users/test/.volta/bin',
+  ])
+  assert.equal(desktopCommandPath('/usr/bin:/bin', 'linux', '/Users/test'), '/usr/bin:/bin')
+})
+
+test('실행 중인 백엔드는 현재 프런트엔드 빌드와 일치할 때만 재사용한다', () => {
+  const current = '<!doctype html><title>Twill</title><div id="root"></div><script src="app-new.js"></script>'
+  const stale = '<!doctype html><title>Twill</title><div id="root"></div><script src="app-old.js"></script>'
+  assert.equal(isExpectedFrontendHtml(current, current), true)
+  assert.equal(isExpectedFrontendHtml(stale, current), false)
+  assert.equal(isExpectedFrontendHtml('<title>Other</title><div id="root"></div>', null), false)
+})
+
+test('프런트엔드 내용이 바뀌면 데스크톱 UI 리비전도 바뀐다', () => {
+  const first = frontendRevisionFromHtml('<script src="app-old.js"></script>')
+  const same = frontendRevisionFromHtml('<script src="app-old.js"></script>')
+  const next = frontendRevisionFromHtml('<script src="app-new.js"></script>')
+  assert.equal(first, same)
+  assert.notEqual(first, next)
+  assert.equal(frontendRevisionFromHtml(''), null)
+})
+
+test('데스크톱 렌더러 URL은 기존 쿼리를 보존하며 UI 리비전을 추가한다', () => {
+  assert.equal(
+    versionedLocalAppUrl('http://127.0.0.1:8000', '/?window=byeori', 'abc123'),
+    'http://127.0.0.1:8000/?window=byeori&_twill_ui=abc123',
+  )
+  assert.equal(
+    versionedLocalAppUrl('http://127.0.0.1:8000', '/quick-memo.html', 'abc123'),
+    'http://127.0.0.1:8000/quick-memo.html?_twill_ui=abc123',
+  )
 })
 
 test('백엔드 포트 환경변수를 반영한다', () => {

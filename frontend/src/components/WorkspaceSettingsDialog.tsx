@@ -1,3 +1,5 @@
+import CodexUpdateNotice from './CodexUpdateNotice'
+import { subscribeAiEngineChanged } from '../aiMaintenance'
 import { useEffect, useState } from 'react'
 import { api, type WorkspaceSettings } from '../api'
 import { dialog } from '../dialog'
@@ -12,6 +14,7 @@ import {
   type ShortcutAction,
 } from '../shortcuts'
 import { DEFAULT_THEME, THEMES, useThemeStore } from '../theme'
+import { APP_BUILD_INFO, formatBuildTime } from '../buildInfo'
 
 // 모델 목록을 아직 못 받았을 때의 강도 후보 (GPT-5.6부터 max·ultra 가 추가됨 — 실제 지원
 // 여부는 모델별 supportedEfforts 가 우선)
@@ -207,7 +210,7 @@ type ModelOption = {
 
 /**
  * 설정 다이얼로그.
- * - 파일 탐색기와 AI 기본 모델/강도·채팅 메모리 학습
+ * - 파일 탐색기와 AI 기본 모델/강도
  * 저장 시 `.workspace.json` 에 반영.
  *
  * "워크스페이스 이름"(어디에도 표시 안 되던 죽은 필드)과 "프로젝트 관리 열기"(사이드바에
@@ -277,6 +280,14 @@ export default function WorkspaceSettingsDialog({ onClose }: { onClose: () => vo
     }
   }
 
+  useEffect(() => subscribeAiEngineChanged(() => {
+    fetch('/api/ai/models').then(async (response) => {
+      const body = await response.json()
+      if (!response.ok) throw new Error(body.detail || '모델 목록을 불러오지 못했습니다.')
+      setModels(body.models)
+    }).catch((reason: Error) => setError(reason.message))
+  }), [])
+
   const currentModel = models.find((m) => m.id === settings?.codex.default_model)
   const effortOptions = currentModel?.supportedEfforts.length ? currentModel.supportedEfforts : FALLBACK_EFFORTS
   // 저장된 값이 현재 모델 목록에 없는 경우(플러그인 미설치 등)에도 값을 잃지 않도록 합성 옵션 추가
@@ -343,6 +354,7 @@ export default function WorkspaceSettingsDialog({ onClose }: { onClose: () => vo
                 AI 설정
               </label>
               <div className="space-y-2 rounded-md border border-[#e9e9e7] p-3">
+                <CodexUpdateNotice manual />
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="mb-1 block text-[11px] text-[#5f5e5b]">기본 모델</label>
@@ -389,25 +401,6 @@ export default function WorkspaceSettingsDialog({ onClose }: { onClose: () => vo
                   <input
                     type="checkbox"
                     className="mt-0.5 h-3.5 w-3.5 accent-[#37352f]"
-                    checked={settings.codex.learn_from_chat}
-                    onChange={(e) =>
-                      setSettings({
-                        ...settings,
-                        codex: { ...settings.codex, learn_from_chat: e.target.checked },
-                      })
-                    }
-                  />
-                  <span className="min-w-0">
-                    <span className="block text-[12px] font-medium text-[#37352f]">채팅 질문 메모리 학습</span>
-                    <span className="mt-0.5 block text-[10px] leading-snug text-[#9b9a97]">
-                      Twill AI 채팅에서 확인된 재사용 가능한 도메인 지식을 자동으로 메모리에 저장합니다.
-                    </span>
-                  </span>
-                </label>
-                <label className="flex cursor-pointer items-start gap-2.5 border-t border-[#efefed] pt-3">
-                  <input
-                    type="checkbox"
-                    className="mt-0.5 h-3.5 w-3.5 accent-[#37352f]"
                     checked={gitMetadataAccess}
                     disabled={gitAccessBusy}
                     onChange={(e) => void updateGitMetadataAccess(e.target.checked)}
@@ -434,20 +427,31 @@ export default function WorkspaceSettingsDialog({ onClose }: { onClose: () => vo
           </div>
         )}
 
-        <div className="flex items-center justify-end gap-2 border-t border-[#e9e9e7] px-5 py-3">
-          <button
-            className="rounded-md border border-[#e3e2e0] px-3 py-1 text-[12px] text-[#5f5e5b] hover:bg-[#f7f7f5]"
-            onClick={onClose}
+        <div className="flex items-center justify-between gap-3 border-t border-[#e9e9e7] bg-[#fbfbfa] px-5 py-3">
+          <div
+            className="min-w-0 text-[10px] leading-relaxed text-[#9b9a97]"
+            aria-label={`Twill 버전 ${APP_BUILD_INFO.version}, 빌드 ${formatBuildTime(APP_BUILD_INFO.builtAt)}`}
+            title={`UI 빌드 시각: ${APP_BUILD_INFO.builtAt || '개발 환경'}`}
           >
-            취소
-          </button>
-          <button
-            className="rounded-md bg-[#37352f] px-3 py-1 text-[12px] font-medium text-white hover:bg-[#2b2925] disabled:opacity-60"
-            onClick={save}
-            disabled={busy || !settings}
-          >
-            {busy ? '저장 중…' : '저장'}
-          </button>
+            <span className="font-medium text-[#787774]">Twill v{APP_BUILD_INFO.version}</span>
+            <span className="mx-1.5" aria-hidden="true">·</span>
+            <span>빌드 {formatBuildTime(APP_BUILD_INFO.builtAt)}</span>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              className="rounded-md border border-[#e3e2e0] bg-white px-3 py-1 text-[12px] text-[#5f5e5b] hover:bg-[#f7f7f5]"
+              onClick={onClose}
+            >
+              취소
+            </button>
+            <button
+              className="rounded-md bg-[#37352f] px-3 py-1 text-[12px] font-medium text-white hover:bg-[#2b2925] disabled:opacity-60"
+              onClick={save}
+              disabled={busy || !settings}
+            >
+              {busy ? '저장 중…' : '저장'}
+            </button>
+          </div>
         </div>
       </div>
     </div>

@@ -5,18 +5,28 @@ type DesktopDocumentTarget = {
   path: string
 }
 
+type DesktopDirectorySelection = {
+  canceled: boolean
+  path: string | null
+}
+
 declare global {
   interface Window {
     noteDesktop?: {
       isDesktop: true
       platform: string
       versions: Readonly<{ chrome: string; electron: string }>
+      restart: () => Promise<void>
       openQuickMemo: () => Promise<void>
       openByeoriWindow: (point?: { x: number; y: number }) => Promise<boolean>
       focusByeoriWindow: () => Promise<boolean>
       isByeoriWindowOpen: () => Promise<boolean>
       reattachByeoriWindow: () => Promise<boolean>
       openDocumentInMain: (target: DesktopDocumentTarget) => Promise<boolean>
+      selectProjectDirectory: (options?: {
+        title?: string
+        defaultPath?: string
+      }) => Promise<DesktopDirectorySelection>
       onByeoriWindowChange: (callback: (open: boolean) => void) => () => void
       onShowByeoriDock: (callback: () => void) => () => void
       onOpenMainDocument: (callback: (target: DesktopDocumentTarget) => void) => () => void

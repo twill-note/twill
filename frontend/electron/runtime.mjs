@@ -1,6 +1,44 @@
+import { createHash } from 'node:crypto'
 import path from 'node:path'
 
 const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '::1', '[::1]'])
+
+export function desktopAppProfile(isPackaged, appDataPath) {
+  if (isPackaged) return { name: 'Twill', userDataPath: null }
+  return {
+    name: 'Twill Development',
+    userDataPath: path.join(appDataPath, 'Twill Development'),
+  }
+}
+
+/**
+ * Finder와 Launchpad로 시작한 macOS 앱은 로그인 셸의 PATH를 받지 않는다.
+ * Codex CLI를 Homebrew로 설치한 경우(/opt/homebrew/bin) 백엔드가 이를 찾도록
+ * 데스크톱 프로세스에 일반적인 사용자 명령 경로를 보충한다.
+ */
+export function desktopCommandPath(currentPath, platform = process.platform, homeDirectory = '') {
+  const existing = String(currentPath || '').split(path.delimiter).filter(Boolean)
+  if (platform !== 'darwin') return existing.join(path.delimiter)
+
+  const macosCommandPaths = [
+    '/opt/homebrew/bin',
+    '/usr/local/bin',
+    ...(homeDirectory
+      ? [
+          path.join(homeDirectory, '.local', 'bin'),
+          path.join(homeDirectory, '.npm-global', 'bin'),
+          path.join(homeDirectory, '.volta', 'bin'),
+        ]
+      : []),
+  ]
+  return [...new Set([...existing, ...macosCommandPaths])].join(path.delimiter)
+}
+
+export function isExpectedFrontendHtml(html, expectedHtml = null) {
+  if (typeof html !== 'string') return false
+  const isTwill = /<title>\s*Twill\s*<\/title>/i.test(html) && /id=["']root["']/i.test(html)
+  return isTwill && (expectedHtml === null || html === expectedHtml)
+}
 
 function argumentValue(argv, name) {
   const prefix = `${name}=`
@@ -22,6 +60,24 @@ export function normalizeLocalAppUrl(raw) {
   url.hash = ''
   url.search = ''
   return url.toString().replace(/\/$/, '')
+}
+
+/**
+ * Vite의 index.html 내용으로 UI 빌드 리비전을 만든다. 엔트리 번들 이름이 바뀌면
+ * 리비전도 바뀌므로, 같은 localhost 주소를 계속 쓰는 설치 앱에서도 이전 문서를
+ * Chromium HTTP 캐시에서 재사용하지 않게 할 수 있다.
+ */
+export function frontendRevisionFromHtml(html) {
+  if (typeof html !== 'string' || !html.trim()) return null
+  return createHash('sha256').update(html).digest('hex').slice(0, 16)
+}
+
+/** 로컬 렌더러 URL에 빌드별 캐시 버스터를 일관되게 추가한다. */
+export function versionedLocalAppUrl(baseUrl, relativePath = '/', revision = null) {
+  const normalizedBase = normalizeLocalAppUrl(baseUrl)
+  const url = new URL(relativePath, `${normalizedBase}/`)
+  if (revision) url.searchParams.set('_twill_ui', revision)
+  return url.toString()
 }
 
 export function parseDesktopOptions(argv, env = process.env) {

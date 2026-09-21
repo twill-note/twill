@@ -11,14 +11,9 @@
  */
 import { create } from 'zustand'
 import { api, type AiSessionMeta, type AiSessionLastRun, type AiTaskSource, type AiTaskSourceStatus } from './api'
-import {
-  createMemoryReview,
-  isMemoryReviewItemSelected,
-  selectedMemoryReviewBullets,
-  type AiMemoryReviewState,
-} from './aiMemory'
 import { SYSTEM_AI_TAB, useAppStore } from './store'
 import { setNoteProp } from './dbmodel'
+import { resolveTaskExecutionScope } from './taskExecutionScope'
 import type { NoteRow } from './types'
 
 /** 전체 실행 순서 계획 세션 → 대상 카드들 (확정 시 이 순서 정보로 runTask). 런타임 전용. */
@@ -88,8 +83,6 @@ export type RunRequestParams = {
   model?: string
   effort?: string
   max_time_sec?: number
-  enable_learn?: boolean
-  memory_mode?: 'off' | 'review' | 'auto'
   current_path?: string
   context?: string
   /** 선택 영역의 명시적 액션으로만 true. 일반 채팅은 현재 문서를 자동 첨부하지 않는다. */
@@ -188,6 +181,13 @@ export type ChatRequestSnapshot = {
   files?: Array<{ url: string; name: string }>
 }
 
+export type SteerAttachments = {
+  /** 실행 중 추가 지시와 함께 전달할 업로드 이미지. */
+  images?: ChatImage[]
+  /** 이미지가 아닌 업로드 파일. */
+  files?: Array<{ url: string; name: string }>
+}
+
 export type RecoveryKind = 'websocket' | 'timeout' | 'auth' | 'cli' | 'limit' | 'backend' | 'cancelled'
 
 export type RecoveryState = {
@@ -236,12 +236,12 @@ export type AiSession = {
   /** 현재 이 세션에서 실행 중인 태스크. 원본 채팅 세션을 재사용하는 실행도 포함한다. */
   activeTaskPath: string | null
   memoryBullets: string[] | null
-  /** 가장 최근에 저장된 학습이 어느 실행에서 만들어졌는지 식별한다. */
-  memorySavedRunId: string | null
-  /** 태스크 완료 후 추출됐지만 아직 사용자가 저장을 확정하지 않은 장기 기억 후보. */
-  memoryReview: AiMemoryReviewState | null
-  memoryReviewSaving: boolean
-  memoryReviewError: string | null
+  /** 가장 최근의 명시적 기억 요청이 어느 실행에서 처리됐는지 식별한다. */
+  memoryResultRunId: string | null
+  /** 요청한 사실이 이미 같은 내용으로 기록돼 있었는지 표시한다. */
+  memoryAlreadySaved: boolean
+  /** 명시적 기억 요청을 처리했지만 저장하지 못한 이유. */
+  memoryError: string | null
   taskStatus: { path: string; status: string } | null
   contextInfo: RunEvent | null
   error: string | null
@@ -270,7 +270,7 @@ export const MAX_CONCURRENT_RUNS = 3
 /** 세션 완료 알림 토스트 (메인 화면 우하단). */
 export type AiToast = {
   id: number
-  sessionId: string
+  sessionId: string | null
   title: string
   kind: 'done' | 'error'
   message: string
@@ -286,6 +286,7 @@ interface AiStoreState {
   /** 세션 완료 알림 (메인 화면 토스트). */
   toasts: AiToast[]
   dismissToast: (id: number) => void
+  reportTaskStartError: (title: string, message: string) => void
 
   /** Editor 가 구독하는 run log 갱신 신호 (마지막으로 갱신된 파일). */
   runLogPath: string | null
@@ -330,16 +331,16 @@ interface AiStoreState {
     prompt?: string
     /** 카드가 이 대화에서 등록됐다면 새 태스크 세션 대신 해당 대화를 재사용한다. */
     sourceSessionId?: string
+    /** 카드 프로젝트가 바뀐 뒤 기존 대화/thread를 재사용하지 않는 명시적 새 실행. */
+    forceNewSession?: boolean
+    /** 세션 생성 전 차단 사유를 카드 UI 안에 표시할 때 사용한다. */
+    onError?: (message: string) => void
   }) => Promise<string | null>
-  steer: (sessionId: string, guidance: string) => void
+  steer: (sessionId: string, guidance: string, attachments?: SteerAttachments) => void
   cancel: (sessionId: string) => void
   /** 실패/중단된 채팅을 같은 대화 세션에서 재시도한다. */
   retryChat: (sessionId: string) => void
   dismissRecovery: (sessionId: string) => void
-  updateMemoryReviewBullet: (sessionId: string, index: number, value: string) => void
-  toggleMemoryReviewBullet: (sessionId: string, index: number) => void
-  approveMemoryReview: (sessionId: string) => Promise<void>
-  discardMemoryReview: (sessionId: string) => Promise<void>
   clearFinished: (sessionId: string) => void
   /** 전체 실행: 계획 세션을 만들어 벼리가 카드 내용을 검토·순서 판단하는 과정을 패널에서 보여준다. */
   startRunOrderPlan: (rows: NoteRow[]) => Promise<string | null>
@@ -363,10 +364,9 @@ const EMPTY_RUNTIME = {
   runLogPath: null,
   activeTaskPath: null,
   memoryBullets: null,
-  memorySavedRunId: null,
-  memoryReview: null,
-  memoryReviewSaving: false,
-  memoryReviewError: null,
+  memoryResultRunId: null,
+  memoryAlreadySaved: false,
+  memoryError: null,
   taskStatus: null,
   contextInfo: null,
   error: null,
@@ -435,11 +435,10 @@ function fromMeta(meta: AiSessionMeta): AiSession {
       lastRun?.task_path && lastRun.task_status
         ? { path: lastRun.task_path, status: lastRun.task_status }
         : null,
-    memoryReview: meta.memory_review
-      ? createMemoryReview(meta.memory_review.run_id, meta.memory_review.bullets)
-      : null,
     memoryBullets: meta.memory_saved?.bullets?.length ? [...meta.memory_saved.bullets] : null,
-    memorySavedRunId: meta.memory_saved?.run_id ?? null,
+    memoryResultRunId: meta.memory_error?.run_id ?? meta.memory_saved?.run_id ?? null,
+    memoryAlreadySaved: Boolean(meta.memory_saved?.already_saved),
+    memoryError: meta.memory_error?.message ?? null,
     recovery: restoredRecovery(lastRun),
   }
 }
@@ -465,7 +464,7 @@ function requestParams(
     images: snapshot.images?.length ? snapshot.images.map((image) => image.url) : undefined,
     image_attachments: snapshot.images?.length ? snapshot.images : undefined,
     files: snapshot.files?.length ? snapshot.files : undefined,
-    // 일반 채팅의 메모리 학습 여부는 서버가 워크스페이스 설정으로 결정한다.
+    // 메모리 기록 여부는 서버가 사용자 메시지의 명시적 기억 요청만으로 판정한다.
     retry,
   }
 }
@@ -1025,18 +1024,17 @@ export const useAiStore = create<AiStoreState>((set, get) => {
       case 'memory_learned':
         patch(id, (session) => ({
           memoryBullets: Array.isArray(msg.bullets) ? msg.bullets.map(String) : [],
-          memorySavedRunId: String(msg.run_id ?? session.runId ?? ''),
-          memoryReview: null,
-          memoryReviewError: null,
+          memoryResultRunId: String(msg.run_id ?? session.runId ?? ''),
+          memoryAlreadySaved: Boolean(msg.already_saved),
+          memoryError: null,
         }))
         break
-      case 'memory_candidates':
+      case 'memory_save_failed':
         patch(id, {
-          memoryReview: createMemoryReview(
-            String(msg.run_id ?? ''),
-            Array.isArray(msg.bullets) ? msg.bullets : [],
-          ),
-          memoryReviewError: null,
+          memoryBullets: null,
+          memoryResultRunId: String(msg.run_id ?? ''),
+          memoryAlreadySaved: false,
+          memoryError: String(msg.message ?? '메모리를 저장하지 못했습니다'),
         })
         break
       case 'steer_ack': {
@@ -1151,6 +1149,17 @@ export const useAiStore = create<AiStoreState>((set, get) => {
     }
   }
 
+  const notifyTaskStartError = (title: string, message: string) => {
+    const toast: AiToast = {
+      id: ++toastIdCounter,
+      sessionId: null,
+      title,
+      kind: 'error',
+      message,
+    }
+    set((state) => ({ toasts: [...state.toasts.slice(-3), toast] }))
+  }
+
   /** WS 를 열고 실행 요청 전송. 세션의 런타임 상태를 초기화. */
   const openRun = (id: string, req: RunRequestParams) => {
     flushAssistantDeltas(id)
@@ -1167,10 +1176,8 @@ export const useAiStore = create<AiStoreState>((set, get) => {
       persistTaskRuntime(id, { mode: 'running', request: req, runId: null, savedAt: Date.now() })
     }
 
-    const pendingMemoryReview = get().sessions.find((session) => session.id === id)?.memoryReview ?? null
     patch(id, {
       ...EMPTY_RUNTIME,
-      memoryReview: pendingMemoryReview,
       busy: true,
       activeTaskPath: req.task_path ?? null,
       lastRun: null,
@@ -1232,6 +1239,7 @@ export const useAiStore = create<AiStoreState>((set, get) => {
     sessionsLoaded: false,
     toasts: [],
     dismissToast: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
+    reportTaskStartError: notifyTaskStartError,
     runLogPath: null,
     runLogVersion: 0,
 
@@ -1264,15 +1272,15 @@ export const useAiStore = create<AiStoreState>((set, get) => {
                 batchOrder: m.batch_order ?? null,
                 cardStatus: m.task_status ?? null,
                 lastRun: m.last_run ?? null,
-                memoryReview: m.memory_review
-                  ? existing.memoryReview?.runId === m.memory_review.run_id
-                    ? existing.memoryReview
-                    : createMemoryReview(m.memory_review.run_id, m.memory_review.bullets)
-                  : null,
                 memoryBullets: m.memory_saved?.bullets?.length
                   ? [...m.memory_saved.bullets]
                   : existing.memoryBullets,
-                memorySavedRunId: m.memory_saved?.run_id ?? existing.memorySavedRunId,
+                memoryResultRunId:
+                  m.memory_error?.run_id ?? m.memory_saved?.run_id ?? existing.memoryResultRunId,
+                memoryAlreadySaved: m.memory_saved
+                  ? Boolean(m.memory_saved.already_saved)
+                  : existing.memoryAlreadySaved,
+                memoryError: m.memory_error?.message ?? (m.memory_saved ? null : existing.memoryError),
                 messages: sockets.has(m.id) ? existing.messages : visibleSessionMessages(m),
               }
               : fromMeta(m)
@@ -1537,6 +1545,8 @@ export const useAiStore = create<AiStoreState>((set, get) => {
       maxTimeSec,
       prompt,
       sourceSessionId,
+      forceNewSession,
+      onError,
     }) => {
       // 같은 태스크가 이미 실행/대기 중이면 그 세션 재사용 (중복 실행 방지)
       const dup = get().sessions.find(
@@ -1547,6 +1557,29 @@ export const useAiStore = create<AiStoreState>((set, get) => {
         return dup.id
       }
 
+      let resolvedScopeId = scopeId ?? null
+      let resolvedSectionId = sectionId ?? null
+      try {
+        const [{ scopes }, { sections }] = await Promise.all([
+          api.workspaceSettings.listScopes(),
+          api.workspaceSettings.getSections(),
+        ])
+        const resolution = resolveTaskExecutionScope(
+          { scopeId, sectionId, taskPath },
+          sections,
+          scopes,
+        )
+        if (resolution.error) {
+          if (onError) onError(resolution.error)
+          else notifyTaskStartError(title || taskPath, resolution.error)
+          return null
+        }
+        resolvedScopeId = resolution.scopeId
+        resolvedSectionId = resolution.sectionId
+      } catch {
+        // 카탈로그 사전 확인이 일시적으로 실패해도 세션 생성 API가 같은 정책으로 최종 검증한다.
+      }
+
       let sourceSession = sourceSessionId
         ? get().sessions.find((session) => session.id === sourceSessionId && session.kind === 'chat')
         : null
@@ -1555,7 +1588,7 @@ export const useAiStore = create<AiStoreState>((set, get) => {
         sourceSession =
           get().sessions.find((session) => session.id === sourceSessionId && session.kind === 'chat') ?? null
       }
-      if (sourceSession) {
+      if (sourceSession && !forceNewSession && sourceSession.scopeId === resolvedScopeId) {
         set({ activeSessionId: sourceSession.id })
         // 한 thread에는 동시에 두 turn을 실행할 수 없다. 사용자가 원본 대화의 현재 실행을
         // 확인한 뒤 다시 누를 수 있도록 포커스만 옮기고 새 세션으로 우회하지 않는다.
@@ -1564,7 +1597,7 @@ export const useAiStore = create<AiStoreState>((set, get) => {
         const displayPrompt = `태스크 실행: ${title || taskPath}`
         const req: RunRequestParams = {
           task_path: taskPath,
-          section_id: sectionId || sourceSession.sectionId || undefined,
+          section_id: resolvedSectionId || sourceSession.sectionId || undefined,
           model,
           effort,
           max_time_sec: maxTimeSec,
@@ -1590,12 +1623,15 @@ export const useAiStore = create<AiStoreState>((set, get) => {
           kind: 'task',
           title,
           task_path: taskPath,
-          scope_id: scopeId,
-          section_id: sectionId,
+          scope_id: resolvedScopeId ?? undefined,
+          section_id: resolvedSectionId ?? undefined,
           model,
           effort,
         })
-      } catch {
+      } catch (error) {
+        const message = (error as Error).message || '태스크 실행 세션을 만들 수 없습니다.'
+        if (onError) onError(message)
+        else notifyTaskStartError(title || taskPath, message)
         return null
       } finally {
         startingTaskPaths.delete(taskPath)
@@ -1608,7 +1644,7 @@ export const useAiStore = create<AiStoreState>((set, get) => {
       const req: RunRequestParams = {
         task_path: taskPath,
         // 세션 생성 시 서버가 카드 frontmatter 기준으로 확정한 섹션을 다시 사용한다.
-        section_id: session.sectionId ?? sectionId,
+        section_id: session.sectionId ?? resolvedSectionId ?? undefined,
         model,
         effort,
         max_time_sec: maxTimeSec,
@@ -1623,25 +1659,53 @@ export const useAiStore = create<AiStoreState>((set, get) => {
       return meta.id
     },
 
-    steer: (sessionId, guidance) => {
+    steer: (sessionId, guidance, attachments) => {
       const text = guidance.trim()
-      if (!text) return
+      const images = attachments?.images ?? []
+      const files = attachments?.files ?? []
+      if (!text && images.length === 0 && files.length === 0) return
+      const displayText = text + (files.length ? `${text ? '\n' : ''}[📎 파일 첨부: ${files.map((file) => file.name).join(', ')}]` : '')
       const ws = sockets.get(sessionId)
       const messageId = `steer-${Date.now()}-${steerMessageIdCounter++}`
       if (!ws || ws.readyState !== WebSocket.OPEN) {
         patch(sessionId, (s) => ({
           steerAck: 'fail',
-          messages: [...s.messages, { role: 'user', content: text, itemId: messageId, delivery: 'failed' }],
+          messages: [
+            ...s.messages,
+            {
+              role: 'user',
+              content: displayText,
+              images: images.length ? images.map((image) => ({ ...image })) : undefined,
+              itemId: messageId,
+              delivery: 'failed',
+            },
+          ],
         }))
         setTimeout(() => patch(sessionId, { steerAck: null }), 3000)
         return
       }
       patch(sessionId, (s) => ({
         steerAck: 'pending',
-        messages: [...s.messages, { role: 'user', content: text, itemId: messageId, delivery: 'pending' }],
+        messages: [
+          ...s.messages,
+          {
+            role: 'user',
+            content: displayText,
+            images: images.length ? images.map((image) => ({ ...image })) : undefined,
+            itemId: messageId,
+            delivery: 'pending',
+          },
+        ],
       }))
       try {
-        ws.send(JSON.stringify({ type: 'steer', guidance: text, client_message_id: messageId }))
+        ws.send(JSON.stringify({
+          type: 'steer',
+          guidance: text,
+          client_message_id: messageId,
+          images: images.length ? images.map((image) => image.url) : undefined,
+          image_attachments: images.length ? images : undefined,
+          files: files.length ? files : undefined,
+        }))
       } catch {
         patch(sessionId, (s) => ({
           steerAck: 'fail',
@@ -1698,80 +1762,8 @@ export const useAiStore = create<AiStoreState>((set, get) => {
 
     dismissRecovery: (sessionId) => patch(sessionId, { error: null, recovery: null }),
 
-    updateMemoryReviewBullet: (sessionId, index, value) => {
-      patch(sessionId, (session) => {
-        if (!session.memoryReview || index < 0 || index >= session.memoryReview.bullets.length) return {}
-        const bullets = [...session.memoryReview.bullets]
-        bullets[index] = value
-        return {
-          memoryReview: { ...session.memoryReview, bullets },
-          memoryReviewError: null,
-        }
-      })
-    },
-
-    toggleMemoryReviewBullet: (sessionId, index) => {
-      patch(sessionId, (session) => {
-        if (!session.memoryReview || index < 0 || index >= session.memoryReview.bullets.length) return {}
-        const review = session.memoryReview
-        const selected = review.bullets.map((_, candidateIndex) =>
-          candidateIndex === index
-            ? !isMemoryReviewItemSelected(review, candidateIndex)
-            : isMemoryReviewItemSelected(review, candidateIndex),
-        )
-        return {
-          memoryReview: { ...review, selected },
-          memoryReviewError: null,
-        }
-      })
-    },
-
-    approveMemoryReview: async (sessionId) => {
-      const session = get().sessions.find((item) => item.id === sessionId)
-      if (!session?.memoryReview || session.memoryReviewSaving) return
-      const selectedBullets = selectedMemoryReviewBullets(session.memoryReview)
-      if (!selectedBullets.length) return
-      patch(sessionId, { memoryReviewSaving: true, memoryReviewError: null })
-      try {
-        const result = await api.ai.approveMemoryReview({
-          session_id: sessionId,
-          run_id: session.memoryReview.runId,
-          bullets: selectedBullets,
-        })
-        patch(sessionId, {
-          memoryReview: null,
-          memoryBullets: result.bullets,
-          memorySavedRunId: result.run_id,
-          memoryReviewSaving: false,
-          memoryReviewError: null,
-        })
-      } catch (error) {
-        patch(sessionId, {
-          memoryReviewSaving: false,
-          memoryReviewError: (error as Error).message,
-        })
-      }
-    },
-
-    discardMemoryReview: async (sessionId) => {
-      const session = get().sessions.find((item) => item.id === sessionId)
-      if (!session?.memoryReview || session.memoryReviewSaving) return
-      patch(sessionId, { memoryReviewSaving: true, memoryReviewError: null })
-      try {
-        await api.ai.discardMemoryReview({ session_id: sessionId, run_id: session.memoryReview.runId })
-        patch(sessionId, { memoryReview: null, memoryReviewSaving: false, memoryReviewError: null })
-      } catch (error) {
-        patch(sessionId, {
-          memoryReviewSaving: false,
-          memoryReviewError: (error as Error).message,
-        })
-      }
-    },
-
     clearFinished: (sessionId) => {
-      patch(sessionId, (s) =>
-        s.busy ? {} : { ...EMPTY_RUNTIME, memoryReview: s.memoryReview, messages: [] },
-      )
+      patch(sessionId, (s) => (s.busy ? {} : { ...EMPTY_RUNTIME, messages: [] }))
     },
 
     startRunOrderPlan: async (rows) => {
@@ -1818,8 +1810,8 @@ ${summaries.join('\n\n')}
         messages: [...cur.messages, { role: 'user', content: displaySummary }],
         updatedAt: Date.now() / 1000,
       }))
-      // 실행 순서 판단은 사용자 질문이 아닌 내부 보조 요청이므로 채팅 학습 설정과 무관하게 제외한다.
-      openRun(meta.id, { prompt, display_prompt: displaySummary, memory_mode: 'off' })
+      // display_prompt가 있는 내부 보조 요청은 서버의 명시적 기억 요청 판정 대상에서 제외된다.
+      openRun(meta.id, { prompt, display_prompt: displaySummary })
       return meta.id
     },
 

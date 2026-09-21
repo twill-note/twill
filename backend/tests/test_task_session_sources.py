@@ -1,3 +1,4 @@
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -16,6 +17,29 @@ class TaskSessionSourceTests(unittest.TestCase):
         self.root = Path(self.temp_dir.name)
         self.tasks = self.root / "tasks"
         self.tasks.mkdir()
+        self.scopes = self.root / "scopes"
+        self.scopes.mkdir()
+        (self.root / ".workspace.json").write_text(
+            json.dumps(
+                {
+                    "sections": [
+                        {
+                            "id": "erd-section",
+                            "name": "ERD 프로젝트",
+                            "expanded": True,
+                            "items": [],
+                            "scope_id": "erd-project",
+                        }
+                    ]
+                },
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
+        (self.scopes / "erd-project.md").write_text(
+            frontmatter.dumps(frontmatter.Post("", title="ERD 프로젝트", label="ERD 프로젝트", path="")) + "\n",
+            encoding="utf-8",
+        )
         self.path = "tasks/ERD 디자이너 버그 수정.md"
         self.card = self.root / self.path
         self.card.write_text(

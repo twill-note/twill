@@ -92,7 +92,7 @@ class OnboardingSeedTests(unittest.TestCase):
 
         self.assertTrue(onboarding.seed_if_empty(self.root))
         guide = frontmatter.load(self.root / "2. Twill 사용 가이드.md")
-        self.assertIn("섹션과 프로젝트 관리 연결", guide.content)
+        self.assertIn("프로젝트와 코드·분석 경로", guide.content)
         self.assertIn("`[[문서 이름]]`", guide.content)
         self.assertEqual('{"custom":true}', board_path.read_text(encoding="utf-8"))
 

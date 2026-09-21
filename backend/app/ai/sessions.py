@@ -25,14 +25,15 @@
                 진행 상태와 중단 동작을 복원하는 데 사용한다.
   last_run    : 마지막 실행의 종료 상태. 태스크는 run log·카드 상태도 함께 저장하고,
                 새로고침 뒤 실행 요약과 중단·오류 안내를 복원한다.
-  memory_review: 마지막 태스크에서 추출되어 사용자 승인 대기 중인 메모리 후보와 저장 문맥.
-  memory_saved : 승인 또는 자동 모드로 가장 최근에 확정 저장한 메모리 결과.
+  memory_saved : 명시적 기억 요청으로 가장 최근에 확정 저장한 메모리 결과.
+  memory_error : 가장 최근의 명시적 기억 요청을 저장하지 못한 실행과 사유.
 """
 from __future__ import annotations
 
 import json
 import time
 import uuid
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -42,6 +43,170 @@ from .. import config
 
 STORE_FILE = "sessions.json"
 TASK_SOURCE_ID_KEY = "source_card_id"
+TASK_PROJECT_REQUIRED_MESSAGE = (
+    "여러 프로젝트가 등록된 워크스페이스에서는 실행할 프로젝트가 필요합니다. "
+    "태스크 카드에서 프로젝트를 지정한 뒤 다시 실행해주세요."
+)
+TASK_PROJECT_INVALID_MESSAGE = (
+    "태스크 카드의 프로젝트를 확인할 수 없습니다. "
+    "태스크 카드에서 유효한 프로젝트를 지정한 뒤 다시 실행해주세요."
+)
+TASK_PROJECT_CHANGED_MESSAGE = (
+    "태스크 카드의 프로젝트가 이 세션을 시작할 때 고정된 프로젝트와 다릅니다. "
+    "진행 중인 실행의 권한은 변경할 수 없습니다. 실행이 끝난 뒤 "
+    "‘변경된 프로젝트로 새 실행’을 선택해주세요."
+)
+
+
+class TaskProjectContextError(ValueError):
+    """태스크 실행 프로젝트를 안전하게 확정할 수 없을 때의 사용자용 오류."""
+
+
+@dataclass(frozen=True)
+class TaskExecutionContext:
+    scope_id: str | None
+    section_id: str | None
+
+
+def _normalized_id(value: object) -> str | None:
+    normalized = str(value or "").strip()
+    return normalized or None
+
+
+def _section_for_task_path(sections: list[dict], task_path: str | None) -> dict | None:
+    """카드에 section_id가 없을 때 노트 경로를 소유한 가장 구체적인 섹션을 찾는다."""
+    normalized_path = str(task_path or "").strip().strip("/")
+    if not normalized_path:
+        return None
+    matches: list[tuple[int, dict]] = []
+    for section in sections:
+        for raw_item in section.get("items") or []:
+            item = str(raw_item or "").strip().strip("/")
+            if item and (normalized_path == item or normalized_path.startswith(item + "/")):
+                matches.append((len(item), section))
+    if not matches:
+        return None
+    max_length = max(length for length, _section in matches)
+    most_specific = [section for length, section in matches if length == max_length]
+    return most_specific[0] if len(most_specific) == 1 else None
+
+
+def _task_execution_catalog() -> tuple[list[dict], list[dict]]:
+    """프로젝트 API와 같은 최신 섹션·스코프 카탈로그를 읽는다."""
+    # routers.workspace가 세션 저장소를 가져오므로 모듈 로드 시점의 순환 import를 피한다.
+    from ..routers import workspace
+
+    sections = workspace.get_sections().get("sections") or []
+    scopes = workspace.list_scopes().get("scopes") or []
+    return (
+        [dict(section) for section in sections if isinstance(section, dict)],
+        [dict(scope) for scope in scopes if isinstance(scope, dict)],
+    )
+
+
+def resolve_task_execution_context(
+    *,
+    scope_id: object = None,
+    section_id: object = None,
+    task_path: str | None = None,
+    sections: list[dict] | None = None,
+    scopes: list[dict] | None = None,
+) -> TaskExecutionContext:
+    """최신 카드/섹션으로 태스크 실행에 고정할 단일 프로젝트를 결정한다.
+
+    요청 파라미터는 이 함수의 입력이 아니다. 호출자는 반드시 카드 frontmatter에서 읽은
+    값을 넘겨야 하며, 다중 프로젝트의 무스코프 카드와 사라진 프로젝트 식별자는 조용히
+    노트 전용 실행으로 낮추지 않는다.
+    """
+    if sections is None or scopes is None:
+        loaded_sections, loaded_scopes = _task_execution_catalog()
+        if sections is None:
+            sections = loaded_sections
+        if scopes is None:
+            scopes = loaded_scopes
+    section_rows = [dict(section) for section in sections if isinstance(section, dict)]
+    scope_rows = [dict(scope) for scope in scopes if isinstance(scope, dict)]
+    by_section = {
+        section_key: section
+        for section in section_rows
+        if (section_key := _normalized_id(section.get("id")))
+    }
+    scope_ids = list(
+        dict.fromkeys(
+            scope_key
+            for scope in scope_rows
+            if (scope_key := _normalized_id(scope.get("id")))
+        )
+    )
+    known_scopes = set(scope_ids)
+
+    card_scope_id = _normalized_id(scope_id)
+    card_section_id = _normalized_id(section_id)
+    selected_section = by_section.get(card_section_id) if card_section_id else None
+
+    if card_scope_id:
+        if card_scope_id not in known_scopes:
+            raise TaskProjectContextError(TASK_PROJECT_INVALID_MESSAGE)
+        # 사용자가 카드의 프로젝트를 바꾸면 과거 section_id가 남을 수 있다. 명시적으로
+        # 선택한 유효 scope를 우선하고, 같은 프로젝트의 최신 섹션으로 스냅샷을 다시 맞춘다.
+        if selected_section is None or _normalized_id(selected_section.get("scope_id")) != card_scope_id:
+            matching_sections = [
+                section
+                for section in section_rows
+                if _normalized_id(section.get("scope_id")) == card_scope_id
+            ]
+            selected_section = matching_sections[0] if len(matching_sections) == 1 else None
+        return TaskExecutionContext(
+            scope_id=card_scope_id,
+            section_id=_normalized_id(selected_section.get("id")) if selected_section else None,
+        )
+
+    if card_section_id and selected_section is None:
+        raise TaskProjectContextError(TASK_PROJECT_INVALID_MESSAGE)
+    if selected_section is None:
+        selected_section = _section_for_task_path(section_rows, task_path)
+    if selected_section is not None:
+        section_scope_id = _normalized_id(selected_section.get("scope_id"))
+        if not section_scope_id or section_scope_id not in known_scopes:
+            raise TaskProjectContextError(TASK_PROJECT_INVALID_MESSAGE)
+        return TaskExecutionContext(
+            scope_id=section_scope_id,
+            section_id=_normalized_id(selected_section.get("id")),
+        )
+
+    if len(scope_ids) > 1:
+        raise TaskProjectContextError(TASK_PROJECT_REQUIRED_MESSAGE)
+    if len(scope_ids) == 1:
+        only_scope_id = scope_ids[0]
+        matching_sections = [
+            section
+            for section in section_rows
+            if _normalized_id(section.get("scope_id")) == only_scope_id
+        ]
+        return TaskExecutionContext(
+            scope_id=only_scope_id,
+            section_id=(
+                _normalized_id(matching_sections[0].get("id"))
+                if len(matching_sections) == 1
+                else None
+            ),
+        )
+
+    # 프로젝트가 하나도 없는 워크스페이스의 기존 노트 전용 실행은 그대로 허용한다.
+    return TaskExecutionContext(scope_id=None, section_id=None)
+
+
+def capture_task_execution_source(path: str) -> tuple[dict, TaskExecutionContext]:
+    """최신 카드에서 새 실행 세션의 출처와 권한 스냅샷을 함께 만든다."""
+    source = capture_task_source(path)
+    context = resolve_task_execution_context(
+        scope_id=source.get("scope_id"),
+        section_id=source.get("section_id"),
+        task_path=source.get("path"),
+    )
+    source["scope_id"] = context.scope_id
+    source["section_id"] = context.section_id
+    return source, context
 
 
 def _source_note_path(path: str) -> Path:
@@ -174,7 +339,14 @@ def _task_source_runtime(source: object) -> tuple[dict | None, dict | None, bool
     if changed:
         saved["last_path"] = current_path
         saved["last_title"] = current_title
-    return {"state": "available", "path": current_path, "title": current_title}, saved, changed
+    return {
+        "state": "available",
+        "path": current_path,
+        "title": current_title,
+        # 표시용 최신 값이다. 세션의 source_task 스냅샷에는 절대 다시 쓰지 않는다.
+        "scope_id": _normalized_id(post.get("scope")),
+        "section_id": _normalized_id(post.get("section_id")),
+    }, saved, changed
 
 
 def _path() -> Path:
@@ -187,6 +359,15 @@ def _load() -> dict:
     try:
         data = json.loads(_path().read_text(encoding="utf-8"))
         if isinstance(data, dict) and isinstance(data.get("sessions"), list):
+            # 후보 검토 흐름은 제거됐다. 구 버전에서 남은 후보가 API·UI에 다시 노출되지 않게
+            # 세션을 읽는 즉시 폐기한다. 확정 저장된 memory_saved 결과는 그대로 보존한다.
+            changed = False
+            for session in data["sessions"]:
+                if isinstance(session, dict) and "memory_review" in session:
+                    session.pop("memory_review", None)
+                    changed = True
+            if changed:
+                _save(data)
             return data
     except (OSError, json.JSONDecodeError, ValueError):
         pass
@@ -285,7 +466,11 @@ def _with_task_card_runtime(session: dict) -> dict:
     return result
 
 
-def _with_task_source_runtime(session: dict) -> tuple[dict, bool]:
+def _with_task_source_runtime(
+    session: dict,
+    *,
+    catalog: tuple[list[dict], list[dict]] | None = None,
+) -> tuple[dict, bool]:
     """세션 API 응답에 카드 출처의 최신 위치 또는 삭제 상태를 덧붙인다."""
     result = dict(session)
     runtime, saved_source, changed = _task_source_runtime(session.get("source_task"))
@@ -294,6 +479,25 @@ def _with_task_source_runtime(session: dict) -> tuple[dict, bool]:
     if changed and saved_source is not None:
         session["source_task"] = saved_source
         result["source_task"] = saved_source
+    if runtime.get("state") == "available":
+        try:
+            latest_context = resolve_task_execution_context(
+                scope_id=runtime.get("scope_id"),
+                section_id=runtime.get("section_id"),
+                task_path=str(runtime.get("path") or "") or None,
+                sections=catalog[0] if catalog else None,
+                scopes=catalog[1] if catalog else None,
+            )
+            runtime["scope_id"] = latest_context.scope_id
+            runtime["section_id"] = latest_context.section_id
+            runtime["scope_mismatch"] = (
+                latest_context.scope_id != _normalized_id(session.get("scope_id"))
+            )
+            runtime["scope_error"] = None
+        except TaskProjectContextError as exc:
+            # 카드가 유효한 프로젝트를 잃은 것도 기존 세션과 안전하게 이어갈 수 없는 상태다.
+            runtime["scope_mismatch"] = True
+            runtime["scope_error"] = str(exc)
     result["source_task_status"] = runtime
     return result, changed
 
@@ -301,9 +505,16 @@ def _with_task_source_runtime(session: dict) -> tuple[dict, bool]:
 def list_sessions() -> list[dict]:
     data = _load()
     changed = _migrate_legacy_task_runs(data)
+    catalog = None
+    if any(isinstance(session.get("source_task"), dict) for session in data["sessions"]):
+        try:
+            catalog = _task_execution_catalog()
+        except Exception:  # noqa: BLE001
+            # 목록 자체는 계속 복원하되, 아래 해석에서 프로젝트를 유효하다고 추측하지 않는다.
+            catalog = ([], [])
     results: list[dict] = []
     for session in data["sessions"]:
-        sourced, source_changed = _with_task_source_runtime(session)
+        sourced, source_changed = _with_task_source_runtime(session, catalog=catalog)
         changed = changed or source_changed
         results.append(_with_task_card_runtime(sourced))
     if changed:

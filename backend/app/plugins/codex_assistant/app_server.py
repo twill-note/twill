@@ -1,6 +1,6 @@
 """codex app-server 프로세스 관리 + JSON-RPC 클라이언트.
 
-codex 는 `codex app-server --stdio` 로 실행하면 JSON-RPC 2.0 프로토콜을 stdio 로 노출한다.
+codex 는 `codex app-server` 로 실행하면 JSON-RPC 2.0 프로토콜을 stdio 로 노출한다.
 이 프로토콜은 공식 VSCode 확장이 사용하는 것과 동일하며, `item/agentMessage/delta` 같은
 토큰 단위 스트리밍 이벤트를 제공한다.
 
@@ -19,8 +19,9 @@ from collections import deque
 import inspect
 import json
 import logging
-import shutil
 from typing import Any, Callable
+
+from .cli import codex_command, stop_codex_process
 
 log = logging.getLogger("plugins.codex_assistant.app_server")
 
@@ -63,35 +64,32 @@ class AppServerClient:
         self._dynamic_tool_handlers: dict[str, DynamicToolHandler] = {}
         self._start_lock = asyncio.Lock()
         self._initialized = False
+        self.maintenance_reason: str | None = None
 
     # ─────────────────────────────────────────────────────────
     # 프로세스 라이프사이클
     # ─────────────────────────────────────────────────────────
     async def ensure_started(self) -> None:
+        if self.maintenance_reason:
+            raise AppServerError(self.maintenance_reason)
         if self._proc and self._proc.returncode is None and self._initialized:
             return
         async with self._start_lock:
+            if self.maintenance_reason:
+                raise AppServerError(self.maintenance_reason)
             if self._proc and self._proc.returncode is None and self._initialized:
                 return
             await self._spawn()
             await self._handshake()
 
     async def _spawn(self) -> None:
-        binary = shutil.which("codex")
-        if not binary:
-            raise AppServerError("codex CLI가 설치되어 있지 않습니다")
         # read loop 사망 후 재시작하는 경우, 이전 프로세스가 살아있으면 고아로 남지 않게 정리
         if self._proc and self._proc.returncode is None:
             log.warning("terminating stale app-server (pid=%s) before respawn", self._proc.pid)
-            try:
-                self._proc.terminate()
-            except ProcessLookupError:
-                pass
-        # --analytics-default-enabled 는 VSCode 확장이 켜는 옵션과 동일 (자동 opt-out 가능)
+            await self._stop()
+        # stdio is the default transport; newer Codex versions no longer accept --stdio.
         proc = await asyncio.create_subprocess_exec(
-            binary,
-            "app-server",
-            "--stdio",
+            *codex_command("app-server"),
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
@@ -119,18 +117,16 @@ class AppServerClient:
         log.info("codex app-server initialized: %s", result.get("codexHome"))
 
     async def stop(self) -> None:
+        async with self._start_lock:
+            await self._stop()
+
+    async def _stop(self) -> None:
         if self._reader_task:
             self._reader_task.cancel()
         if self._stderr_task:
             self._stderr_task.cancel()
-        if self._proc and self._proc.returncode is None:
-            try:
-                self._proc.terminate()
-                await asyncio.wait_for(self._proc.wait(), timeout=3)
-            except asyncio.TimeoutError:
-                self._proc.kill()
-            except ProcessLookupError:
-                pass
+        if self._proc:
+            await stop_codex_process(self._proc)
         self._proc = None
         self._reader_task = None
         self._stderr_task = None

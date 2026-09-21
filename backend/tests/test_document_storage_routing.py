@@ -18,8 +18,10 @@ class CapturingEngine:
     def __init__(self):
         self.inputs = []
         self.turn_configs = []
+        self.start_cwds = []
 
     async def start_thread(self, *, cwd, config=None):
+        self.start_cwds.append(cwd)
         return "thread-1"
 
     async def resume_thread(self, *, thread_id, cwd, config=None):
@@ -129,6 +131,106 @@ class DocumentStorageRoutingTests(unittest.TestCase):
             ],
             engine.turn_configs[0]["workspace_write_roots"],
         )
+
+    def test_pathless_project_direct_chat_runs_in_isolated_internal_context(self):
+        docs = self.root / "docs-only"
+        docs.mkdir()
+        scopes = self.root / "scopes"
+        scopes.mkdir()
+        (scopes / "docs-scope.md").write_text(
+            "---\nlabel: 문서 전용\npath: ''\n---\n",
+            encoding="utf-8",
+        )
+        (self.root / ".workspace.json").write_text(
+            json.dumps(
+                {
+                    "sections": [
+                        {
+                            "id": "docs-project",
+                            "name": "문서 전용",
+                            "scope_id": "docs-scope",
+                            "items": ["docs-only"],
+                        }
+                    ]
+                },
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
+        engine = CapturingEngine()
+        session = sessions.create_session(kind="chat", title="문서 전용 질문")
+
+        async def run():
+            return [
+                event
+                async for event in Orchestrator().run(
+                    RunRequest(
+                        session_id=session["id"],
+                        prompt="이 프로젝트의 다음 작업을 알려줘",
+                        section_id="docs-project",
+                        scope_id="docs-scope",
+                        enable_learn=False,
+                    )
+                )
+            ]
+
+        with patch.object(engine_registry, "default", return_value=engine):
+            events = asyncio.run(run())
+
+        internal = (self.root / ".projects" / "docs-scope").resolve()
+        self.assertEqual([str(internal)], engine.start_cwds)
+        self.assertTrue((internal / "AGENTS.md").is_file())
+        context_event = next(event for event in events if event.get("type") == "context_ready")
+        self.assertEqual([str(docs.resolve())], context_event["document_roots"])
+
+    def test_pathless_project_task_run_uses_same_isolated_context(self):
+        docs = self.root / "task-docs"
+        docs.mkdir()
+        scopes = self.root / "scopes"
+        scopes.mkdir()
+        (scopes / "task-scope.md").write_text(
+            "---\nlabel: 태스크 프로젝트\npath: ''\n---\n",
+            encoding="utf-8",
+        )
+        tasks = self.root / "tasks"
+        tasks.mkdir()
+        task_path = "tasks/경로 없는 프로젝트 실행.md"
+        (self.root / task_path).write_text(
+            "---\ntitle: 경로 없는 프로젝트 실행\nstatus: todo\nscope: task-scope\nsection_id: task-project\n---\n\n프로젝트 문맥에서 실행한다.\n",
+            encoding="utf-8",
+        )
+        (self.root / ".workspace.json").write_text(
+            json.dumps(
+                {
+                    "sections": [
+                        {
+                            "id": "task-project",
+                            "name": "태스크 프로젝트",
+                            "scope_id": "task-scope",
+                            "items": ["task-docs"],
+                        }
+                    ]
+                },
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
+        engine = CapturingEngine()
+
+        async def run():
+            return [
+                event
+                async for event in Orchestrator().run(
+                    RunRequest(task_path=task_path, section_id="task-project", scope_id="task-scope")
+                )
+            ]
+
+        with patch.object(engine_registry, "default", return_value=engine):
+            asyncio.run(run())
+
+        internal = (self.root / ".projects" / "task-scope").resolve()
+        self.assertEqual(str(internal), engine.start_cwds[0])
+        self.assertTrue((internal / "AGENTS.md").is_file())
 
 
 class CodexSandboxRoutingTests(unittest.IsolatedAsyncioTestCase):

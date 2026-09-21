@@ -82,18 +82,40 @@ class FileTreeSettingsTests(unittest.TestCase):
     def test_workspace_settings_round_trip_options(self):
         defaults = workspace.get_settings()
         self.assertFalse(defaults["explorer"]["show_all_files"])
-        self.assertFalse(defaults["codex"]["learn_from_chat"])
+        self.assertNotIn("learn_from_chat", defaults["codex"])
+        self.assertNotIn("memory_mode", defaults["codex"])
 
         request = workspace.WorkspaceSettingsModel(**defaults)
         request.explorer.show_all_files = True
-        request.codex.learn_from_chat = True
         saved = workspace.put_settings(request)
 
         self.assertTrue(saved["explorer"]["show_all_files"])
-        self.assertTrue(saved["codex"]["learn_from_chat"])
         on_disk = json.loads((self.root / ".workspace.json").read_text(encoding="utf-8"))
         self.assertTrue(on_disk["explorer"]["show_all_files"])
-        self.assertTrue(on_disk["codex"]["learn_from_chat"])
+
+    def test_legacy_memory_settings_are_ignored_and_removed_on_save(self):
+        (self.root / ".workspace.json").write_text(
+            json.dumps(
+                {
+                    "codex": {
+                        "instructions_ref": "AGENTS.md",
+                        "memories_ref": "MEMORIES.md",
+                        "learn_from_chat": True,
+                        "memory_mode": "auto",
+                    }
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        settings = workspace.get_settings()
+        self.assertNotIn("learn_from_chat", settings["codex"])
+        self.assertNotIn("memory_mode", settings["codex"])
+
+        workspace.put_settings(workspace.WorkspaceSettingsModel(**settings))
+        on_disk = json.loads((self.root / ".workspace.json").read_text(encoding="utf-8"))
+        self.assertNotIn("learn_from_chat", on_disk["codex"])
+        self.assertNotIn("memory_mode", on_disk["codex"])
 
     def test_legacy_section_memory_setting_is_removed_without_creating_files(self):
         (self.root / ".workspace.json").write_text(

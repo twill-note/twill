@@ -39,7 +39,7 @@ export default function Sidebar() {
     try {
       const { indexed } = await api.reindex()
       await Promise.all([refreshTree(), refreshTags()])
-      dialog.alert(`재색인 완료: ${indexed}개 노트`)
+      dialog.alert(`새로고침 완료: ${indexed}개 노트`)
     } finally {
       setReindexing(false)
     }
@@ -92,7 +92,7 @@ export default function Sidebar() {
           {/* 이모지 아이콘으로 통일 (⟳·⚙ 텍스트 글리프는 다른 버튼과 스타일이 달라 이질감) */}
           <button
             className="rounded px-1.5 py-0.5 text-[12px] text-[#9b9a97] hover:bg-[#efefed]"
-            title="재색인"
+            title="새로고침"
             onClick={handleReindex}
             disabled={reindexing}
           >

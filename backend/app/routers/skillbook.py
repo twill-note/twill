@@ -35,6 +35,11 @@ def _raise_http(exc: Exception) -> None:
     raise exc
 
 
+@router.get("/storage")
+def storage_info():
+    return {"path": str(skillbook.SKILLBOOK_ROOT)}
+
+
 @router.get("")
 async def list_entries(
     query: str | None = Query(default=None),

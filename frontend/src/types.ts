@@ -10,7 +10,7 @@ export interface TreeNode {
   children?: TreeNode[]
 }
 
-/** 사이드바 섹션 (영역). 루트 항목들을 명명된 그룹으로 배치. */
+/** 사이드바 프로젝트. 기존 sections 저장 형식은 호환을 위해 유지한다. */
 export interface Section {
   id: string
   name: string
@@ -20,6 +20,8 @@ export interface Section {
   /** 섹션 생성 시 자동으로 등록되는 프로젝트 관리(스코프) 노트의 id.
    *  스코프의 실제 경로(path)는 사용자가 프로젝트 관리에서 직접 채워야 함 (자동 주입 아님). */
   scope_id?: string | null
+  /** 연결된 코드·분석 폴더. null이면 문서 전용 프로젝트이며 오류 상태가 아니다. */
+  project_path?: string | null
 }
 
 export interface Frontmatter {

@@ -183,7 +183,7 @@ export default function DocumentTaskDialog({ documentPath, onClose }: { document
           <p className="mt-1 text-[11px] text-[#9b9a97]">
             {section
               ? `실행 문맥: ${section.name} · ${section.scope_id || '워크스페이스 기본'}`
-              : '문서가 속한 섹션을 찾지 못해 워크스페이스 기본 문맥을 사용합니다.'}
+              : '문서가 속한 프로젝트를 찾지 못해 워크스페이스 기본 문맥을 사용합니다.'}
           </p>
         </div>
 

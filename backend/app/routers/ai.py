@@ -4,8 +4,8 @@ from __future__ import annotations
 import json
 import logging
 import re
-import shutil
 import asyncio
+from contextlib import asynccontextmanager, suppress
 
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 
@@ -16,12 +16,14 @@ from ..ai.engine import registry as engine_registry
 from ..ai import git_metadata_access
 from ..ai.orchestrator import (
     RunRequest,
-    approve_memory_review,
-    discard_memory_review,
+    _user_image_records,
     orchestrator,
     prompt_runtime_info,
 )
 from ..plugins.codex_assistant.app_server import client as codex_app_server
+
+from ..plugins.codex_assistant.cli import codex_command, stop_codex_process
+from ..plugins.codex_assistant import updates
 
 log = logging.getLogger("ai_router")
 
@@ -30,8 +32,41 @@ router = APIRouter(prefix="/api/ai", tags=["ai"])
 _CODEX_URL_RE = re.compile(r"https?://[\w./%?=&#:_-]+")
 
 
-def _codex_binary() -> str:
-    return shutil.which("codex") or "codex"
+@asynccontextmanager
+async def engine_maintenance(reason: str):
+    if codex_app_server.maintenance_reason or orchestrator.has_active_runs():
+        raise HTTPException(status_code=409, detail="AI 작업 또는 계정 변경이 진행 중입니다. 완료하거나 중단한 뒤 다시 시도해 주세요.")
+    codex_app_server.maintenance_reason = reason
+    try:
+        await codex_app_server.stop()
+        yield
+    finally:
+        codex_app_server.maintenance_reason = None
+
+
+@router.get("/updates")
+async def codex_updates(force: bool = False):
+    try:
+        return {**await updates.check_update(force=force), "busy": bool(codex_app_server.maintenance_reason)}
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Codex 업데이트를 확인하지 못했습니다: {exc}") from exc
+
+
+@router.post("/updates")
+async def update_codex():
+    async with engine_maintenance("Codex 업데이트 중입니다. 완료 후 다시 시도해 주세요."):
+        try:
+            result = await updates.install_update()
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail=f"Codex 업데이트 실패: {exc}") from exc
+    return {**result, "busy": False, "server_restarted": True}
+
+
+@router.post("/restart-engine")
+async def restart_engine():
+    async with engine_maintenance("AI 엔진을 다시 시작하고 있습니다."):
+        pass
+    return {"ok": True}
 
 
 @router.get("/engines")
@@ -53,16 +88,11 @@ async def engine_status():
 @router.post("/logout")
 async def logout():
     """벼리의 기본 Codex 계정을 로그아웃한다 (플러그인 라우트가 아닌 코어 API)."""
-    try:
-        proc = await asyncio.create_subprocess_exec(
-            _codex_binary(), "logout", stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
-        )
-        out, err = await proc.communicate()
-    except FileNotFoundError:
-        raise HTTPException(status_code=500, detail="codex CLI가 설치되어 있지 않습니다")
-    if proc.returncode != 0:
-        detail = err.decode(errors="ignore") or out.decode(errors="ignore")
-        raise HTTPException(status_code=500, detail=detail or "로그아웃 실패")
+    async with engine_maintenance("AI 엔진에서 로그아웃하고 있습니다."):
+        try:
+            await updates.run_command(codex_command("logout"))
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
     return {"ok": True}
 
 
@@ -71,9 +101,21 @@ async def login_ws(ws: WebSocket):
     """벼리의 Codex 로그인 출력을 브라우저에 릴레이한다."""
     await ws.accept()
     try:
+        async with engine_maintenance("AI 엔진 로그인 중입니다."):
+            success = await _login(ws)
+        if success:
+            await ws.send_json({"type": "success", "restart_recommended": True})
+        await ws.close()
+    except Exception as exc:
+        with suppress(Exception):
+            await ws.send_json({"type": "error", "message": getattr(exc, "detail", str(exc))})
+            await ws.close()
+
+
+async def _login(ws: WebSocket):
+    try:
         proc = await asyncio.create_subprocess_exec(
-            _codex_binary(),
-            "login",
+            *codex_command("login"),
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.STDOUT,
             stdin=asyncio.subprocess.DEVNULL,
@@ -104,19 +146,19 @@ async def login_ws(ws: WebSocket):
             while True:
                 data = json.loads(await ws.receive_text())
                 if isinstance(data, dict) and data.get("type") == "cancel" and proc.returncode is None:
-                    proc.terminate()
+                    await stop_codex_process(proc)
                     return
         except (WebSocketDisconnect, json.JSONDecodeError):
             if proc.returncode is None:
-                proc.terminate()
+                await stop_codex_process(proc)
 
     watch_task = asyncio.create_task(watch_client())
     try:
-        await pump_stdout()
+        await asyncio.wait_for(pump_stdout(), timeout=300)
         await proc.wait()
-        await ws.send_json({"type": "success"} if proc.returncode == 0 else {
-            "type": "error", "message": f"login exited with {proc.returncode}"
-        })
+        if proc.returncode == 0:
+            return True
+        await ws.send_json({"type": "error", "message": f"login exited with {proc.returncode}"})
     except Exception as e:  # noqa: BLE001
         try:
             await ws.send_json({"type": "error", "message": str(e)})
@@ -124,15 +166,9 @@ async def login_ws(ws: WebSocket):
             pass
     finally:
         watch_task.cancel()
-        if proc.returncode is None:
-            try:
-                proc.terminate()
-            except ProcessLookupError:
-                pass
-        try:
-            await ws.close()
-        except Exception:  # noqa: BLE001
-            pass
+        with suppress(asyncio.CancelledError):
+            await watch_task
+        await stop_codex_process(proc)
 
 
 @router.get("/models")
@@ -141,7 +177,10 @@ async def list_models():
     engine = engine_registry.default()
     if engine is None:
         return {"models": []}
-    return {"models": await engine.list_models()}
+    try:
+        return {"models": await engine.list_models()}
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"모델 목록을 불러오지 못했습니다: {exc}") from exc
 
 
 @router.get("/usage-limits")
@@ -198,39 +237,6 @@ async def put_git_metadata_access(req: GitMetadataAccessRequest):
     return {**result, "server_restarted": True}
 
 
-class MemoryReviewReq(BaseModel):
-    session_id: str
-    run_id: str
-    bullets: list[str] = Field(default_factory=list)
-
-
-class MemoryReviewDiscardReq(BaseModel):
-    session_id: str
-    run_id: str
-
-
-@router.post("/memory-reviews/approve")
-def approve_memory_candidates(req: MemoryReviewReq):
-    """사용자가 검토·편집한 후보를 해당 실행의 메모리 노트에 확정 저장한다."""
-    try:
-        return approve_memory_review(req.session_id, req.run_id, req.bullets)
-    except LookupError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
-
-
-@router.post("/memory-reviews/discard")
-def discard_memory_candidates(req: MemoryReviewDiscardReq):
-    """사용자가 저장하지 않기로 한 후보를 세션에서 제거한다."""
-    try:
-        return discard_memory_review(req.session_id, req.run_id)
-    except LookupError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
-
-
 # ─────────────────────────────────────────────────────────────
 # 벼리 세션 (패널 탭 하나 = 세션 하나)
 # ─────────────────────────────────────────────────────────────
@@ -274,11 +280,23 @@ class CreateSessionReq(BaseModel):
 
 @router.post("/sessions")
 def create_session(req: CreateSessionReq):
-    source_path = req.source_task_path or (req.task_path if req.kind == "task" else None)
+    if req.kind == "task" and not str(req.task_path or "").strip():
+        raise HTTPException(status_code=422, detail="태스크 실행 세션에는 태스크 카드 경로가 필요합니다")
+    # 태스크 세션의 권한 출처는 실행할 카드 자체여야 한다. 클라이언트가 별도의
+    # source_task_path를 보내 다른 카드의 프로젝트 스냅샷을 붙일 수 없게 한다.
+    source_path = req.task_path if req.kind == "task" else req.source_task_path
     source_task = None
+    task_context = None
     if source_path:
         try:
-            source_task = ai_sessions.capture_task_source(source_path)
+            if req.kind == "task":
+                # 태스크 실행은 요청값이 아니라 최신 카드·섹션과 등록 프로젝트로 권한 경계를
+                # 확정한다. 여기서 실패한 실행을 노트 전용 세션으로 만들지 않는다.
+                source_task, task_context = ai_sessions.capture_task_execution_source(source_path)
+            else:
+                source_task = ai_sessions.capture_task_source(source_path)
+        except ai_sessions.TaskProjectContextError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
         except ValueError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
 
@@ -291,8 +309,10 @@ def create_session(req: CreateSessionReq):
         title=req.title,
         task_path=req.task_path,
         source_task=source_task,
-        scope_id=source_scope_id or req.scope_id,
-        section_id=source_section_id or req.section_id,
+        # 태스크의 요청 scope/section은 권한 상승 입력으로 사용하지 않는다. 채팅만 기존의
+        # 명시 프로젝트 선택 계약을 유지한다.
+        scope_id=task_context.scope_id if task_context else source_scope_id or req.scope_id,
+        section_id=task_context.section_id if task_context else source_section_id or req.section_id,
         model=req.model,
         effort=req.effort,
     )
@@ -435,7 +455,7 @@ async def run_ws(ws: WebSocket):
     클라이언트 → 서버:
       첫 메시지 (JSON): { task_path?, prompt?, scope_id?, section_id?, skills?, engine_id?, retry?,
                           model?, effort?, output_schema?,
-                          max_time_sec?, memory_mode?, enable_learn? }
+                          max_time_sec? }
       이후 메시지 (JSON): { "type": "steer", "guidance": "..." }
                        또는 { "type": "cancel" }
 
@@ -469,19 +489,54 @@ async def run_ws(ws: WebSocket):
                 if data.get("type") == "steer":
                     guidance = str(data.get("guidance") or "").strip()
                     client_message_id = str(data.get("client_message_id") or "").strip()
+                    images = (
+                        [str(item) for item in data.get("images", []) if isinstance(item, str)]
+                        if isinstance(data.get("images"), list)
+                        else []
+                    )
+                    image_attachments = (
+                        [item for item in data.get("image_attachments", []) if isinstance(item, dict)]
+                        if isinstance(data.get("image_attachments"), list)
+                        else []
+                    )
+                    files = (
+                        [item for item in data.get("files", []) if isinstance(item, dict)]
+                        if isinstance(data.get("files"), list)
+                        else []
+                    )
                     ok = False
                     turn_id = None
-                    if guidance and current_run_id:
+                    if (guidance or images or files) and current_run_id:
+                        steer_kwargs: dict = {"client_message_id": client_message_id or None}
+                        if images:
+                            steer_kwargs["images"] = images
+                        if files:
+                            steer_kwargs["files"] = files
                         ok = await orchestrator.steer(
                             current_run_id,
                             guidance,
-                            client_message_id=client_message_id or None,
+                            **steer_kwargs,
                         )
                         # 성공한 추가 지시는 일반 사용자 메시지와 같이 보관한다. 그래야 실행
                         # 화면에서 말풍선으로 남고 새로고침 뒤에도 어떤 지시를 보냈는지 확인할 수 있다.
                         if ok and req.session_id:
                             try:
-                                ai_sessions.append_message(req.session_id, "user", guidance)
+                                display_guidance = guidance
+                                if files:
+                                    names = ", ".join(str(item.get("name") or "") for item in files)
+                                    display_guidance += (
+                                        ("\n" if display_guidance else "") + f"[📎 파일 첨부: {names}]"
+                                    )
+                                user_images = _user_image_records(images, image_attachments)
+                                if user_images:
+                                    ai_sessions.append_message(
+                                        req.session_id,
+                                        "user",
+                                        display_guidance,
+                                        images=user_images,
+                                    )
+                                else:
+                                    ai_sessions.append_message(req.session_id, "user", display_guidance)
                             except Exception:  # noqa: BLE001
                                 log.exception("steer guidance session persistence failed")
                         if ok:
@@ -531,10 +586,6 @@ async def run_ws(ws: WebSocket):
             effort=data.get("effort") or None,
             output_schema=data.get("output_schema") or None,
             max_time_sec=data.get("max_time_sec"),
-            # 구형 자동 저장 opt-in도 정확한 JSON boolean true만 허용한다. 신규 흐름은
-            # memory_mode를 쓰며, 태스크에서 생략하면 워크스페이스 설정을 따른다.
-            enable_learn=data.get("enable_learn") is True,
-            memory_mode=data.get("memory_mode") if isinstance(data.get("memory_mode"), str) else None,
             session_id=data.get("session_id") or None,
             current_path=data.get("current_path") or None,
             context_text=data.get("context") or None,

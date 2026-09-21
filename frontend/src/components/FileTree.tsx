@@ -4,15 +4,18 @@ import { useAppStore } from '../store'
 import type { Section, TreeNode } from '../types'
 import { dialog } from '../dialog'
 import { displayCombo, IS_MAC } from '../shortcuts'
+import ProjectPathDialog from './ProjectPathDialog'
+import { useAiStore } from '../aiStore'
+import { notifyWorkspaceScopesChanged } from '../workspaceScopeEvents'
 
 interface MenuState {
   x: number
   y: number
   node: TreeNode | null // null = 루트 빈 공간
-  section?: Section | null // 섹션 헤더 우클릭
+  section?: Section | null // 프로젝트 헤더 우클릭
 }
 
-/** 자동 미할당 섹션 id — 유저가 만든 섹션과 충돌 없게 예약. */
+/** 자동 미할당 프로젝트 id — 사용자가 만든 프로젝트와 충돌 없게 예약. */
 const UNASSIGNED_ID = '__unassigned__'
 const COPY_PATH_COMBO = 'Mod+Shift+KeyC'
 const REVEAL_IN_EXPLORER_COMBO = 'Mod+KeyE'
@@ -80,6 +83,7 @@ export default function FileTree() {
   const [renamingSection, setRenamingSection] = useState<string | null>(null)
   const [creating, setCreating] = useState<{ dir: string; type: 'file' | 'dir' } | null>(null)
   const [addingSection, setAddingSection] = useState(false)
+  const [pathDialog, setPathDialog] = useState<{ project: Section; creation: boolean } | null>(null)
   const [templating, setTemplating] = useState<{ dir: string } | null>(null)
   const [dragOver, setDragOver] = useState<string | null>(null)
   const [dragOverSection, setDragOverSection] = useState<string | null>(null)
@@ -167,7 +171,7 @@ export default function FileTree() {
   }
 
   // ─────────────────────────────────────────────────────────
-  // 섹션 계산: 루트 자식들을 섹션 순서대로 배치, 나머지는 "Root" 로.
+  // 프로젝트 계산: 루트 자식들을 프로젝트 순서대로 배치, 나머지는 "Root" 로.
   // ─────────────────────────────────────────────────────────
   const rootByPath = new Map(tree.map((n) => [n.path, n]))
   const assigned = new Set<string>()
@@ -176,6 +180,7 @@ export default function FileTree() {
     name: string
     expanded: boolean
     nodes: TreeNode[]
+    projectPath?: string | null
     system?: boolean
   }[] = []
   for (const s of sections) {
@@ -192,6 +197,7 @@ export default function FileTree() {
       name: s.name,
       expanded: s.expanded,
       nodes,
+      projectPath: s.project_path,
     })
   }
   const unassigned = tree.filter((n) => !assigned.has(n.path))
@@ -224,7 +230,7 @@ export default function FileTree() {
     if (!trimmed || trimmed === node.name) return
     try {
       const res = await api.rename(node.path, trimmed)
-      // 섹션에 등록된 경로도 갱신
+      // 프로젝트에 등록된 문서 경로도 갱신
       const oldPath = node.path
       const newPath = res.path.endsWith('.md') && node.type === 'dir' ? res.path.replace(/\.md$/, '') : res.path
       const updated = sections.map((s) => ({
@@ -252,7 +258,7 @@ export default function FileTree() {
     if (!ok) return
     try {
       await api.remove(node.path)
-      // 섹션에서도 제거
+      // 프로젝트에서도 제거
       const updated = sections.map((s) => ({
         ...s,
         items: s.items.filter((p) => p !== node.path),
@@ -306,19 +312,21 @@ export default function FileTree() {
   }
 
   // ─────────────────────────────────────────────────────────
-  // 섹션 관리
+  // 프로젝트 관리
   // ─────────────────────────────────────────────────────────
   const addSection = async (name: string) => {
     setAddingSection(false)
     const trimmed = name.trim()
     if (!trimmed) return
     try {
-      // 섹션 하나를 프로젝트 하나로 취급해 기본 프로젝트 폴더를 만들고 파일 트리에 표시한다.
+      // 코드 경로보다 프로젝트와 독립 문서 저장소를 먼저 만든다.
       const { section } = await api.workspaceSettings.createProjectSection(trimmed)
+      notifyWorkspaceScopesChanged()
       await refreshSections()
       await refreshTree()
       const projectDir = section.items[0]
       if (projectDir) setExpanded((prev) => new Set(prev).add(projectDir))
+      setPathDialog({ project: section, creation: true })
     } catch (e) {
       dialog.alert((e as Error).message)
     }
@@ -328,18 +336,53 @@ export default function FileTree() {
     setRenamingSection(null)
     const trimmed = name.trim()
     if (!trimmed) return
-    await saveSections(sections.map((s) => (s.id === sid ? { ...s, name: trimmed } : s)))
+    try {
+      await api.workspaceSettings.renameProject(sid, trimmed)
+      await refreshSections()
+      notifyWorkspaceScopesChanged()
+    } catch (reason) {
+      dialog.alert((reason as Error).message)
+    }
   }
 
   const deleteSection = async (sid: string) => {
     const target = sections.find((s) => s.id === sid)
     if (!target) return
-    const ok = await dialog.confirm(`섹션 "${target.name}"을(를) 삭제할까요?`, {
-      detail: '섹션 안의 폴더/노트는 그대로 유지되며 "Root" 로 이동합니다.',
-      confirmLabel: '삭제',
-    })
-    if (!ok) return
-    await saveSections(sections.filter((s) => s.id !== sid))
+    try {
+      if (!target.scope_id) {
+        const ok = await dialog.confirm(`프로젝트 "${target.name}"을(를) 삭제할까요?`, {
+          detail: '프로젝트의 폴더와 노트는 그대로 유지되며 "Root" 로 이동합니다.',
+          confirmLabel: '프로젝트 삭제',
+          danger: true,
+        })
+        if (ok) await saveSections(sections.filter((s) => s.id !== sid))
+        return
+      }
+
+      const preview = await api.workspaceSettings.previewScopeDeletion(target.scope_id)
+      if (!preview.can_delete) {
+        const blockers = preview.blocking_tasks.map((task) => `• ${task.title} — ${task.state}`).join('\n')
+        await dialog.alert('실행 중인 태스크가 있어 프로젝트를 삭제할 수 없습니다.', { detail: blockers })
+        return
+      }
+      const impact = [
+        '프로젝트의 문서 폴더와 노트, 연결된 외부 코드 경로는 삭제하지 않습니다.',
+        `연결된 태스크 ${preview.task_count}개의 프로젝트 지정은 해제됩니다.`,
+        '기존 AI 대화와 실행 기록은 유지됩니다.',
+      ].join('\n')
+      const ok = await dialog.confirm(`프로젝트 "${target.name}"을(를) 삭제할까요?`, {
+        detail: impact,
+        confirmLabel: '프로젝트 삭제',
+        danger: true,
+      })
+      if (!ok) return
+      await api.workspaceSettings.deleteScope(target.scope_id)
+      await refreshSections()
+      await useAiStore.getState().loadSessions()
+      notifyWorkspaceScopesChanged()
+    } catch (reason) {
+      dialog.alert((reason as Error).message)
+    }
   }
 
   const toggleSection = (sid: string) => {
@@ -351,7 +394,7 @@ export default function FileTree() {
   }
 
   const moveToSection = async (nodePath: string, targetSid: string | null) => {
-    // targetSid=null → Root로 (모든 섹션에서 제거)
+    // targetSid=null → Root로 (모든 프로젝트에서 제거)
     const cleaned = sections.map((s) => ({ ...s, items: s.items.filter((p) => p !== nodePath) }))
     if (targetSid === null || targetSid === UNASSIGNED_ID) {
       await saveSections(cleaned)
@@ -361,17 +404,24 @@ export default function FileTree() {
     await saveSections(next)
   }
 
+  const connectProjectPath = async (project: Section, path: string) => {
+    await api.workspaceSettings.setProjectPath(project.id, path)
+    await refreshSections()
+    notifyWorkspaceScopesChanged()
+    setPathDialog(null)
+  }
+
   const dropOnSection = async (sid: string, e: React.DragEvent) => {
     e.preventDefault()
     e.stopPropagation()
     setDragOverSection(null)
     const src = e.dataTransfer.getData('text/note-path')
     if (!src) return
-    // 루트 직계만 섹션에 배정 가능
+    // 루트 직계만 프로젝트에 배정 가능
     const isRootItem = !src.includes('/')
     if (!isRootItem) {
-      // 서브 항목: 이동 후 섹션 배정은 다음 refreshTree 사이클에서
-      // 여기서는 무시 (섹션 경계로 드롭한 경우엔 이동시키지 않음)
+      // 서브 항목: 이동 후 프로젝트 배정은 다음 refreshTree 사이클에서
+      // 여기서는 무시 (프로젝트 경계로 드롭한 경우엔 이동시키지 않음)
       return
     }
     await moveToSection(src, sid === UNASSIGNED_ID ? null : sid)
@@ -499,16 +549,16 @@ export default function FileTree() {
       onDragOver={(e) => e.preventDefault()}
       onDrop={(e) => handleDrop('', e)}
     >
-      {/* 파일 트리 헤더: 섹션 추가 · 새 폴더 · 새 노트 */}
+      {/* 파일 트리 헤더: 프로젝트 추가 · 새 폴더 · 새 노트 */}
       <div className="mb-1 flex items-center justify-between px-2 pt-0.5 pb-1">
         <span className="text-[10px] font-medium uppercase tracking-wide text-[#9b9a97]">파일</span>
         <div className="flex gap-0.5">
           <button
             className="rounded px-1.5 py-0.5 text-[11px] text-[#9b9a97] hover:bg-[#e8e7e4] hover:text-[#37352f]"
-            title="새 섹션 추가"
+            title="새 프로젝트 추가"
             onClick={() => setAddingSection(true)}
           >
-            + 섹션
+            + 프로젝트
           </button>
           <button
             className="rounded px-1.5 py-0.5 text-[11px] text-[#9b9a97] hover:bg-[#e8e7e4] hover:text-[#37352f]"
@@ -530,13 +580,13 @@ export default function FileTree() {
       {addingSection && (
         <InlineInput
           depth={0}
-          placeholder="새 섹션 이름 (예: 프로젝트, 참고자료…)"
+          placeholder="새 프로젝트 이름 (예: 쇼핑몰, 사내 도구…)"
           onSubmit={addSection}
           onCancel={() => setAddingSection(false)}
         />
       )}
 
-      {/* 섹션 목록 */}
+      {/* 프로젝트 목록 */}
       {displaySections.map((s) => {
         return (
         <div key={s.id} className="mb-1">
@@ -572,12 +622,20 @@ export default function FileTree() {
                 <span className="w-2 text-[9px]">{s.expanded ? '▾' : '▸'}</span>
                 <span className="truncate">{s.name}</span>
                 <span className="ml-1 text-[10px] text-[#c9c8c4]">{s.nodes.length}</span>
+                {s.projectPath ? (
+                  <span
+                    className="ml-1 shrink-0 text-[9px] font-normal normal-case tracking-normal text-[#6f8f76]"
+                    title={`코드·분석 경로 연결됨: ${s.projectPath}`}
+                  >
+                    🔗
+                  </span>
+                ) : null}
               </button>
               {!s.system && (
                 <>
                   <button
                     className="rounded px-1 text-[11px] text-[#c9c8c4] hover:text-[#5f5e5b]"
-                    title="섹션 옵션"
+                    title="프로젝트 옵션"
                     onClick={(e) => {
                       e.stopPropagation()
                       const r = (e.target as HTMLElement).getBoundingClientRect()
@@ -604,7 +662,7 @@ export default function FileTree() {
         )
       })}
 
-      {/* 루트에서 바로 새 항목 만들기 (섹션 밖) */}
+      {/* 루트에서 바로 새 항목 만들기 (프로젝트 밖) */}
       {creating && creating.dir === '' && (
         <InlineInput
           depth={0}
@@ -656,18 +714,25 @@ export default function FileTree() {
           }}
           onClick={(e) => e.stopPropagation()}
         >
-          {/* 섹션 헤더 우클릭 메뉴 */}
+          {/* 프로젝트 헤더 우클릭 메뉴 */}
           {menu.section && (
             <>
               <MenuItem
-                label="✏️ 섹션 이름 변경"
+                label="✏️ 프로젝트 이름 변경"
                 onClick={() => {
                   setRenamingSection(menu.section!.id)
                   setMenu(null)
                 }}
               />
               <MenuItem
-                label="🗑️ 섹션 삭제"
+                label={menu.section.project_path ? '🔗 프로젝트 경로 변경' : '🔗 프로젝트 경로 지정'}
+                onClick={() => {
+                  setPathDialog({ project: menu.section!, creation: false })
+                  setMenu(null)
+                }}
+              />
+              <MenuItem
+                label="🗑️ 프로젝트 삭제"
                 danger
                 onClick={() => {
                   deleteSection(menu.section!.id)
@@ -681,7 +746,7 @@ export default function FileTree() {
           {!menu.section && (
             <>
               <MenuItem
-                label="🗂️ 새 섹션"
+                label="🗂️ 새 프로젝트"
                 onClick={() => {
                   setAddingSection(true)
                   setMenu(null)
@@ -753,11 +818,11 @@ export default function FileTree() {
                   }}
                 />
               )}
-              {/* 섹션 배정: 루트 직계 항목만 가능 */}
+              {/* 프로젝트 배정: 루트 직계 항목만 가능 */}
               {menu.node && !menu.node.path.includes('/') && (
                 <>
                   <div className="my-1 border-t border-[#eeeeec]" />
-                  <div className="px-3 pt-1 pb-0.5 text-[10px] uppercase tracking-wide text-[#9b9a97]">섹션</div>
+                  <div className="px-3 pt-1 pb-0.5 text-[10px] uppercase tracking-wide text-[#9b9a97]">프로젝트</div>
                   {sections.map((sec) => {
                     const inThisSection = sec.items.includes(menu.node!.path)
                     return (
@@ -772,7 +837,7 @@ export default function FileTree() {
                     )
                   })}
                   <MenuItem
-                    label="   Root (섹션에서 빼기)"
+                    label="   Root (프로젝트에서 빼기)"
                     onClick={() => {
                       moveToSection(menu.node!.path, null)
                       setMenu(null)
@@ -780,7 +845,7 @@ export default function FileTree() {
                   />
                   {sections.length === 0 && (
                     <p className="px-3 py-1 text-[11px] text-[#c9c8c4]">
-                      (아직 섹션 없음 — 하단 + 섹션 추가)
+                      (아직 프로젝트 없음 — 상단 + 프로젝트 추가)
                     </p>
                   )}
                 </>
@@ -816,6 +881,15 @@ export default function FileTree() {
             </>
           )}
         </div>
+      )}
+      {pathDialog && (
+        <ProjectPathDialog
+          projectName={pathDialog.project.name}
+          initialPath={pathDialog.project.project_path}
+          creation={pathDialog.creation}
+          onClose={() => setPathDialog(null)}
+          onSelect={(path) => connectProjectPath(pathDialog.project, path)}
+        />
       )}
     </div>
   )

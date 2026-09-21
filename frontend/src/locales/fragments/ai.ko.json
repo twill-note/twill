@@ -96,7 +96,7 @@
     "openRunLog": "실행 로그 열기",
     "openCardTooltip": "{{path}} 카드 열기",
     "openTaskBoard": "태스크 보드 열기",
-    "memoryLearned": "학습됨 ({{count}}개)",
+    "memoryLearned": "기억됨 ({{count}}개)",
     "orderParseFailed": "⚠️ 결론 JSON 해석에 실패해 카드 순서 그대로 제안합니다",
     "proposedRunOrder": "🤖 AI가 제안한 실행 순서",
     "reasonLabel": "판단 근거: {{reason}}",

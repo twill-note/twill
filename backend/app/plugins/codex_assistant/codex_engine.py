@@ -1,6 +1,6 @@
 """Codex 엔진 어댑터.
 
-`codex app-server --stdio` 프로세스를 감싼 AppServerClient 를 AIEngine 인터페이스로 노출한다.
+`codex app-server` 프로세스를 감싼 AppServerClient 를 AIEngine 인터페이스로 노출한다.
 Orchestrator 는 이 엔진을 통해서만 codex 와 상호작용.
 """
 from __future__ import annotations
@@ -14,6 +14,8 @@ from typing import Any, AsyncIterator
 from ...memories import search_memories_tool
 from ...skillbook import list_skillbook_tool, read_skillbook_tool
 from .app_server import client as app_server, AppServerError
+
+from .cli import codex_command
 
 log = logging.getLogger("codex_engine")
 
@@ -31,7 +33,10 @@ _SKILLBOOK_DYNAMIC_TOOLS: list[dict[str, Any]] = [
             "properties": {
                 "query": {
                     "type": "string",
-                    "description": "이름과 설명을 검색할 선택적 검색어",
+                    "description": (
+                        "이름·설명·ID를 검색할 선택적 검색어. 사용자 요청 문장 전체를 전달해도 "
+                        "포함된 항목명과 개별 단어를 기준으로 관련 항목을 찾는다."
+                    ),
                 },
                 "source": {
                     "type": "string",
@@ -489,16 +494,21 @@ class CodexEngine:
         turn_id: str,
         guidance: str,
         client_message_id: str | None = None,
+        images: list[str] | None = None,
     ) -> str | None:
         """현재 Codex app-server 프로토콜로 같은 턴에 추가 지시를 전달한다.
 
         `expectedTurnId`는 오래된 턴에 지시가 잘못 붙는 일을 막는 서버 측 전제조건이다.
         응답의 turnId는 steer 뒤에도 이어서 사용할 활성 턴 ID이므로 호출자에게 돌려준다.
         """
+        input_items: list[dict[str, str]] = [
+            {"type": "text", "text": _compose_continuing_steer_input(guidance)}
+        ]
+        input_items.extend({"type": "localImage", "path": image_path} for image_path in images or [])
         params: dict[str, Any] = {
             "threadId": thread_id,
             "expectedTurnId": turn_id,
-            "input": [{"type": "text", "text": _compose_continuing_steer_input(guidance)}],
+            "input": input_items,
         }
         if client_message_id:
             params["clientUserMessageId"] = client_message_id
@@ -517,7 +527,7 @@ class CodexEngine:
             return {"available": False, "logged_in": False, "detail": "codex CLI가 설치되어 있지 않습니다"}
         try:
             proc = await asyncio.create_subprocess_exec(
-                binary, "login", "status",
+                *codex_command("login", "status"),
                 stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
             )
             out, err = await proc.communicate()
@@ -528,13 +538,22 @@ class CodexEngine:
         return {"available": True, "logged_in": bool(logged_in), "detail": text}
 
     async def list_models(self) -> list[dict[str, Any]]:
-        try:
-            await app_server.ensure_started()
+        data = []
+        cursor = None
+        seen = set()
+        while True:
             result = await app_server.request(
-                "model/list", {"includeHidden": False, "limit": 50}, timeout=15
+                "model/list", {"includeHidden": False, "limit": 50, **({"cursor": cursor} if cursor else {})}, timeout=15
             )
-        except AppServerError:
-            return []
+            if not isinstance(result.get("data"), list):
+                raise AppServerError("model/list 응답에 모델 목록이 없습니다")
+            data.extend(result["data"])
+            cursor = result.get("nextCursor")
+            if not cursor:
+                break
+            if cursor in seen:
+                raise AppServerError("model/list 페이지 커서가 반복됩니다")
+            seen.add(cursor)
         return [
             {
                 "id": m.get("id"),
@@ -545,7 +564,7 @@ class CodexEngine:
                 "defaultEffort": m.get("defaultReasoningEffort"),
                 "supportedEfforts": [e.get("reasoningEffort") for e in m.get("supportedReasoningEfforts", [])],
             }
-            for m in result.get("data", []) if not m.get("hidden")
+            for m in data if not m.get("hidden")
         ]
 
     async def usage_limits(self) -> dict[str, Any]:

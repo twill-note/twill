@@ -3,6 +3,7 @@ import { api } from '../api'
 import { type AiSession, useAiStore } from '../aiStore'
 import { type ColumnDef, type DbConfig } from '../dbschema'
 import { SYSTEM_AI_TAB, useAppStore } from '../store'
+import { TASK_PROJECT_CHANGED_MESSAGE, taskSessionAction } from '../taskExecutionScope'
 import type { FileContent, NoteRow } from '../types'
 import DbCell from './DbCell'
 import NoteBodyEditor from './NoteBodyEditor'
@@ -59,6 +60,23 @@ export default function TaskCardPopup({ row, config, onClose, onCellChange, onRo
   )
   // 실행 중 여부와 관계없이 카드에 이미 연결된 세션이 있으면 새 채팅을 만들지 않는다.
   const taskSession = useAiStore((s) => s.sessions.find((session) => taskSessionForPath(session, row.path)))
+  const directCardScopeId =
+    typeof row.props.scope === 'string' && row.props.scope.trim() ? row.props.scope.trim() : null
+  const cardScopeId =
+    taskSession?.sourceTaskStatus?.state === 'available'
+      ? (taskSession.sourceTaskStatus.scope_id ?? null)
+      : directCardScopeId ?? taskSession?.scopeId ?? null
+  const currentSessionAction = taskSessionAction(
+    taskSession ?? null,
+    cardScopeId,
+    Boolean(taskSession?.sourceTaskStatus?.scope_mismatch),
+  )
+  const scopeMismatch = Boolean(
+    taskSession && (
+      taskSession.sourceTaskStatus?.scope_mismatch ||
+      taskSession.scopeId !== cardScopeId
+    ),
+  )
 
   useEffect(() => {
     api
@@ -66,6 +84,11 @@ export default function TaskCardPopup({ row, config, onClose, onCellChange, onRo
       .then(setContent)
       .catch((e) => setError((e as Error).message))
   }, [row.path])
+
+  useEffect(() => {
+    // 카드 프로젝트 편집 직후에도 서버가 계산한 세션 불일치 상태를 팝업에 반영한다.
+    void loadSessions()
+  }, [loadSessions, row.path, row.props.scope, row.props.section_id])
 
   const columnMap = useMemo(() => {
     const m: Record<string, ColumnDef> = {}
@@ -88,7 +111,16 @@ export default function TaskCardPopup({ row, config, onClose, onCellChange, onRo
       await loadSessions()
       const sessions = useAiStore.getState().sessions
       const existing = sessions.find((session) => taskSessionForPath(session, row.path))
-      if (existing) {
+      const latestCardScopeId =
+        existing?.sourceTaskStatus?.state === 'available'
+          ? (existing.sourceTaskStatus.scope_id ?? null)
+          : directCardScopeId ?? existing?.scopeId ?? null
+      const existingAction = taskSessionAction(
+        existing ?? null,
+        latestCardScopeId,
+        Boolean(existing?.sourceTaskStatus?.scope_mismatch),
+      )
+      if (existing && existingAction !== 'start-changed-project') {
         selectSession(existing.id)
         onClose()
         return
@@ -110,6 +142,7 @@ export default function TaskCardPopup({ row, config, onClose, onCellChange, onRo
         return
       }
 
+      let startError = ''
       const sessionId = await runTask({
         taskPath: row.path,
         title: row.title || row.path,
@@ -119,10 +152,15 @@ export default function TaskCardPopup({ row, config, onClose, onCellChange, onRo
         effort: (row.props.effort as string) || undefined,
         maxTimeSec:
           typeof row.props.max_time_min === 'number' ? (row.props.max_time_min as number) * 60 : undefined,
-        sourceSessionId: sourceSessionId ?? undefined,
+        sourceSessionId: existingAction === 'start-changed-project' ? undefined : sourceSessionId ?? undefined,
+        forceNewSession: existingAction === 'start-changed-project',
+        onError: (message) => {
+          startError = message
+          setError(message)
+        },
       })
       if (!sessionId) {
-        setError('세션을 만들 수 없습니다. 백엔드 연결을 확인하세요.')
+        if (!startError) setError('세션을 만들 수 없습니다. 백엔드 연결을 확인하세요.')
         return
       }
       onRowUpdated()
@@ -248,6 +286,18 @@ export default function TaskCardPopup({ row, config, onClose, onCellChange, onRo
           </div>
         )}
 
+        {scopeMismatch && (
+          <div className="shrink-0 border-t border-[#f4dfab] bg-[#fff9eb] px-6 py-2 text-[12px] text-[#8a6817]" role="alert">
+            <div className="font-medium">프로젝트가 변경되었습니다</div>
+            <div className="mt-0.5 text-[11px]">
+              {TASK_PROJECT_CHANGED_MESSAGE}{' '}
+              {taskSession?.busy || taskSession?.queued
+                ? '현재 실행이 끝나거나 보류된 뒤 새 실행을 시작할 수 있습니다.'
+                : '아래에서 변경된 프로젝트로 새 실행을 시작해주세요.'}
+            </div>
+          </div>
+        )}
+
         {/* 액션 */}
         <div className="flex shrink-0 items-center justify-between gap-2 border-t border-[#e9e9e7] px-6 py-3">
           <div className="truncate text-[10px] text-[#9b9a97]" title={row.path}>
@@ -265,12 +315,18 @@ export default function TaskCardPopup({ row, config, onClose, onCellChange, onRo
               onClick={() => void runWithByeori()}
               disabled={openingWork}
               title={
-                taskSession
+                currentSessionAction === 'start-changed-project'
+                  ? '기존 세션을 재사용하지 않고 카드의 최신 프로젝트 권한으로 새 실행을 시작합니다.'
+                  : taskSession
                   ? '이미 연결된 작업 채팅을 엽니다. 새 채팅은 만들지 않습니다.'
                   : '이 태스크의 작업을 시작하고 우측 작업 채팅에서 진행 상황을 보여줍니다.'
               }
             >
-              {openingWork ? '여는 중…' : '작업 수행'}
+              {openingWork
+                ? '여는 중…'
+                : currentSessionAction === 'start-changed-project'
+                  ? '변경된 프로젝트로 새 실행'
+                  : '작업 수행'}
             </button>
           </div>
         </div>

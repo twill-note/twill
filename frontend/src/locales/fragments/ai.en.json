@@ -96,7 +96,7 @@
     "openRunLog": "Open run log",
     "openCardTooltip": "Open card {{path}}",
     "openTaskBoard": "Open task board",
-    "memoryLearned": "Learned ({{count}})",
+    "memoryLearned": "Remembered ({{count}})",
     "orderParseFailed": "⚠️ Failed to parse the conclusion JSON — proposing the original card order",
     "proposedRunOrder": "🤖 AI-proposed run order",
     "reasonLabel": "Rationale: {{reason}}",

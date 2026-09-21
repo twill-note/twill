@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useAiStore } from '../aiStore'
 import { SYSTEM_AI_TAB, useAppStore } from '../store'
 import type { NoteRow } from '../types'
@@ -10,6 +11,7 @@ import type { NoteRow } from '../types'
  * 같은 프로젝트(스코프) 직렬화 정책에 걸리면 ⏳ 대기 상태로 표시되고 자리가 나면 자동 시작.
  */
 export default function TaskRunButton({ row, onStarted }: { row: NoteRow; onStarted?: () => void }) {
+  const [startError, setStartError] = useState<string | null>(null)
   const openRightTab = useAppStore((s) => s.openRightTab)
   const runTask = useAiStore((s) => s.runTask)
   const selectSession = useAiStore((s) => s.selectSession)
@@ -40,7 +42,8 @@ export default function TaskRunButton({ row, onStarted }: { row: NoteRow; onStar
       selectSession(sourceSession.id)
       return
     }
-    await runTask({
+    setStartError(null)
+    const sessionId = await runTask({
       taskPath: row.path,
       title: row.title || row.path,
       scopeId: (row.props.scope as string) || undefined,
@@ -50,8 +53,9 @@ export default function TaskRunButton({ row, onStarted }: { row: NoteRow; onStar
       maxTimeSec:
         typeof row.props.max_time_min === 'number' ? (row.props.max_time_min as number) * 60 : undefined,
       sourceSessionId: sourceSessionId ?? undefined,
+      onError: setStartError,
     })
-    onStarted?.()
+    if (sessionId) onStarted?.()
   }
 
   if (session?.busy) {
@@ -91,17 +95,24 @@ export default function TaskRunButton({ row, onStarted }: { row: NoteRow; onStar
     )
   }
   return (
-    <button
-      className="rounded border border-[#e3e2e0] bg-white px-1.5 py-0.5 text-[10px] font-medium text-[#37352f] shadow-sm hover:bg-[#37352f] hover:text-white"
-      onClick={onClick}
-      title={
-        sourceSession
-          ? '이 태스크를 등록한 원본 대화에서 이어서 실행'
-          : '카드에 세팅된 값대로 Twill AI 세션을 만들어 실행'
-      }
-    >
-      {sourceSession ? '▶ 이어서 실행' : '▶ 실행'}
-    </button>
+    <div className="flex max-w-[220px] flex-col items-end gap-1">
+      <button
+        className="rounded border border-[#e3e2e0] bg-white px-1.5 py-0.5 text-[10px] font-medium text-[#37352f] shadow-sm hover:bg-[#37352f] hover:text-white"
+        onClick={onClick}
+        title={
+          sourceSession
+            ? '이 태스크를 등록한 원본 대화에서 이어서 실행'
+            : '카드에 세팅된 값대로 Twill AI 세션을 만들어 실행'
+        }
+      >
+        {sourceSession ? '▶ 이어서 실행' : '▶ 실행'}
+      </button>
+      {startError && (
+        <span className="text-right text-[10px] leading-snug text-[#c92a2a]" role="alert">
+          {startError}
+        </span>
+      )}
+    </div>
   )
 }
 

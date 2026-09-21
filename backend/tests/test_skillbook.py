@@ -139,6 +139,78 @@ class SkillBookTests(unittest.TestCase):
             {"id", "name", "description", "source", "read_only"},
         )
 
+    def test_natural_language_query_finds_embedded_manual_name(self):
+        (self.manual_dir / "task-board.md").write_text(
+            "# 태스크 보드\n\n"
+            "`tasks/` DB 폴더입니다. 카드 하나는 AI에게 시킬 작업 하나입니다.\n",
+            encoding="utf-8",
+        )
+
+        listed = json.loads(
+            skillbook.list_skillbook_tool(
+                {
+                    "query": (
+                        "업무 태스크 보드 카드 등록 frontmatter "
+                        "source_session 상태 대기"
+                    )
+                }
+            )
+        )
+
+        self.assertEqual(
+            [entry["id"] for entry in listed["skills"]],
+            ["system-manual:task-board"],
+        )
+
+    def test_multi_term_query_matches_terms_across_summary_fields(self):
+        self.write_skill(name="task-helper", description="업무 카드를 등록하는 절차")
+
+        listed = json.loads(
+            skillbook.list_skillbook_tool({"query": "카드 등록 방법"})
+        )
+
+        self.assertEqual(listed["skills"][0]["id"], "skillbook:task-helper")
+
+    def test_unrelated_query_still_returns_no_entries(self):
+        self.write_skill(description="데이터 정리 절차")
+
+        listed = json.loads(
+            skillbook.list_skillbook_tool({"query": "전자서명"})
+        )
+
+        self.assertEqual(listed["skills"], [])
+
+
+class SkillBookCatalogSearchTests(unittest.TestCase):
+    def test_every_catalog_entry_is_searchable_and_readable(self):
+        entries = [entry for entry in skillbook.list_skillbook() if entry["valid"]]
+
+        self.assertGreater(len(entries), 0)
+        for entry in entries:
+            with self.subTest(entry_id=entry["id"]):
+                query = (
+                    f"스킬북의 [{entry['name']}] 항목을 확인하고 "
+                    "이 절차로 작업해줘"
+                )
+                listed = json.loads(
+                    skillbook.list_skillbook_tool(
+                        {"query": query, "source": entry["source"]}
+                    )
+                )
+                by_id = json.loads(
+                    skillbook.list_skillbook_tool({"query": entry["id"]})
+                )
+                body = json.loads(
+                    skillbook.read_skillbook_tool({"id": entry["id"]})
+                )
+
+                self.assertGreater(len(listed["skills"]), 0)
+                self.assertEqual(listed["skills"][0]["id"], entry["id"])
+                self.assertGreater(len(by_id["skills"]), 0)
+                self.assertEqual(by_id["skills"][0]["id"], entry["id"])
+                self.assertEqual(body["id"], entry["id"])
+                self.assertTrue(body["content"].strip())
+
 
 if __name__ == "__main__":
     unittest.main()

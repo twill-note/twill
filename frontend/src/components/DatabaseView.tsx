@@ -18,6 +18,7 @@ import {
 import { DbBoard, DbTable } from './dbviews'
 import TaskCardPopup from './TaskCardPopup'
 import TaskRunButton, { runAllTasks } from './TaskRunButton'
+import { notifyWorkspaceScopesChanged, subscribeWorkspaceScopesChanged } from '../workspaceScopeEvents'
 
 function isAutoFollowup(row: NoteRow): boolean {
   const created = row.props.auto_created
@@ -176,12 +177,23 @@ export default function DatabaseView() {
   const [mode, setMode] = useState<'table' | 'board'>('table')
   const [groupBy, setGroupBy] = useState('')
   const [reloadKey, setReloadKey] = useState(0)
+  const [scopeRevision, setScopeRevision] = useState(0)
   const [popupPath, setPopupPath] = useState<string | null>(null)
   const popupRow = popupPath ? rows.find((r) => r.path === popupPath) ?? null : null
 
   useEffect(() => {
     setProjectFilter('')
   }, [dbDir])
+
+  // 사이드바·다른 Electron 창에서 프로젝트가 생성·이름 변경되면 현재 표와 태스크
+  // 보드의 프로젝트 옵션도 같은 원본으로 즉시 다시 읽는다.
+  useEffect(
+    () => subscribeWorkspaceScopesChanged(() => {
+      setReloadKey((key) => key + 1)
+      setScopeRevision((revision) => revision + 1)
+    }),
+    [],
+  )
 
   useEffect(() => {
     api
@@ -239,7 +251,7 @@ export default function DatabaseView() {
         if (next.boardGroupBy) setGroupBy(next.boardGroupBy)
       })
       .catch(() => {})
-  }, [dbDir])
+  }, [dbDir, scopeRevision])
 
   const propKeys = useMemo(() => propKeysOf(rows), [rows])
   const groupCandidates = useMemo(() => {
@@ -340,12 +352,14 @@ export default function DatabaseView() {
     async (path: string, key: string, value: unknown) => {
       try {
         await setNoteProp(path, key, value)
-        if (config.kind === 'scopes_board' && key === 'path' && typeof value === 'string' && value.trim()) {
+        if (config.kind === 'scopes_board' && key === 'path' && typeof value === 'string') {
           const row = rows.find((candidate) => candidate.path === path)
           const scopeId = row ? scopeIdFromProjectRow(row) : null
           if (!scopeId) throw new Error('프로젝트 관리 행의 식별자를 확인할 수 없습니다.')
-          // 경로가 확정되는 시점에 프로젝트 루트의 실제 AGENTS.md를 함께 보장한다.
+          // 외부 경로가 있으면 그곳에, 없으면 프로젝트별 내부 위치에 AGENTS.md를 보장한다.
           await api.workspaceSettings.ensureScopeAgents(scopeId)
+          await refreshSections()
+          notifyWorkspaceScopesChanged()
         }
         // select 계열이면 옵션 자동 등록
         const col = config.columns.find((c) => c.key === key)
@@ -360,10 +374,14 @@ export default function DatabaseView() {
         // 경로 속성 저장은 성공하고 AGENTS.md 생성만 실패했을 수 있으므로 서버 원본을
         // 다시 읽어 표와 디스크 상태가 어긋나지 않게 한다.
         setReloadKey((k) => k + 1)
+        if (config.kind === 'scopes_board' && key === 'path') {
+          await refreshSections()
+          notifyWorkspaceScopesChanged()
+        }
         dialog.alert((e as Error).message)
       }
     },
-    [config, persistConfig, rows],
+    [config, persistConfig, refreshSections, rows],
   )
 
   const onColumnChange = useCallback(
@@ -450,12 +468,12 @@ export default function DatabaseView() {
         const preview = await api.workspaceSettings.previewScopeDeletion(scopeId)
         const impact = [
           `프로젝트: ${preview.label}`,
-          `연결된 사이드바 섹션: ${preview.section_count}개 (목록에서 제거)`,
+          `연결된 사이드바 프로젝트: ${preview.section_count}개 (목록에서 제거)`,
           `scope 해제 태스크 카드: ${preview.task_count}개 (본문·상태·실행 이력 유지)`,
           `실행 중 또는 대기 중인 관련 태스크: ${preview.active_task_count}개`,
           '',
           '프로젝트 행은 휴지통으로 이동합니다.',
-          '연결 섹션의 폴더·노트와 외부 프로젝트 경로는 삭제하지 않고 Root에 그대로 남습니다.',
+          '연결 프로젝트의 폴더·노트와 외부 코드 경로는 삭제하지 않고 Root에 그대로 남습니다.',
         ].join('\n')
         if (!preview.can_delete) {
           const names = preview.blocking_tasks
@@ -477,7 +495,7 @@ export default function DatabaseView() {
         await api.workspaceSettings.deleteScope(scopeId)
         await refreshSections()
         await useAiStore.getState().loadSessions()
-        window.dispatchEvent(new Event('workspace-scopes-changed'))
+        notifyWorkspaceScopesChanged()
         setReloadKey((key) => key + 1)
       } catch (error) {
         await dialog.alert((error as Error).message)
@@ -494,13 +512,16 @@ export default function DatabaseView() {
     })
     if (!next?.trim() || next.trim() === current) return
     try {
-      await setNoteProp(row.path, 'label', next.trim())
-      window.dispatchEvent(new Event('workspace-scopes-changed'))
+      const scopeId = scopeIdFromProjectRow(row)
+      if (!scopeId) throw new Error('프로젝트 관리 행의 식별자를 확인할 수 없습니다.')
+      await api.workspaceSettings.renameScopeProject(scopeId, next.trim())
+      await refreshSections()
+      notifyWorkspaceScopesChanged()
       setReloadKey((key) => key + 1)
     } catch (error) {
       await dialog.alert((error as Error).message)
     }
-  }, [])
+  }, [refreshSections])
 
   const projectRowMenuItems = useCallback(
     (row: NoteRow) => {
@@ -516,7 +537,7 @@ export default function DatabaseView() {
           icon: '🗑',
           label: '프로젝트 삭제',
           danger: true,
-          title: '연결 섹션도 목록에서 제거하며, 노트·폴더·외부 프로젝트 경로는 삭제하지 않습니다.',
+          title: '연결 프로젝트도 목록에서 제거하며, 노트·폴더·외부 코드 경로는 삭제하지 않습니다.',
           onClick: () => void deleteProjectScope(row),
         },
       ]
@@ -672,7 +693,7 @@ export default function DatabaseView() {
               // 프로젝트 관리는 일반 DB 행 삭제 대신 서버 전용 참조 정리 삭제만 제공한다.
               onDeleteRow={config.kind === 'scopes_board' ? undefined : deleteRow}
               rowMenuItems={projectRowMenuItems}
-              // 컬럼 ⋯ 메뉴: '실행' 컬럼에만 전체 실행 항목 추가 (카드 순서대로 차례 실행)
+              // 컬럼 ⋯ 메뉴: '실행' 컬럼에서 카드들을 순서대로 전체 실행한다.
               columnMenuExtras={
                 config.kind === 'task_board' && groupBy === 'status'
                   ? (groupValue, items) =>

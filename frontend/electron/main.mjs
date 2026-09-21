@@ -1,19 +1,26 @@
 import { spawn } from 'node:child_process'
+import { desktopRelaunchArgs, stopDesktopBackend } from './lifecycle.mjs'
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { app, BrowserWindow, dialog, ipcMain, Menu, screen, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, Menu, screen, session, shell } from 'electron'
 
 import {
   backendPortCandidates,
   backendPythonCandidates,
+  desktopAppProfile,
+  desktopCommandPath,
   desktopWindowChromeOptions,
+  frontendRevisionFromHtml,
+  isExpectedFrontendHtml,
   isSafeExternalUrl,
   parseDesktopOptions,
   popoutWindowBounds,
   restoredWindowBoundsForDrag,
   selectWslgOzonePlatform,
+  versionedLocalAppUrl,
   windowBoundsFromResize,
   windowPositionFromDrag,
   windowsWorkAreaForDisplay,
@@ -26,7 +33,14 @@ import {
 
 const isWslg = process.platform === 'linux' && Boolean(process.env.WSL_DISTRO_NAME && process.env.DISPLAY)
 
-app.setName('Twill')
+// macOS의 Finder/Launchpad 앱에는 Homebrew 경로가 보통 빠져 있다. 이 값은 이후
+// 시작되는 Python 백엔드와 codex app-server 자식 프로세스까지 그대로 상속된다.
+const commandPath = desktopCommandPath(process.env.PATH, process.platform, os.homedir())
+if (commandPath) process.env.PATH = commandPath
+
+const desktopProfile = desktopAppProfile(app.isPackaged, app.getPath('appData'))
+app.setName(desktopProfile.name)
+if (desktopProfile.userDataPath) app.setPath('userData', desktopProfile.userDataPath)
 
 function detectDrmRenderNode() {
   if (process.platform !== 'linux') return false
@@ -70,6 +84,8 @@ let backendProcess = null
 let backendOwned = false
 let backendReady = false
 let quitting = false
+let shutdownComplete = false
+let restartRequested = false
 let mainWindow = null
 let quickMemoWindow = null
 let byeoriWindow = null
@@ -84,6 +100,39 @@ const windowResizeSampleMs = 16
 const windowResizeAckTimeoutMs = 32
 let windowsScreenInfoPromise = null
 let backendLog = ''
+let frontendRevision = null
+
+function rendererUrl(relativePath = '/') {
+  return versionedLocalAppUrl(appUrl, relativePath, frontendRevision)
+}
+
+/**
+ * 앱 삭제·재설치로는 Chromium의 사용자 데이터 캐시가 없어지지 않는다. UI 빌드가
+ * 달라졌을 때 네트워크 캐시만 비우고 localStorage와 세션 설정은 그대로 보존한다.
+ * URL에도 같은 리비전을 붙이므로 캐시 삭제가 실패해도 이전 index.html을 쓰지 않는다.
+ */
+async function refreshFrontendCacheIfNeeded() {
+  if (!frontendRevision) return false
+  const markerPath = path.join(app.getPath('userData'), 'frontend-revision')
+  let previousRevision = null
+  try {
+    previousRevision = fs.readFileSync(markerPath, 'utf8').trim() || null
+  } catch (error) {
+    if (error?.code !== 'ENOENT') console.warn('[desktop] UI 캐시 리비전을 읽지 못했습니다.', error)
+  }
+  if (previousRevision === frontendRevision) return false
+
+  try {
+    await session.defaultSession.clearCache()
+    fs.mkdirSync(path.dirname(markerPath), { recursive: true })
+    fs.writeFileSync(markerPath, `${frontendRevision}\n`, { mode: 0o600 })
+    console.log(`[desktop] UI 캐시를 새 빌드로 갱신했습니다: ${previousRevision || 'none'} -> ${frontendRevision}`)
+    return true
+  } catch (error) {
+    console.warn('[desktop] 이전 UI 네트워크 캐시를 비우지 못했습니다. 리비전 URL로 계속합니다.', error)
+    return false
+  }
+}
 
 function appendBackendLog(chunk) {
   const text = chunk.toString()
@@ -109,12 +158,12 @@ async function endpointResponds(url) {
   }
 }
 
-async function probeNoteFrontend(baseUrl) {
+async function probeNoteFrontend(baseUrl, expectedHtml = null) {
   try {
     const response = await fetch(`${baseUrl}/`, { signal: AbortSignal.timeout(1_000) })
     if (!response.ok || !(response.headers.get('content-type') || '').includes('text/html')) return false
     const html = await response.text()
-    return /<title>\s*Twill\s*<\/title>/i.test(html) && /id=["']root["']/i.test(html)
+    return isExpectedFrontendHtml(html, expectedHtml)
   } catch {
     return false
   }
@@ -140,15 +189,21 @@ function resolvePython() {
 }
 
 async function startOrReuseBackend() {
+  const frontendIndex = path.join(frontendDist, 'index.html')
+  if (!fs.existsSync(frontendIndex)) {
+    throw new Error('프런트엔드 빌드가 없습니다. npm run build 후 다시 실행하세요.')
+  }
+  const expectedFrontendHtml = fs.readFileSync(frontendIndex, 'utf8')
+  frontendRevision = frontendRevisionFromHtml(expectedFrontendHtml)
   let selected = null
   for (const port of backendPortCandidates(options.backendPort)) {
     const candidate = `http://${options.backendHost}:${port}`
     if (await probe(`${candidate}/api/workspace`)) {
-      if (await probeNoteFrontend(candidate)) {
+      if (!process.argv.includes('--fresh-backend') && await probeNoteFrontend(candidate, expectedFrontendHtml)) {
         console.log(`[desktop] 실행 중인 백엔드를 재사용합니다: ${candidate}`)
         return candidate
       }
-      console.warn(`[desktop] 화면을 제공하지 않는 기존 백엔드를 건너뜁니다: ${candidate}`)
+      console.warn(`[desktop] 현재 빌드와 다른 화면을 제공하는 기존 백엔드를 건너뜁니다: ${candidate}`)
       continue
     }
     if (await endpointResponds(candidate)) continue
@@ -157,10 +212,6 @@ async function startOrReuseBackend() {
   }
   if (!selected) throw new Error('사용 가능한 로컬 백엔드 포트를 찾지 못했습니다.')
   const { baseUrl, port } = selected
-
-  if (!fs.existsSync(path.join(frontendDist, 'index.html'))) {
-    throw new Error('프런트엔드 빌드가 없습니다. npm run build 후 다시 실행하세요.')
-  }
 
   const command = app.isPackaged ? packagedBackend : resolvePython()
   const commandArgs = app.isPackaged
@@ -183,6 +234,7 @@ async function startOrReuseBackend() {
       },
       stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true,
+      detached: process.platform !== 'win32',
     },
   )
   backendOwned = true
@@ -204,22 +256,11 @@ async function startOrReuseBackend() {
   return baseUrl
 }
 
-function stopBackend() {
-  if (!backendOwned || !backendProcess || backendProcess.exitCode !== null) return
-  if (process.platform === 'win32') {
-    const processId = backendProcess.pid
-    spawn('taskkill.exe', ['/pid', String(processId), '/t', '/f'], {
-      stdio: 'ignore',
-      windowsHide: true,
-    }).unref()
-    return
-  }
-  backendProcess.kill('SIGTERM')
-  const processToStop = backendProcess
-  const forceTimer = setTimeout(() => {
-    if (processToStop.exitCode === null) processToStop.kill('SIGKILL')
-  }, 3_000)
-  forceTimer.unref()
+async function stopBackend() {
+  await stopDesktopBackend({
+    child: backendProcess, owned: backendOwned, platform: process.platform,
+    runCommand: readProcessOutput, killGroup: (pid, signal) => process.kill(pid, signal),
+  })
 }
 
 function readProcessOutput(command, args, timeoutMs = 3_000) {
@@ -783,7 +824,9 @@ async function createMainWindow() {
   })
   mainWindow.on('closed', () => { mainWindow = null })
   const smokeNote = smokeTest ? process.env.NOTE_APP_SMOKE_NOTE : ''
-  const initialUrl = smokeNote ? `${appUrl}/#${encodeURIComponent(smokeNote)}` : `${appUrl}/`
+  const initialUrlObject = new URL(rendererUrl('/'))
+  if (smokeNote) initialUrlObject.hash = encodeURIComponent(smokeNote)
+  const initialUrl = initialUrlObject.toString()
   await mainWindow.loadURL(initialUrl)
   await waitForDocumentFonts(mainWindow)
   if (!smokeTest || process.env.NOTE_APP_SMOKE_SHOW === '1') {
@@ -843,7 +886,7 @@ async function openByeoriWindow(_event, rendererPoint) {
   })
 
   try {
-    await createdWindow.loadURL(`${appUrl}/?window=byeori`)
+    await createdWindow.loadURL(rendererUrl('/?window=byeori'))
     await waitForDocumentFonts(createdWindow)
     createdWindow.show()
     if (useWslgWayland) await placeWslgWindowOnCursorDisplay(createdWindow)
@@ -910,7 +953,7 @@ async function openQuickMemo() {
     if (!smokeTest) quickMemoWindow?.show()
   })
   quickMemoWindow.on('closed', () => { quickMemoWindow = null })
-  await quickMemoWindow.loadURL(`${appUrl}/quick-memo.html`)
+  await quickMemoWindow.loadURL(rendererUrl('/quick-memo.html'))
 }
 
 async function runSmokeTest() {
@@ -1293,14 +1336,16 @@ if (!hasSingleInstanceLock) {
       }
       if (options.manageBackend) {
         const backendUrl = await startOrReuseBackend()
-        if (!await probeNoteFrontend(backendUrl)) {
-          throw new Error(`백엔드가 빌드된 Twill 화면을 제공하지 않습니다: ${backendUrl}`)
+        const expectedFrontendHtml = fs.readFileSync(path.join(frontendDist, 'index.html'), 'utf8')
+        if (!await probeNoteFrontend(backendUrl, expectedFrontendHtml)) {
+          throw new Error(`백엔드가 현재 빌드된 Twill 화면을 제공하지 않습니다: ${backendUrl}`)
         }
         // FastAPI가 API와 빌드 UI를 함께 제공하므로 고정 origin을 사용한다.
         // 매 실행마다 달라지는 Vite preview 포트는 localStorage를 초기화된 것처럼 보이게 했다.
         appUrl = backendUrl
       }
       if (!appUrl) throw new Error('Electron이 열 로컬 앱 주소를 결정하지 못했습니다.')
+      await refreshFrontendCacheIfNeeded()
       installLocalStoragePersistence()
       ipcMain.handle('desktop:window-command', async (event, command) => {
         const window = BrowserWindow.fromWebContents(event.sender)
@@ -1332,12 +1377,47 @@ if (!hasSingleInstanceLock) {
         if (!window || window.isDestroyed() || typeof color !== 'string' || !/^#[0-9a-f]{6}$/i.test(color)) return
         window.setBackgroundColor(color)
       })
+      ipcMain.handle('desktop:restart', async (event) => {
+        const window = BrowserWindow.fromWebContents(event.sender)
+        if (!window || window.isDestroyed() || new URL(event.senderFrame.url).origin !== new URL(appUrl).origin) {
+          throw new Error('앱 창에서만 다시 시작할 수 있습니다.')
+        }
+        if (restartRequested) return
+        // The API refuses while AI work or an update is active, including work
+        // started from a detached window.
+        const response = await fetch(new URL('/api/ai/restart-engine', appUrl), { method: 'POST' })
+        if (!response.ok) {
+          const body = await response.json()
+          throw new Error(body.detail || 'AI 엔진을 다시 시작할 수 없습니다.')
+        }
+        restartRequested = true
+        app.quit()
+      })
       ipcMain.handle('desktop:open-quick-memo', async () => openQuickMemo())
       ipcMain.handle('desktop:open-byeori-window', openByeoriWindow)
       ipcMain.handle('desktop:focus-byeori-window', async () => focusByeoriWindow())
       ipcMain.handle('desktop:is-byeori-window-open', async () => isByeoriWindowOpen())
       ipcMain.handle('desktop:reattach-byeori-window', async () => reattachByeoriWindow())
       ipcMain.handle('desktop:open-main-document', openDocumentInMain)
+      ipcMain.handle('desktop:select-project-directory', async (event, request = {}) => {
+        const window = BrowserWindow.fromWebContents(event.sender)
+        if (!window || window.isDestroyed()) return { canceled: true, path: null }
+        const requestedTitle = typeof request?.title === 'string' ? request.title.trim() : ''
+        const requestedPath = typeof request?.defaultPath === 'string' ? request.defaultPath.trim() : ''
+        const defaultPath = requestedPath && path.isAbsolute(requestedPath) && fs.existsSync(requestedPath)
+          ? requestedPath
+          : undefined
+        const result = await dialog.showOpenDialog(window, {
+          title: requestedTitle.slice(0, 100) || '프로젝트 폴더 선택',
+          defaultPath,
+          properties: ['openDirectory'],
+        })
+        const selectedPath = result.filePaths[0]
+        return {
+          canceled: result.canceled || !selectedPath,
+          path: selectedPath ? path.resolve(selectedPath) : null,
+        }
+      })
       installMenu()
       await createMainWindow()
       if (smokeTest) await runSmokeTest()
@@ -1358,7 +1438,20 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
 })
 
-app.on('before-quit', () => {
+app.on('before-quit', (event) => {
+  if (shutdownComplete) return
+  event.preventDefault()
+  if (quitting) return
   quitting = true
-  stopBackend()
+  void stopBackend().then(() => {
+    shutdownComplete = true
+    if (restartRequested) {
+      app.relaunch({ args: desktopRelaunchArgs(process.argv) })
+    }
+    app.quit()
+  }).catch((error) => {
+    quitting = false
+    restartRequested = false
+    dialog.showErrorBox('Twill 종료 실패', `백엔드를 종료하지 못했습니다. 다시 시도해 주세요.\n${error.message}`)
+  })
 })

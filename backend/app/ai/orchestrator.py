@@ -6,7 +6,7 @@
   · 이벤트 스트림 릴레이
   · Run log 노트 쓰기 (B6)
   · 태스크 상태 전이 (B5)
-  · 학습 memories 추출 (B+1)
+  · 사용자가 명시적으로 요청한 memories 기록
 
 이번 커밋은 조립 + 실행 + 이벤트 릴레이까지. 나머지는 후속 태스크.
 """
@@ -65,10 +65,16 @@ def _system_identity_preamble() -> str:
         "# 스킬북 탐색 규칙\n\n"
         "반복 가능한 전문 절차, 이 앱의 사용법, 도메인 지식이 필요하면 사용 가능한 항목을 추측하지 말고 "
         "반드시 `list_skillbook`을 먼저 호출한다. 관련 항목을 고른 뒤 `read_skillbook`으로 필요한 대표 문서나 "
-        "구성요소만 읽고 따른다. 사용자가 실행할 스킬 ID를 명시한 경우에는 주입된 해당 스킬을 바로 따른다.",
+        "구성요소만 읽고 따른다. 사용자가 항목 이름을 명시하면 그 이름을 검색어로 우선 사용한다. 검색 결과가 "
+        "없으면 항목이 없다고 단정하지 말고 핵심 기능명으로 다시 검색한 뒤, 그래도 없으면 검색어 없이 전체 목록을 "
+        "확인한다. 사용자가 실행할 스킬 ID를 명시한 경우에는 주입된 해당 스킬을 바로 따른다.",
+        "# 메모리 기록 정책\n\n"
+        "일반 대화나 태스크 실행 결과에서 장기 메모리를 자동으로 추출하거나 저장하지 마세요. 사용자가 일반 채팅에서 "
+        "명시적으로 기억을 요청한 경우에만 앱의 전용 기록기가 처리합니다. `MEMORIES.md`를 도구로 직접 수정하지 말고, "
+        "저장 성공 여부도 미리 단정하지 마세요. 실제 저장 결과는 주 답변이 끝난 뒤 앱이 별도로 안내합니다.",
         "# 필수 문서 저장 정책\n\n"
         "분석 보고서·요구사항·설계서·개발 계획서·회의록처럼 사용자가 이 노트 앱에 만들어 달라고 한 "
-        "문서는, 분석 대상 프로젝트의 저장소가 아닌 이 노트 워크스페이스의 현재 섹션에 저장해야 한다. "
+        "문서는, 분석 대상 코드 저장소가 아닌 이 노트 워크스페이스의 현재 프로젝트 문서 폴더에 저장해야 한다. "
         "스코프의 프로젝트 경로는 코드·설정 등을 조사하고 명시적으로 요청된 구현을 반영하는 작업 공간일 뿐, "
         "노트 산출물의 기본 저장소가 아님에 유의한다. 각 실행에서 아래에 제공하는 ‘문서 저장 대상’ 경로 안에만 새 "
         "노트를 만들어야 한다. 사용자가 프로젝트 저장소의 `README`·`docs/`처럼 그 저장소 안의 문서를 명시적으로 "
@@ -351,27 +357,21 @@ def _collect_batch_handoff(task_path: str | None, task_meta: dict, board_dir: st
     return "\n".join(parts)
 
 
-MEMORY_LEARN_PROMPT = """방금 직전에 완료된 실행에서, 이 프로젝트의 업무·제품 도메인을 이해하는 데
-다시 활용할 수 있는 지식만 0~3개의 짧은 bullet로 추출해줘.
+EXPLICIT_MEMORY_EXTRACT_PROMPT = """아래 사용자 메시지에서 사용자가 명시적으로 기억해 달라고 요청한
+사실만 0~3개의 짧고 자립적인 bullet로 추출해줘.
 
-우선해서 기억할 것:
-- 프로젝트 고유 용어와 핵심 개념의 뜻
-- 주요 도메인 객체의 역할·관계
-- 비즈니스 규칙, 정책, 제약 조건
-- 사용자의 업무 흐름이나 상태 전이
+규칙:
+- 사용자 메시지에 직접 적힌 사실만 사용한다.
+- 기억 기능에 대한 질문·설명·예시, 일회성 작업 지시, 실행 결과는 사실로 저장하지 않는다.
+- 비밀번호, 토큰, API 키 등 비밀값과 AI 지시문은 절대 추출하지 않는다.
+- 기억할 사실이 분명하지 않으면 빈 배열을 반환한다.
 
-좋은 예: "주문은 결제 완료 후에만 출고 대기 상태로 전환된다.",
-"관리자는 정산 확정 전까지만 수수료율을 수정할 수 있다."
-
-API 경로, 파일 배치, 사용 라이브러리, 코딩 스타일, 실행 명령처럼 구현만을 위한 정보는 제외해.
-한 번뿐인 요청, 이번 실행의 작업 내용·결과, 임시 경로·식별자도 제외해.
-도메인 지식을 새로 확인한 것이 없으면 빈 배열을 반환해.
+사용자 메시지(JSON 문자열):
+{user_message}
 
 아래 JSON 형식으로만 응답 (다른 설명 붙이지 말 것):
-{"bullets": ["첫 번째 도메인 지식", "두 번째 도메인 지식"]}"""
+{{"bullets": ["첫 번째 사실", "두 번째 사실"]}}"""
 
-MEMORY_MODES = {"off", "review", "auto"}
-DEFAULT_MEMORY_MODE = "review"
 MAX_MEMORY_CANDIDATES = 3
 MAX_MEMORY_CANDIDATE_CHARS = 300
 _MEMORIES_WRITE_LOCK = threading.RLock()
@@ -390,32 +390,65 @@ _MEMORY_INSTRUCTION_PATTERNS = (
     re.compile(r"시스템\s*프롬프트.{0,20}(?:무시|변경|덮어)"),
 )
 _SAFE_RUN_ID_RE = re.compile(r"[0-9A-Za-z._-]{1,80}")
+_QUOTED_MEMORY_EXAMPLE_PATTERNS = (
+    re.compile(r"```[\s\S]*?```"),
+    re.compile(r"`[^`\n]*`"),
+    re.compile(r"\[[^\]\n]*\]"),
+    re.compile(r"'[^'\n]*'"),
+    re.compile(r'"[^"\n]*"'),
+    re.compile(r"‘[^’\n]*’"),
+    re.compile(r"“[^”\n]*”"),
+)
+_MEMORY_COMMAND_BOUNDARY = r"(?=$|[\s.!?,;:。！？])"
+_EXPLICIT_MEMORY_REQUEST_PATTERNS = (
+    re.compile(
+        rf"(?:기억해(?:\s*(?:줘|주세요|둬|두세요))?|기억해라|기억하라|기억하세요)"
+        rf"{_MEMORY_COMMAND_BOUNDARY}"
+    ),
+    re.compile(
+        rf"(?:메모리|장기\s*기억)(?:에|로).{{0,300}}?"
+        rf"(?:저장해(?:\s*(?:줘|주세요))?|저장하세요|기록해(?:\s*(?:줘|주세요))?|기록하세요|"
+        rf"남겨(?:\s*(?:줘|주세요))?|남겨주세요){_MEMORY_COMMAND_BOUNDARY}"
+    ),
+    re.compile(r"(?i)(?:^|\bplease\s+)remember(?:\s+(?:this|that|it))?\b"),
+    re.compile(r"(?i)\bsave\b.{0,80}\bto\s+(?:my\s+)?memory\b"),
+)
+_MEMORY_META_USAGE_PATTERNS = (
+    re.compile(
+        r"(?:기억해(?:\s*(?:줘|주세요|둬|두세요))?|기억해라|기억하라|기억하세요)"
+        r"\s*(?:라는|라고)\s*(?:말|표현|명령|문구)?"
+    ),
+    re.compile(
+        r"(?:메모리|장기\s*기억)(?:에|로).{0,120}?"
+        r"(?:저장해|저장하세요|기록해|기록하세요|남겨|남겨주세요)"
+        r"\s*(?:라는|라고)\s*(?:말|표현|명령|문구|버튼)?"
+    ),
+)
 
 
-def _normalize_memory_mode(value: object) -> str | None:
-    if not isinstance(value, str):
-        return None
-    normalized = value.strip().lower()
-    return normalized if normalized in MEMORY_MODES else None
+def _is_explicit_memory_request(value: object) -> bool:
+    """직접적인 기억 명령만 판정하고 인용된 예시 문구는 무시한다."""
+    if not isinstance(value, str) or not value.strip():
+        return False
+    candidate = value
+    for pattern in _QUOTED_MEMORY_EXAMPLE_PATTERNS:
+        candidate = pattern.sub(" ", candidate)
+    for pattern in _MEMORY_META_USAGE_PATTERNS:
+        candidate = pattern.sub(" ", candidate)
+    candidate = re.sub(r"\s+", " ", candidate).strip()
+    return any(pattern.search(candidate) for pattern in _EXPLICIT_MEMORY_REQUEST_PATTERNS)
 
 
-def _effective_memory_mode(settings: dict, req: "RunRequest", *, is_task: bool) -> str:
-    """요청의 명시 모드 → 레거시 opt-in → 워크스페이스 기본값 순으로 결정한다."""
-    if req.memory_mode is not None:
-        return req.memory_mode
-    if req.enable_learn:
-        return "auto"
-    codex = settings.get("codex") if isinstance(settings, dict) else None
-    if not is_task:
-        return "auto" if isinstance(codex, dict) and codex.get("learn_from_chat") is True else "off"
-    configured = _normalize_memory_mode(codex.get("memory_mode")) if isinstance(codex, dict) else None
-    return configured or DEFAULT_MEMORY_MODE
+def _explicit_memory_extract_prompt(user_message: str) -> str:
+    return EXPLICIT_MEMORY_EXTRACT_PROMPT.format(
+        user_message=json.dumps(str(user_message or ""), ensure_ascii=False),
+    )
 
 
 def _validate_memory_bullets(raw_bullets: object) -> tuple[list[str], list[dict[str, str]]]:
-    """메모리 후보를 한 줄 사실로 정규화하고 비밀값·지시문·과도한 길이를 거른다."""
+    """기억할 사실을 한 줄로 정규화하고 비밀값·지시문·과도한 길이를 거른다."""
     if not isinstance(raw_bullets, list):
-        return [], [{"value": "", "reason": "후보 목록 형식이 올바르지 않습니다"}]
+        return [], [{"value": "", "reason": "기억할 사실 목록 형식이 올바르지 않습니다"}]
 
     accepted: list[str] = []
     rejected: list[dict[str, str]] = []
@@ -427,7 +460,7 @@ def _validate_memory_bullets(raw_bullets: object) -> tuple[list[str], list[dict[
             continue
         reason = ""
         if len(value) > MAX_MEMORY_CANDIDATE_CHARS:
-            reason = f"후보는 {MAX_MEMORY_CANDIDATE_CHARS}자 이하여야 합니다"
+            reason = f"기억할 사실은 {MAX_MEMORY_CANDIDATE_CHARS}자 이하여야 합니다"
         elif any(pattern.search(value) for pattern in _MEMORY_SECRET_PATTERNS):
             reason = "비밀값 또는 인증정보로 보이는 내용은 저장할 수 없습니다"
         elif any(pattern.search(value) for pattern in _MEMORY_INSTRUCTION_PATTERNS):
@@ -439,13 +472,13 @@ def _validate_memory_bullets(raw_bullets: object) -> tuple[list[str], list[dict[
             accepted.append(value)
             seen.add(key)
     if len(raw_bullets) > MAX_MEMORY_CANDIDATES:
-        rejected.append({"value": "", "reason": f"후보는 최대 {MAX_MEMORY_CANDIDATES}개까지 저장할 수 있습니다"})
+        rejected.append({"value": "", "reason": f"기억할 사실은 최대 {MAX_MEMORY_CANDIDATES}개까지 저장할 수 있습니다"})
     return accepted, rejected
 
 
 def _validate_memory_run_id(run_id: str) -> None:
     if not _SAFE_RUN_ID_RE.fullmatch(str(run_id or "")):
-        raise ValueError("메모리 후보의 실행 식별자가 올바르지 않습니다")
+        raise ValueError("메모리 저장 실행 식별자가 올바르지 않습니다")
 
 
 def _safe_workspace_ref(ref: str | None, fallback: str) -> str:
@@ -551,73 +584,73 @@ def _append_to_memories(
     return target_ref
 
 
-def approve_memory_review(session_id: str, run_id: str, raw_bullets: object) -> dict[str, Any]:
-    """세션에 보존된 검토 후보를 사용자가 편집한 값으로 확정 저장한다."""
-    with _MEMORIES_WRITE_LOCK:
-        return _approve_memory_review_locked(session_id, run_id, raw_bullets)
+def _memory_fact_key(value: object) -> str:
+    normalized = re.sub(r"\s+", " ", str(value or "")).strip().lstrip("-*• ").strip()
+    return normalized.casefold()
 
 
-def _approve_memory_review_locked(session_id: str, run_id: str, raw_bullets: object) -> dict[str, Any]:
+def _stored_memory_fact_keys(path: Path) -> set[str]:
+    if not path.is_file():
+        return set()
+    try:
+        lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    except OSError:
+        return set()
+    return {
+        key
+        for line in lines
+        if (match := re.match(r"^\s*[-*•]\s+(.+?)\s*$", line))
+        and (key := _memory_fact_key(match.group(1)))
+    }
+
+
+def _save_explicit_memories(raw_bullets: object, run_id: str) -> dict[str, Any]:
+    """명시적 기억 요청의 사실을 전역 메모리에 한 번만 기록한다."""
     _validate_memory_run_id(run_id)
-    session = ai_sessions.get_session(session_id)
-    if not session:
-        raise LookupError("Twill AI 세션을 찾을 수 없습니다")
-
-    saved = session.get("memory_saved")
-    if isinstance(saved, dict) and str(saved.get("run_id") or "") == run_id:
-        return {
-            "saved": True,
-            "already_saved": True,
-            "run_id": run_id,
-            "bullets": list(saved.get("bullets") or []),
-            "path": saved.get("path"),
-        }
-
-    review = session.get("memory_review")
-    if not isinstance(review, dict) or str(review.get("run_id") or "") != run_id:
-        raise LookupError("검토할 메모리 후보를 찾을 수 없습니다")
-
     bullets, rejected = _validate_memory_bullets(raw_bullets)
     if rejected:
         raise ValueError(rejected[0]["reason"])
     if not bullets:
-        raise ValueError("저장할 메모리 후보를 하나 이상 입력해주세요")
+        raise ValueError("메시지에서 기억할 사실을 찾지 못했습니다. 기억할 내용을 함께 적어주세요")
 
-    memories_path = _append_to_memories(
-        bullets,
-        run_id,
-        section_id=str(review.get("section_id") or "") or None,
-        scope_id=str(review.get("scope_id") or "") or None,
-        section_name=str(review.get("section_name") or "") or None,
-        memories_ref=str(review.get("memories_ref") or "") or None,
-    )
-    result = {
-        "saved": True,
-        "already_saved": False,
-        "run_id": run_id,
-        "bullets": bullets,
-        "path": memories_path,
-    }
-    ai_sessions.update_session(session_id, memory_review=None, memory_saved=result)
-    return result
-
-
-def discard_memory_review(session_id: str, run_id: str) -> dict[str, Any]:
-    """저장하지 않기로 한 검토 후보를 세션에서 제거한다."""
+    target_ref = DEFAULT_MEMORIES
+    target = config.notes_dir() / target_ref
     with _MEMORIES_WRITE_LOCK:
-        return _discard_memory_review_locked(session_id, run_id)
+        if target.is_file():
+            try:
+                content = target.read_text(encoding="utf-8", errors="replace")
+                if re.search(rf"(?m)^## .* · run:{re.escape(run_id)}\s*$", content):
+                    return {
+                        "saved": True,
+                        "already_saved": True,
+                        "run_id": run_id,
+                        "bullets": bullets,
+                        "path": target_ref,
+                    }
+            except OSError:
+                pass
 
+        existing = _stored_memory_fact_keys(target)
+        new_bullets = [bullet for bullet in bullets if _memory_fact_key(bullet) not in existing]
+        if not new_bullets:
+            return {
+                "saved": True,
+                "already_saved": True,
+                "run_id": run_id,
+                "bullets": bullets,
+                "path": target_ref,
+            }
 
-def _discard_memory_review_locked(session_id: str, run_id: str) -> dict[str, Any]:
-    _validate_memory_run_id(run_id)
-    session = ai_sessions.get_session(session_id)
-    if not session:
-        raise LookupError("Twill AI 세션을 찾을 수 없습니다")
-    review = session.get("memory_review")
-    if not isinstance(review, dict) or str(review.get("run_id") or "") != run_id:
-        raise LookupError("검토할 메모리 후보를 찾을 수 없습니다")
-    ai_sessions.update_session(session_id, memory_review=None)
-    return {"discarded": True, "run_id": run_id}
+        memories_path = _append_to_memories(new_bullets, run_id)
+        if not memories_path:
+            raise OSError("메모리 파일에 기록하지 못했습니다")
+        return {
+            "saved": True,
+            "already_saved": False,
+            "run_id": run_id,
+            "bullets": new_bullets,
+            "path": memories_path,
+        }
 
 
 def _update_task_frontmatter(task_path: str, patch: dict[str, Any]) -> None:
@@ -712,12 +745,12 @@ def prompt_runtime_info() -> dict[str, Any]:
             "content": VERIFY_REPORT_PROMPT,
         },
         {
-            "id": "memory-learn",
+            "id": "explicit-memory-extract",
             "stage": "실행 후처리 프롬프트",
-            "title": "학습 메모리 추출 지시",
-            "source": "내장 · 태스크 메모리 설정이 검토/자동일 때",
+            "title": "명시적 기억 요청 추출 지시",
+            "source": "내장 · 일반 채팅에서 사용자가 기억을 요청했을 때만",
             "included": False,
-            "content": MEMORY_LEARN_PROMPT,
+            "content": EXPLICIT_MEMORY_EXTRACT_PROMPT,
         },
     ]
     common_instructions = _system_identity_preamble()
@@ -745,7 +778,7 @@ def prompt_runtime_info() -> dict[str, Any]:
             },
             {
                 "title": "실행 컨텍스트 및 명시적 스킬",
-                "when": "섹션·스코프가 결정되거나 스킬을 직접 선택한 태스크를 실행할 때",
+                "when": "프로젝트·스코프가 결정되거나 스킬을 직접 선택한 태스크를 실행할 때",
                 "description": "현재 section/scope 식별자와 문서 저장 경로, 사용자가 직접 선택한 skill 본문만 추가합니다.",
             },
             {
@@ -877,16 +910,16 @@ def _assemble_developer_instructions(
 
     # 스코프는 분석/구현 대상 코드베이스일 수 있지만, 노트 앱에서 생성하는 문서의 저장소는
     # 언제나 notes 워크스페이스다. cwd만 전달하면 에이전트가 그곳에 분석 보고서를 쓰기 쉬우므로,
-    # 절대 경로와 허용된 섹션 폴더를 매 실행 프롬프트에 명시한다.
+    # 절대 경로와 허용된 프로젝트 문서 폴더를 매 실행 프롬프트에 명시한다.
     workspace_root = str(config.notes_dir().resolve())
     document_roots = list(section_document_roots) or [workspace_root]
     roots_listing = "\n".join(f"- `{path}`" for path in document_roots)
-    source_detail = f"현재 스코프의 분석/구현 경로: `{scope_cwd}`" if scope_id and scope_cwd else "외부 스코프 없음"
+    source_detail = f"현재 프로젝트의 AI 작업 경로: `{scope_cwd}`" if scope_id and scope_cwd else "선택된 프로젝트 없음"
     parts.append(
         "# 문서 저장 대상 (반드시 준수)\n\n"
         f"노트 워크스페이스 루트: `{workspace_root}`\n"
         f"{source_detail}\n\n"
-        "사용자가 요청한 분석 문서·사양서·계획서 등 노트 산출물은 아래 현재 섹션 폴더 중 내용에 맞는 "
+        "사용자가 요청한 분석 문서·사양서·계획서 등 노트 산출물은 아래 현재 프로젝트 문서 폴더 중 내용에 맞는 "
         "곳에 Markdown 파일로 저장하세요. 스코프 경로에는 같은 종류의 새 문서를 만들지 마세요. "
         "프로젝트 저장소 내 문서 변경을 사용자가 명시한 경우만 그 요청을 예외로 처리합니다.\n"
         f"{roots_listing}"
@@ -962,35 +995,57 @@ def _scopes_from_note_db() -> list[dict]:
 
 
 def _resolve_scope_cwd(settings: dict, scope_id: str | None) -> str:
-    """scope id → 절대 경로. 우선순위: scopes/*.md DB > settings.json > 워크스페이스 루트."""
+    """scope id → 절대 경로. 경로가 없거나 유효하지 않으면 프로젝트별 내부 cwd를 쓴다."""
     default_cwd = str(config.notes_dir())
     if not scope_id:
         return default_cwd
+    known_project = False
+
+    def internal_cwd() -> str:
+        if not known_project:
+            return default_cwd
+        try:
+            from ..routers.workspace import PROJECT_AGENTS_FILE, _ensure_agents_file, project_runtime_root
+
+            runtime = project_runtime_root(scope_id)
+            _ensure_agents_file(runtime / PROJECT_AGENTS_FILE)
+            return str(runtime)
+        except Exception:  # noqa: BLE001
+            # 내부 저장소 자체가 손상된 경우에만 워크스페이스 루트로 최종 폴백한다.
+            return default_cwd
+
     # 1) DB 우선
     for s in _scopes_from_note_db():
-        if s["id"] == scope_id and s["path"]:
-            p = Path(s["path"]).expanduser()
-            if not p.is_absolute():
-                p = config.notes_dir() / p
-            try:
-                return str(p.resolve())
-            except OSError:
-                return default_cwd
+        if s["id"] != scope_id:
+            continue
+        known_project = True
+        if not s["path"]:
+            break
+        p = Path(s["path"]).expanduser()
+        if not p.is_absolute():
+            p = config.notes_dir() / p
+        try:
+            resolved = p.resolve()
+            return str(resolved) if resolved.is_dir() else internal_cwd()
+        except OSError:
+            return internal_cwd()
     # 2) settings.json fallback
     scopes = (settings.get("scopes") or []) if isinstance(settings, dict) else []
     for s in scopes:
         if isinstance(s, dict) and s.get("id") == scope_id:
+            known_project = True
             raw = str(s.get("path") or "").strip()
             if not raw:
-                return default_cwd
+                return internal_cwd()
             p = Path(raw).expanduser()
             if not p.is_absolute():
                 p = config.notes_dir() / p
             try:
-                return str(p.resolve())
+                resolved = p.resolve()
+                return str(resolved) if resolved.is_dir() else internal_cwd()
             except OSError:
-                return default_cwd
-    return default_cwd
+                return internal_cwd()
+    return internal_cwd()
 
 
 def _read_current_doc(current_path: str | None, max_chars: int = 4000) -> tuple[str, str, str]:
@@ -1204,6 +1259,7 @@ class RunRequest:
         output_schema: dict | None = None,
         task_board_dir: str = "tasks",
         max_time_sec: int | None = None,
+        # 구형 클라이언트 호환 필드. 자동 학습은 제거되어 값과 관계없이 동작하지 않는다.
         enable_learn: bool = False,
         memory_mode: str | None = None,
         session_id: str | None = None,
@@ -1228,10 +1284,9 @@ class RunRequest:
         self.output_schema = output_schema
         self.task_board_dir = task_board_dir
         self.max_time_sec = max_time_sec
-        # 일반 채팅은 워크스페이스의 learn_from_chat 설정을, 태스크는 off/review/auto 정책을 따른다.
-        # enable_learn은 구형 내부 호출의 auto 호환용이다.
+        # 구형 요청을 파싱할 수만 있게 보존한다. 신규 메모리는 일반 채팅의 명시적 요청으로만 기록한다.
         self.enable_learn = bool(enable_learn)
-        self.memory_mode = _normalize_memory_mode(memory_mode)
+        self.memory_mode = str(memory_mode or "").strip().lower() or None
         # 벼리 패널 세션 (탭). 있으면 thread 를 이어가고 메시지를 세션에 영속화.
         self.session_id = session_id
         # 챗 모드 컨텍스트: 현재 열람 중인 문서 경로(명시 요청 때만 사용) + 선택 텍스트
@@ -1326,6 +1381,7 @@ def _resolve_run_context(
     session: dict | None,
     *,
     use_current_path: bool = True,
+    task_execution_context: ai_sessions.TaskExecutionContext | None = None,
 ) -> RunContext:
     """요청·태스크·현재 노트·세션으로부터 섹션/스코프/메모리 대상을 한 번만 결정한다.
 
@@ -1336,46 +1392,69 @@ def _resolve_run_context(
     sections = [dict(section) for section in raw_sections if isinstance(section, dict)] if isinstance(raw_sections, list) else []
 
     by_id = {str(section.get("id")): section for section in sections if section.get("id")}
-    selected = (
-        by_id.get(str(req.section_id))
-        if req.section_id
-        else by_id.get(str(task_meta.get("section_id")))
-        if task_meta.get("section_id")
-        else None
-    )
+    frozen_task_session = bool(req.task_path and session)
+    if frozen_task_session:
+        selected = by_id.get(str(session.get("section_id"))) if session.get("section_id") else None
+        frozen_scope_id = str(session.get("scope_id") or "").strip() or None
+        if selected and (str(selected.get("scope_id") or "").strip() or None) != frozen_scope_id:
+            selected = None
+    elif req.task_path and task_execution_context:
+        selected = (
+            by_id.get(str(task_execution_context.section_id))
+            if task_execution_context.section_id
+            else None
+        )
+    else:
+        selected = (
+            by_id.get(str(req.section_id))
+            if req.section_id
+            else by_id.get(str(task_meta.get("section_id")))
+            if task_meta.get("section_id")
+            else None
+        )
 
     # 일반 채팅의 현재 문서는 경로만으로 섹션·메모리·시스템 프롬프트를 바꾸지 않는다.
     # 명시적 문서 첨부도 사용자 입력에만 한 번 넣으며 RunContext에는 남기지 않는다.
     current_note = _workspace_relative_path(req.current_path) if use_current_path else None
-    if selected is None:
+    if selected is None and not frozen_task_session and not (req.task_path and task_execution_context):
         selected = _section_for_note(sections, current_note)
-    if selected is None and req.task_path and session and session.get("section_id"):
-        selected = by_id.get(str(session.get("section_id")))
     # 섹션이 하나뿐인 워크스페이스는 그 섹션이 곧 전체 컨텍스트 — 아무 신호가 없어도 기본 적용.
     # (이게 없으면 scope/section 정보가 없는 카드 실행의 학습이 전역 MEMORIES.md 로 새는 문제 발생)
-    if selected is None and len(sections) == 1:
+    if (
+        selected is None
+        and not frozen_task_session
+        and not (req.task_path and task_execution_context)
+        and len(sections) == 1
+    ):
         selected = sections[0]
 
     # 태스크 카드는 실행 대상을 이미 확정한 요청이다. 카드 scope가 없더라도 카드의
     # section/session 기본값이 대상이므로, 클라이언트가 scope_id를 덧붙여 이를 바꾸지
     # 못하게 한다. 직접 만든 챗만 명시 선택 → 섹션 기본값 → 기존 세션 순으로 해석한다.
     if req.task_path:
-        scope_id = (
-            task_meta.get("scope")
-            or (selected.get("scope_id") if selected else None)
-            or (session.get("scope_id") if session else None)
-        )
+        if session:
+            scope_id = session.get("scope_id")
+        elif task_execution_context:
+            scope_id = task_execution_context.scope_id
+        else:
+            scope_id = task_meta.get("scope") or (selected.get("scope_id") if selected else None)
     else:
         scope_id = (
             req.scope_id
             or (selected.get("scope_id") if selected else None)
         )
     scope_id = str(scope_id).strip() if scope_id else None
-    if selected is None and scope_id:
+    if selected is None and scope_id and not req.task_path:
         selected = next((section for section in sections if section.get("scope_id") == scope_id), None)
 
     return RunContext(
-        section_id=str(selected.get("id")) if selected and selected.get("id") else None,
+        section_id=(
+            str(session.get("section_id") or "").strip() or None
+            if frozen_task_session
+            else str(selected.get("id"))
+            if selected and selected.get("id")
+            else None
+        ),
         section_name=str(selected.get("name") or selected.get("id")) if selected else None,
         section_memories_ref=None,
         scope_id=scope_id,
@@ -1460,17 +1539,44 @@ class Orchestrator:
         """Codex 실행 서버를 재시작해선 안 되는 진행 중 실행이 있는지 반환한다."""
         return bool(self._active)
 
-    async def steer(self, run_id: str, guidance: str, *, client_message_id: str | None = None) -> bool:
+    async def steer(
+        self,
+        run_id: str,
+        guidance: str,
+        *,
+        client_message_id: str | None = None,
+        images: list[str] | None = None,
+        files: list[dict] | None = None,
+    ) -> bool:
         run = self._active.get(run_id)
         if not run or not run.thread_id or not run.turn_id:
             return False
-        try:
-            next_turn_id = await run.engine.steer(
-                thread_id=run.thread_id,
-                turn_id=run.turn_id,
-                guidance=guidance,
-                client_message_id=client_message_id,
+        image_paths = _resolve_image_paths(images)
+        file_attachments = _resolve_file_attachments(files)
+        effective_guidance = guidance.strip()
+        if file_attachments:
+            listing = "\n".join(f"- {path} (원본 파일명: {name})" for path, name in file_attachments)
+            effective_guidance += (
+                ("\n\n" if effective_guidance else "")
+                + "[첨부 파일]\n사용자가 아래 파일들을 추가 지시와 함께 첨부했습니다. "
+                + "내용이 필요하면 해당 경로의 파일을 직접 열어 확인하세요:\n"
+                + listing
             )
+        if not effective_guidance and image_paths:
+            effective_guidance = "첨부한 이미지를 확인해 주세요."
+        if not effective_guidance:
+            return False
+        try:
+            kwargs: dict[str, Any] = {
+                "thread_id": run.thread_id,
+                "turn_id": run.turn_id,
+                "guidance": effective_guidance,
+                "client_message_id": client_message_id,
+            }
+            # 이미지가 없으면 확장 인자를 생략해 기존 플러그인 엔진과도 호환한다.
+            if image_paths:
+                kwargs["images"] = image_paths
+            next_turn_id = await run.engine.steer(**kwargs)
             # 최신 app-server 는 steer 성공 뒤의 활성 turnId를 반환한다. 다음 추가 지시가
             # 이전 turn에 붙지 않게 갱신하되, 기존 엔진(None 반환)과도 호환한다.
             if isinstance(next_turn_id, str) and next_turn_id:
@@ -1527,9 +1633,33 @@ class Orchestrator:
         # 태스크 컨텍스트
         task_body, task_meta = _read_task_context(req.task_path)
         is_task = bool(req.task_path)
-        memory_mode = _effective_memory_mode(settings, req, is_task=is_task)
+        task_execution_context: ai_sessions.TaskExecutionContext | None = None
+        if is_task:
+            try:
+                task_execution_context = ai_sessions.resolve_task_execution_context(
+                    scope_id=task_meta.get("scope") if isinstance(task_meta, dict) else None,
+                    section_id=task_meta.get("section_id") if isinstance(task_meta, dict) else None,
+                    task_path=req.task_path,
+                )
+            except ai_sessions.TaskProjectContextError as exc:
+                yield {"type": "error", "message": str(exc), "code": "task_project_required"}
+                return
 
+            if session:
+                frozen_scope_id = str(session.get("scope_id") or "").strip() or None
+                if frozen_scope_id != task_execution_context.scope_id:
+                    yield {
+                        "type": "error",
+                        "message": ai_sessions.TASK_PROJECT_CHANGED_MESSAGE,
+                        "code": "task_scope_changed",
+                    }
+                    return
         raw_prompt = (req.prompt or "").strip()
+        explicit_memory_requested = (
+            not is_task
+            and not req.display_prompt
+            and _is_explicit_memory_request(raw_prompt)
+        )
         current_document_requested = not is_task and (req.include_document or _requests_current_document(raw_prompt))
         # 예전 /plan 단축어는 태스크를 쪼개는 기능이었다. 맥락이 분리된 카드를 만들지
         # 않도록 기능을 없앴으므로, 구형 클라이언트 요청도 명확히 거절한다.
@@ -1593,6 +1723,7 @@ class Orchestrator:
             task_meta if isinstance(task_meta, dict) else {},
             session,
             use_current_path=is_task,
+            task_execution_context=task_execution_context,
         )
         scope_id = run_context.scope_id
         cwd = _resolve_scope_cwd(settings, scope_id)
@@ -1648,7 +1779,7 @@ class Orchestrator:
             "task_path": req.task_path,
             "session_id": req.session_id,
             "kind": "task" if is_task else "chat",
-            "memory_mode": memory_mode,
+            "explicit_memory_requested": explicit_memory_requested,
         }
 
         # 스레드 시작 (developer_instructions 를 config 로 전달)
@@ -2279,67 +2410,34 @@ class Orchestrator:
                 ai_sessions.update_session(session["id"], title=title, title_mode="generated")
             yield {"type": "session_updated", "session_id": session["id"]}
 
-        # 완료된 실행에서 장기 기억 후보를 추출한다. review는 세션에 후보만 보존하고,
-        # auto 또는 레거시 enable_learn opt-in만 즉시 Markdown 메모리에 기록한다.
-        # 설정에서 명시적으로 켠 일반 채팅은 도구를 쓰지 않은 텍스트 질문도 학습 대상이다.
-        pending_review = session.get("memory_review") if session else None
+        # 일반 채팅에서 사용자가 직접 기억을 요청한 경우에만 메시지 속 사실을 추출해 저장한다.
+        # 태스크 본문·실행 결과·설정값·레거시 memory_mode/enable_learn 값은 이 흐름을 열 수 없다.
         if (
-            memory_mode != "off"
-            and not (memory_mode == "review" and isinstance(pending_review, dict))
+            explicit_memory_requested
             and not error_seen
             and not interrupted
-            and final_text.strip()
-            and (not is_task or tool_events)
         ):
             try:
-                learn_data = await _run_background_json(engine, thread_id, MEMORY_LEARN_PROMPT)
-                bullets: list[str] = []
-                if isinstance(learn_data, dict) and isinstance(learn_data.get("bullets"), list):
-                    bullets, rejected = _validate_memory_bullets(learn_data["bullets"])
-                    if rejected:
-                        log.info("memory candidates rejected: %s", rejected)
-                if bullets:
-                    if memory_mode == "review":
-                        review = {
-                            "run_id": run_id,
-                            "bullets": bullets,
-                            "section_id": run_context.section_id,
-                            "scope_id": run_context.scope_id,
-                            "section_name": run_context.section_name,
-                            "memories_ref": run_context.section_memories_ref,
-                        }
-                        if session:
-                            ai_sessions.update_session(session["id"], memory_review=review)
-                        yield {"type": "memory_candidates", **review}
-                    else:
-                        memories_path = _append_to_memories(
-                            bullets,
-                            run_id,
-                            section_id=run_context.section_id,
-                            scope_id=run_context.scope_id,
-                            section_name=run_context.section_name,
-                            memories_ref=run_context.section_memories_ref,
-                        )
-                        if session:
-                            ai_sessions.update_session(
-                                session["id"],
-                                memory_saved={
-                                    "saved": True,
-                                    "already_saved": False,
-                                    "run_id": run_id,
-                                    "bullets": bullets,
-                                    "path": memories_path,
-                                },
-                            )
-                        yield {
-                            "type": "memory_learned",
-                            "run_id": run_id,
-                            "bullets": bullets,
-                            "path": memories_path,
-                            "section_id": run_context.section_id,
-                        }
+                extraction_prompt = _explicit_memory_extract_prompt(raw_prompt)
+                learn_data = await _run_background_json(engine, thread_id, extraction_prompt)
+                raw_bullets = learn_data.get("bullets") if isinstance(learn_data, dict) else None
+                result = _save_explicit_memories(raw_bullets, run_id)
+                if session:
+                    ai_sessions.update_session(session["id"], memory_saved=result, memory_error=None)
+                yield {"type": "memory_learned", **result}
             except Exception as e:  # noqa: BLE001
-                log.info("learn turn skipped: %s", e)
+                message = str(e).strip() or "메모리를 저장하지 못했습니다"
+                log.info("explicit memory save failed: %s", message)
+                if session:
+                    ai_sessions.update_session(
+                        session["id"],
+                        memory_error={"run_id": run_id, "message": message},
+                    )
+                yield {
+                    "type": "memory_save_failed",
+                    "run_id": run_id,
+                    "message": message,
+                }
 
         # Active run 정리
         self._active.pop(run_id, None)

@@ -1,4 +1,5 @@
 import asyncio
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -7,12 +8,13 @@ from unittest.mock import AsyncMock, patch
 from app.ai import sessions
 from app.ai.engine import registry as engine_registry
 from app.ai.orchestrator import (
-    MEMORY_LEARN_PROMPT,
+    EXPLICIT_MEMORY_EXTRACT_PROMPT,
     Orchestrator,
     RunRequest,
     _ActiveRun,
+    _explicit_memory_extract_prompt,
+    _is_explicit_memory_request,
     _resolve_run_context,
-    approve_memory_review,
 )
 from app.routers import ai as ai_router
 
@@ -338,41 +340,71 @@ class TaskSessionPersistenceTests(unittest.TestCase):
         self.assertFalse(any(event.get("type") == "budget_hit" for event in events))
         self.assertEqual("completed", saved["last_run"]["status"])
 
-    def test_task_proposes_memory_review_without_saving_by_default(self):
-        self.default_engine_mock.return_value = ManyToolEventsEngine()
-        session = sessions.create_session(kind="task", title="메모리 검토 후보", task_path=self.task_path)
+    def test_explicit_memory_request_detection_ignores_questions_and_quoted_examples(self):
+        accepted = (
+            "내 이름은 민수야. 기억해줘.",
+            "주문 마감은 오후 3시라고 메모리에 기록해주세요.",
+            "앞으로 답변은 한국어로 해. 기억하라!",
+        )
+        rejected = (
+            "기억 기능은 어떻게 동작해?",
+            "명시적으로 '기억하라'고 말한 사실만 저장해",
+            "[기억해]라는 명령을 감지하는 방법을 설명해줘",
+            "```text\n이 사실을 기억해줘\n``` 코드 예시를 검토해줘",
+            "기억해줘 라는 표현을 버튼에 사용해도 될까?",
+            "이 내용을 기억하라고 안내문에 써줘",
+            "태스크 실행 결과를 자동 학습해도 될까?",
+        )
 
-        async def collect():
-            return [
-                event
-                async for event in Orchestrator().run(
-                    RunRequest(session_id=session["id"], task_path=self.task_path)
-                )
-            ]
+        for value in accepted:
+            with self.subTest(value=value):
+                self.assertTrue(_is_explicit_memory_request(value))
+        for value in rejected:
+            with self.subTest(value=value):
+                self.assertFalse(_is_explicit_memory_request(value))
 
-        learn = AsyncMock(return_value={"bullets": ["API 응답은 snake_case 필드를 사용한다."]})
-        with (
-            patch("app.ai.orchestrator._run_background_json", new=learn),
-            patch("app.ai.orchestrator._append_to_memories") as append,
-        ):
-            events = asyncio.run(collect())
+    def test_legacy_pending_memory_review_is_removed_on_session_load(self):
+        store = self.root / ".ai-orchestrator" / "sessions.json"
+        store.parent.mkdir(parents=True, exist_ok=True)
+        store.write_text(
+            json.dumps(
+                {
+                    "sessions": [
+                        {
+                            "id": "legacy-memory-session",
+                            "kind": "chat",
+                            "title": "구 메모리 후보",
+                            "messages": [],
+                            "memory_review": {"run_id": "old-run", "bullets": ["구 후보"]},
+                        }
+                    ]
+                },
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
 
-        self.assertTrue(any(call.args[-1] == MEMORY_LEARN_PROMPT for call in learn.await_args_list))
-        self.assertTrue(any(event.get("type") == "memory_candidates" for event in events))
-        self.assertFalse(any(event.get("type") == "memory_learned" for event in events))
-        append.assert_not_called()
-        saved = sessions.get_session(session["id"])
-        self.assertEqual(["API 응답은 snake_case 필드를 사용한다."], saved["memory_review"]["bullets"])
+        restored = sessions.list_sessions()[0]
+        persisted = json.loads(store.read_text(encoding="utf-8"))["sessions"][0]
 
-    def test_memory_learn_prompt_prioritizes_reusable_domain_knowledge(self):
-        self.assertIn("업무·제품 도메인", MEMORY_LEARN_PROMPT)
-        self.assertIn("비즈니스 규칙, 정책, 제약 조건", MEMORY_LEARN_PROMPT)
-        self.assertIn("API 경로, 파일 배치, 사용 라이브러리", MEMORY_LEARN_PROMPT)
-        self.assertIn("도메인 지식을 새로 확인한 것이 없으면 빈 배열", MEMORY_LEARN_PROMPT)
+        self.assertNotIn("memory_review", restored)
+        self.assertNotIn("memory_review", persisted)
 
-    def test_memory_learning_still_requires_explicit_opt_in(self):
-        self.default_engine_mock.return_value = ManyToolEventsEngine()
-        session = sessions.create_session(kind="task", title="메모리 명시 저장", task_path=self.task_path)
+    def test_memory_review_write_endpoints_are_removed(self):
+        paths = {route.path for route in ai_router.router.routes}
+
+        self.assertNotIn("/api/ai/memory-reviews/approve", paths)
+        self.assertNotIn("/api/ai/memory-reviews/discard", paths)
+
+    def test_explicit_memory_extract_prompt_is_limited_to_user_message(self):
+        prompt = _explicit_memory_extract_prompt("주문 마감은 오후 3시야. 기억해줘.")
+
+        self.assertIn("사용자 메시지에 직접 적힌 사실만", EXPLICIT_MEMORY_EXTRACT_PROMPT)
+        self.assertIn('"주문 마감은 오후 3시야. 기억해줘."', prompt)
+        self.assertIn('"bullets"', prompt)
+
+    def test_task_and_legacy_flags_never_trigger_memory_extraction(self):
+        session = sessions.create_session(kind="task", title="자동 학습 금지", task_path=self.task_path)
 
         async def collect():
             return [
@@ -381,110 +413,118 @@ class TaskSessionPersistenceTests(unittest.TestCase):
                     RunRequest(
                         session_id=session["id"],
                         task_path=self.task_path,
+                        prompt="이 결과를 기억해줘",
                         enable_learn=True,
+                        memory_mode="auto",
                     )
                 )
             ]
 
-        learn = AsyncMock(return_value={"bullets": ["태스크 카드는 tasks 폴더에 둔다."]})
-        with (
-            patch("app.ai.orchestrator._run_background_json", new=learn),
-            patch("app.ai.orchestrator._append_to_memories", return_value="MEMORIES.md") as append,
-        ):
+        background = AsyncMock(return_value={"bullets": ["저장되면 안 되는 사실"]})
+        with patch("app.ai.orchestrator._run_background_json", new=background):
             events = asyncio.run(collect())
 
-        self.assertEqual(
-            1,
-            sum(call.args[-1] == MEMORY_LEARN_PROMPT for call in learn.await_args_list),
-        )
-        append.assert_called_once()
-        learned = next(event for event in events if event.get("type") == "memory_learned")
-        saved_run_id = sessions.get_session(session["id"])["memory_saved"]["run_id"]
-        self.assertEqual(saved_run_id, learned["run_id"])
-        self.assertTrue(saved_run_id)
+        self.assertFalse(any("사용자 메시지(JSON 문자열)" in call.args[-1] for call in background.await_args_list))
+        self.assertFalse(any(event.get("type", "").startswith("memory_") for event in events))
+        self.assertFalse((self.root / "MEMORIES.md").exists())
 
-    def test_chat_memory_setting_learns_from_question_without_tool_calls(self):
-        session = sessions.create_session(kind="chat", title="채팅 메모리 학습")
+    def test_ordinary_chat_never_writes_memory_even_with_legacy_setting(self):
+        session = sessions.create_session(kind="chat", title="일반 질문")
 
         async def collect():
             return [
                 event
                 async for event in Orchestrator().run(
-                    RunRequest(session_id=session["id"], prompt="배송 정책을 기억해줘")
+                    RunRequest(
+                        session_id=session["id"],
+                        prompt="배송 정책을 설명해줘",
+                        enable_learn=True,
+                        memory_mode="auto",
+                    )
                 )
             ]
 
-        learn = AsyncMock(return_value={"bullets": ["주문은 결제 완료 후에만 출고 대기 상태로 전환된다."]})
         with (
             patch(
                 "app.ai.orchestrator._read_workspace_settings",
-                return_value={"codex": {"learn_from_chat": True}},
+                return_value={"codex": {"learn_from_chat": True, "memory_mode": "auto"}},
             ),
-            patch("app.ai.orchestrator._run_background_json", new=learn),
-            patch("app.ai.orchestrator._append_to_memories", return_value="MEMORIES.md") as append,
+            patch("app.ai.orchestrator._run_background_json", new_callable=AsyncMock) as background,
         ):
             events = asyncio.run(collect())
 
-        append.assert_called_once()
-        self.assertTrue(any(event.get("type") == "memory_learned" for event in events))
-        self.assertEqual(1, sum(call.args[-1] == MEMORY_LEARN_PROMPT for call in learn.await_args_list))
+        background.assert_not_awaited()
+        self.assertFalse(any(event.get("type", "").startswith("memory_") for event in events))
+        self.assertFalse((self.root / "MEMORIES.md").exists())
 
-    def test_task_memory_mode_off_skips_candidate_extraction(self):
-        self.default_engine_mock.return_value = ManyToolEventsEngine()
-        session = sessions.create_session(kind="task", title="메모리 후보 끄기", task_path=self.task_path)
+    def test_explicit_chat_request_saves_memory_and_reports_actual_result(self):
+        session = sessions.create_session(kind="chat", title="명시적 기억")
 
         async def collect():
             return [
                 event
                 async for event in Orchestrator().run(
-                    RunRequest(session_id=session["id"], task_path=self.task_path, memory_mode="off")
+                    RunRequest(session_id=session["id"], prompt="주문 마감은 오후 3시야. 기억해줘.")
                 )
             ]
 
-        with patch("app.ai.orchestrator._run_background_json", new_callable=AsyncMock) as background:
+        extraction = AsyncMock(return_value={"bullets": ["주문 마감은 오후 3시다."]})
+        with patch("app.ai.orchestrator._run_background_json", new=extraction):
             events = asyncio.run(collect())
 
-        self.assertFalse(any(call.args[-1] == MEMORY_LEARN_PROMPT for call in background.await_args_list))
-        self.assertFalse(any(event.get("type") == "memory_candidates" for event in events))
-        self.assertFalse(any(event.get("type") == "memory_learned" for event in events))
+        learned = next(event for event in events if event.get("type") == "memory_learned")
+        self.assertTrue(learned["saved"])
+        self.assertFalse(learned["already_saved"])
+        self.assertEqual("MEMORIES.md", learned["path"])
+        self.assertIn("주문 마감은 오후 3시야", extraction.await_args.args[-1])
+        content = (self.root / "MEMORIES.md").read_text(encoding="utf-8")
+        self.assertIn("- 주문 마감은 오후 3시다.", content)
+        saved = sessions.get_session(session["id"])["memory_saved"]
+        self.assertEqual(learned["run_id"], saved["run_id"])
 
-    def test_memory_review_approval_writes_once_and_clears_pending_review(self):
-        session = sessions.create_session(kind="task", title="메모리 승인", task_path=self.task_path)
-        sessions.update_session(
-            session["id"],
-            memory_review={
-                "run_id": "run-review-1",
-                "bullets": ["기존 후보"],
-                "section_id": None,
-                "scope_id": None,
-                "section_name": None,
-                "memories_ref": "MEMORIES.md",
-            },
-        )
+    def test_same_explicit_fact_is_written_only_once(self):
+        session = sessions.create_session(kind="chat", title="중복 기억")
 
-        first = approve_memory_review(session["id"], "run-review-1", [" 편집한 장기 기억 "])
-        second = approve_memory_review(session["id"], "run-review-1", ["다른 값"])
+        async def collect():
+            return [
+                event
+                async for event in Orchestrator().run(
+                    RunRequest(session_id=session["id"], prompt="내 이름은 민수야. 기억해줘.")
+                )
+            ]
 
+        extraction = AsyncMock(return_value={"bullets": ["사용자의 이름은 민수다."]})
+        with patch("app.ai.orchestrator._run_background_json", new=extraction):
+            first_events = asyncio.run(collect())
+            second_events = asyncio.run(collect())
+
+        first = next(event for event in first_events if event.get("type") == "memory_learned")
+        second = next(event for event in second_events if event.get("type") == "memory_learned")
         self.assertFalse(first["already_saved"])
         self.assertTrue(second["already_saved"])
         content = (self.root / "MEMORIES.md").read_text(encoding="utf-8")
-        self.assertEqual(1, content.count("run:run-review-1"))
-        self.assertIn("- 편집한 장기 기억", content)
-        saved = sessions.get_session(session["id"])
-        self.assertIsNone(saved["memory_review"])
+        self.assertEqual(1, content.count("- 사용자의 이름은 민수다."))
 
-    def test_memory_review_rejects_secret_like_content(self):
-        session = sessions.create_session(kind="task", title="메모리 보안 검증", task_path=self.task_path)
-        sessions.update_session(
-            session["id"],
-            memory_review={"run_id": "run-secret", "bullets": ["후보"], "memories_ref": "MEMORIES.md"},
-        )
+    def test_rejected_explicit_memory_reports_failure_without_writing(self):
+        session = sessions.create_session(kind="chat", title="메모리 저장 실패")
 
-        with self.assertRaisesRegex(ValueError, "비밀값"):
-            approve_memory_review(session["id"], "run-secret", ["api_key=1234567890abcdef"])
+        async def collect():
+            return [
+                event
+                async for event in Orchestrator().run(
+                    RunRequest(session_id=session["id"], prompt="이 API 키를 기억해줘.")
+                )
+            ]
 
+        extraction = AsyncMock(return_value={"bullets": ["api_key=1234567890abcdef"]})
+        with patch("app.ai.orchestrator._run_background_json", new=extraction):
+            events = asyncio.run(collect())
+
+        failed = next(event for event in events if event.get("type") == "memory_save_failed")
+        self.assertIn("비밀값", failed["message"])
+        self.assertFalse(any(event.get("type") == "memory_learned" for event in events))
         self.assertFalse((self.root / "MEMORIES.md").exists())
-        self.assertIsNotNone(sessions.get_session(session["id"])["memory_review"])
+        self.assertEqual(failed["run_id"], sessions.get_session(session["id"])["memory_error"]["run_id"])
 
 
 if __name__ == "__main__":

@@ -5,8 +5,10 @@ description: Create or update an app-only skill in this project's Skill Book. Us
 
 # Create System Skill
 
-Create skills only under this project's `skillbook/skills` directory. Do not install
-them into a user's global Codex skill directory.
+Create skills only in Twill's persistent Skill Book directory, returned as
+`storage_path` by `list_skillbook`, under its `skills` subdirectory. This directory
+is outside the app installation and survives reinstalling Twill. Do not use the
+repository's bundled `skillbook/skills` or a user's global Codex skill directory.
 
 ## Workflow
 

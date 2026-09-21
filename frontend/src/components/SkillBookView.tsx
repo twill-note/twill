@@ -48,6 +48,12 @@ const SKILLBOOK_CONFIG: DbConfig = {
 
 export default function SkillBookView() {
   const closeBoardView = useAppStore((state) => state.closeBoardView)
+  const [storagePath, setStoragePath] = useState('')
+  useEffect(() => {
+    fetch('/api/skillbook/storage').then(async (response) => {
+      if (response.ok) setStoragePath((await response.json()).path)
+    }).catch(() => {})
+  }, [])
   const [entries, setEntries] = useState<SkillBookSummary[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [filter, setFilter] = useState('')
@@ -172,7 +178,8 @@ export default function SkillBookView() {
             emptyLabel="등록된 스킬이 없습니다"
           />
           <p className="mt-3 text-[11px] text-[#9b9a97]">
-            🔒 시스템 매뉴얼은 수정 할 수 없습니다.
+            🔒 시스템 매뉴얼은 수정할 수 없습니다. 스킬은 앱 설치 폴더 밖에 보존됩니다.
+            {storagePath && <span className="mt-1 block break-all">저장 위치: {storagePath}</span>}
           </p>
         </div>
       )}

@@ -1,3 +1,4 @@
+import { notifyAiEngineChanged, offerAppRestart, subscribeAiEngineChanged } from '../aiMaintenance'
 import {
   isValidElement,
   memo,
@@ -23,16 +24,13 @@ import {
 } from '../api'
 import { aiBus } from '../aiBus'
 import { useAiStore, type AiSession, type AiMessage, type ChatImage } from '../aiStore'
-import {
-  isMemoryReviewItemSelected,
-  isMemorySavedForRun,
-  selectedMemoryReviewBullets,
-} from '../aiMemory'
+import { isMemorySavedForRun } from '../aiMemory'
 import { useAppStore } from '../store'
 import { dialog } from '../dialog'
 import ImageAnnotator from './ImageAnnotator'
 import MentionPopover, { type MentionState } from './MentionPopover'
 import { MermaidExpandButton, MermaidPreview } from './MermaidBlock'
+import { subscribeWorkspaceScopesChanged } from '../workspaceScopeEvents'
 
 // 배열을 렌더 때마다 새로 만들면 ReactMarkdown도 매번 새 플러그인 설정으로 판단한다.
 const MARKDOWN_REMARK_PLUGINS = [remarkGfm]
@@ -79,6 +77,61 @@ function nodeText(node: React.ReactNode): string {
   return ''
 }
 
+/** AI 응답의 코드·다이어그램 원문을 아이콘 한 번으로 복사한다. */
+function ChatCopyButton({ value, className = '' }: { value: string; className?: string }) {
+  const [copied, setCopied] = useState(false)
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(value)
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 1500)
+    } catch {
+      void dialog.alert('클립보드 복사에 실패했습니다.')
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      className={`flex h-6 w-6 items-center justify-center rounded-sm border-0 bg-transparent p-0 text-current shadow-none transition-opacity hover:bg-transparent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#7a5eb0] ${copied ? 'opacity-100' : 'opacity-50 hover:opacity-100'} ${className}`}
+      onClick={() => void copy()}
+      aria-label={copied ? '코드 복사됨' : '코드 복사'}
+      title={copied ? '복사됨' : '코드 복사'}
+    >
+      {copied ? (
+        <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true">
+          <path d="m5 12 4 4L19 6" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      ) : (
+        <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+          <rect x="8" y="8" width="11" height="11" rx="2" />
+          <path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" strokeLinecap="round" />
+        </svg>
+      )}
+    </button>
+  )
+}
+
+function ChatCodeBlock({
+  children,
+  className = '',
+  ...props
+}: React.HTMLAttributes<HTMLPreElement>) {
+  const source = nodeText(children).replace(/\n$/, '')
+  return (
+    <div className="group relative my-2 min-w-0">
+      <pre {...props} className={`!my-0 pr-10 ${className}`}>{children}</pre>
+      {source && (
+        <ChatCopyButton
+          value={source}
+          className="absolute right-1.5 top-1.5 group-hover:opacity-100 focus-visible:opacity-100"
+        />
+      )}
+    </div>
+  )
+}
+
 /** 채팅 코드 펜스의 언어 이름을 Mermaid 소스로 정규화한다.
  * ` ```sequenceDiagram `처럼 다이어그램 종류를 언어에 직접 적은 응답도 지원한다. */
 function mermaidSourceFromCodeBlock(children: React.ReactNode): string | null {
@@ -101,6 +154,7 @@ function ChatMermaidDiagram({ source }: { source: string }) {
       <div className="chat-mermaid-header flex items-center justify-between gap-2 border-b px-3 py-1.5 text-[11px]">
         <span className="font-medium">{kind}</span>
         <div className="flex shrink-0 items-center gap-1">
+          <ChatCopyButton value={source} />
           <MermaidExpandButton
             source={source}
             className="chat-mermaid-source-toggle hover:bg-black/10 hover:text-current"
@@ -376,7 +430,7 @@ const MessageBubble = memo(function MessageBubble({
         // 스트리밍 중에는 닫히지 않은 코드 펜스가 자주 생기므로 원문을 유지한다.
         // 완료 뒤에만 다이어그램으로 교체해 문법 오류 깜빡임을 없앤다.
         const source = m.streaming ? null : mermaidSourceFromCodeBlock(children)
-        return source ? <ChatMermaidDiagram source={source} /> : <pre {...props}>{children}</pre>
+        return source ? <ChatMermaidDiagram source={source} /> : <ChatCodeBlock {...props}>{children}</ChatCodeBlock>
       },
       img: ({ node: _node, src, alt }: { node?: unknown } & ImgHTMLAttributes<HTMLImageElement>) =>
         typeof src === 'string' && src ? (
@@ -588,29 +642,44 @@ function TaskSourceBanner({ session, openFile }: { session: AiSession; openFile:
   // 생성 직후의 POST 응답에는 아직 list_sessions용 runtime 상태가 없을 수 있다.
   const title = status?.title || source.last_title || source.title
   const path = deleted ? null : status?.path || source.last_path || source.path
+  const projectWarning = status?.scope_mismatch ? (
+    <div className="rounded-lg border border-[#f4dfab] bg-[#fff9eb] px-3 py-2 text-[11px] leading-snug text-[#8a6817]" role="alert">
+      <div className="font-medium">카드와 세션의 프로젝트가 다릅니다</div>
+      <div className="mt-0.5">
+        {status.scope_error ||
+          '이 세션의 프로젝트 권한은 시작 시점 값으로 유지됩니다. 태스크 카드에서 ‘변경된 프로젝트로 새 실행’을 시작해주세요.'}
+      </div>
+    </div>
+  ) : null
 
   if (!path) {
     return (
-      <div className="rounded-lg border border-[#e7e0cf] bg-[#fffcf5] px-3 py-2 text-[12px] text-[#795f28]" role="note">
-        <span className="font-medium">요청 대상: {title}</span>
-        <span className="ml-1.5 text-[11px] text-[#9a8050]">삭제된 카드</span>
+      <div className="space-y-1.5">
+        {projectWarning}
+        <div className="rounded-lg border border-[#e7e0cf] bg-[#fffcf5] px-3 py-2 text-[12px] text-[#795f28]" role="note">
+          <span className="font-medium">요청 대상: {title}</span>
+          <span className="ml-1.5 text-[11px] text-[#9a8050]">삭제된 카드</span>
+        </div>
       </div>
     )
   }
 
   return (
-    <button
-      type="button"
-      className="flex w-full items-center gap-2 rounded-lg border border-[#c9dcff] bg-[#f4f8ff] px-3 py-2 text-left text-[12px] text-[#375a9e] hover:bg-[#eaf2ff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#4a9eff]"
-      onClick={() => openFile(path)}
-      title={`${path} 카드 열기`}
-    >
-      <span aria-hidden="true">↗</span>
-      <span className="min-w-0 flex-1 truncate">
-        <span className="font-medium">요청 대상: {title}</span>
-      </span>
-      <span className="shrink-0 text-[10px] text-[#5c7db8]">카드 열기</span>
-    </button>
+    <div className="space-y-1.5">
+      {projectWarning}
+      <button
+        type="button"
+        className="flex w-full items-center gap-2 rounded-lg border border-[#c9dcff] bg-[#f4f8ff] px-3 py-2 text-left text-[12px] text-[#375a9e] hover:bg-[#eaf2ff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#4a9eff]"
+        onClick={() => openFile(path)}
+        title={`${path} 카드 열기`}
+      >
+        <span aria-hidden="true">↗</span>
+        <span className="min-w-0 flex-1 truncate">
+          <span className="font-medium">요청 대상: {title}</span>
+        </span>
+        <span className="shrink-0 text-[10px] text-[#5c7db8]">카드 열기</span>
+      </button>
+    </div>
   )
 }
 
@@ -820,14 +889,11 @@ export default function ByeoriPanel({
   const cancel = useAiStore((s) => s.cancel)
   const retryChat = useAiStore((s) => s.retryChat)
   const dismissRecovery = useAiStore((s) => s.dismissRecovery)
-  const updateMemoryReviewBullet = useAiStore((s) => s.updateMemoryReviewBullet)
-  const toggleMemoryReviewBullet = useAiStore((s) => s.toggleMemoryReviewBullet)
-  const approveMemoryReview = useAiStore((s) => s.approveMemoryReview)
-  const discardMemoryReview = useAiStore((s) => s.discardMemoryReview)
   const setSessionModel = useAiStore((s) => s.setSessionModel)
   const confirmRunOrder = useAiStore((s) => s.confirmRunOrder)
   const dismissRunOrder = useAiStore((s) => s.dismissRunOrder)
   const active: AiSession | null = sessions.find((s) => s.id === activeSessionId) ?? null
+  const taskScopeMismatch = Boolean(active?.sourceTaskStatus?.scope_mismatch)
   const hasRecoverableWork = sessions.some((s) => s.busy || s.queued)
 
   const [status, setStatus] = useState<AiEngineStatus | null>(null)
@@ -844,7 +910,7 @@ export default function ByeoriPanel({
         ? activeProject.project
           ? `${activeProject.project} · ${activeProject.label}`
           : activeProject.label
-        : active.scopeId || '태스크 카드/섹션 설정'
+        : active.scopeId || '태스크 카드/프로젝트 설정'
       : null
   // 워크스페이스 기본 모델/강도 (.workspace.json → 없으면 앱 기본값 terra/xhigh 가 내려옴)
   const [wsDefaults, setWsDefaults] = useState<{ model: string; effort: string }>({ model: '', effort: '' })
@@ -916,12 +982,20 @@ export default function ByeoriPanel({
 
   useEffect(() => {
     refreshStatus()
+    return subscribeAiEngineChanged(() => {
+      setModels([])
+      setUsageLimits(null)
+      void api.ai.status().then(async (next) => {
+        setStatus(next)
+        if (next.logged_in) setModels((await api.ai.models()).models)
+      }).catch((e: Error) => setUiError(e.message))
+    })
   }, [refreshStatus])
 
   useEffect(() => {
     if (status?.logged_in) {
       loadSessions()
-      api.ai.models().then((r) => setModels(r.models)).catch(() => {})
+      api.ai.models().then((r) => setModels(r.models)).catch((e: Error) => setUiError(e.message))
       refreshUsageLimits()
       api.workspaceSettings
         .get()
@@ -958,12 +1032,11 @@ export default function ByeoriPanel({
     if (active?.kind !== 'chat') setScopePickerOpen(false)
   }, [active?.id, active?.kind])
 
-  // 프로젝트 관리 테이블의 유효한 항목만 질문 대상 선택기에 노출한다. 세션의 scope 는
+  // 경로 유무와 관계없이 모든 프로젝트를 질문 대상 선택기에 노출한다. 세션의 scope 는
   // 안정적인 id 로 저장하므로, 여기서는 표시명과 경로를 해석하는 데만 사용한다.
   useEffect(() => {
     refreshScopes()
-    window.addEventListener('workspace-scopes-changed', refreshScopes)
-    return () => window.removeEventListener('workspace-scopes-changed', refreshScopes)
+    return subscribeWorkspaceScopesChanged(refreshScopes)
   }, [refreshScopes])
 
   useEffect(() => {
@@ -1242,6 +1315,14 @@ export default function ByeoriPanel({
       return
     }
 
+    if (taskScopeMismatch) {
+      setUiError(
+        active?.sourceTaskStatus?.scope_error ||
+          '카드의 프로젝트가 변경되었습니다. 태스크 카드에서 ‘변경된 프로젝트로 새 실행’을 시작해주세요.',
+      )
+      return
+    }
+
     let sessionId = active?.id ?? null
     if (!sessionId) {
       sessionId = await startNewChat()
@@ -1287,10 +1368,18 @@ export default function ByeoriPanel({
 
   const sendSteer = () => {
     const text = prompt.trim()
-    if (!active?.busy || !active.turnId || !text) return
-    steer(active.id, text)
+    if (!active?.busy || !active.turnId || (!text && attachments.length === 0)) return
+    const images = attachments.filter((attachment) => attachment.kind === 'image')
+    const files = attachments.filter((attachment) => attachment.kind === 'file')
+    steer(active.id, text, {
+      images: images.length
+        ? images.map((image) => ({ url: image.url, name: image.name, alt: image.name }))
+        : undefined,
+      files: files.length ? files.map((file) => ({ url: file.url, name: file.name })) : undefined,
+    })
     setPrompt('')
     setMentionedPaths([])
+    setAttachments([])
     setMention({ active: false, query: '', anchor: inputRef.current })
   }
 
@@ -1337,7 +1426,7 @@ export default function ByeoriPanel({
   // ── 로그아웃 (codex 엔진 고유) — 초기 로그인 이후 계정 전환/해제용 ──
   const logout = async () => {
     const ok = await dialog.confirm('Codex 계정에서 로그아웃할까요?', {
-      detail: '진행 중인 실행이 있다면 중단될 수 있으며, 다시 로그인할 때까지 AI 작업을 사용할 수 없습니다.',
+      detail: '진행 중인 AI 작업을 먼저 완료하거나 중단해 주세요. 다시 로그인할 때까지 AI 작업을 사용할 수 없습니다.',
       confirmLabel: '로그아웃',
       danger: true,
     })
@@ -1346,6 +1435,9 @@ export default function ByeoriPanel({
     try {
       const res = await fetch('/api/ai/logout', { method: 'POST' })
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail ?? '로그아웃 실패')
+      setModels([])
+      setUsageLimits(null)
+      notifyAiEngineChanged()
       await refreshStatus() // logged_in=false → 로그인 화면으로 전환
     } catch (e) {
       setUiError((e as Error).message)
@@ -1372,14 +1464,17 @@ export default function ByeoriPanel({
       } else if (msg.type === 'success') {
         setLoginBusy(false)
         setLoginUrl(null)
-        refreshStatus()
         ws.close()
+        notifyAiEngineChanged()
+        void refreshStatus()
+        void offerAppRestart().catch((e: Error) => setUiError(e.message))
       } else if (msg.type === 'error') {
         setUiError(msg.message ?? '로그인 실패')
         setLoginBusy(false)
         ws.close()
       }
     }
+    ws.onerror = () => setUiError("로그인 연결에 실패했습니다. 다시 시도해 주세요.")
     ws.onclose = () => setLoginBusy(false)
   }
 
@@ -1433,18 +1528,18 @@ export default function ByeoriPanel({
 
   const messages = active?.messages ?? []
   const isPlanSession = Boolean(active?.isOrderPlan || active?.title.startsWith('전체 실행 계획'))
-  const selectedMemoryBullets = active?.memoryReview
-    ? selectedMemoryReviewBullets(active.memoryReview)
-    : []
   const showMemorySaved = active
-    ? isMemorySavedForRun(active.memorySavedRunId, active.runId, active.memoryBullets)
+    ? isMemorySavedForRun(active.memoryResultRunId, active.runId, active.memoryBullets)
     : false
+  const showMemoryError = Boolean(
+    active?.memoryError && active.memoryResultRunId && active.memoryResultRunId === active.runId,
+  )
 
   const showSummary =
     active &&
     !active.busy &&
     !active.queued &&
-    (active.runLogPath || active.taskStatus || active.memoryReview || showMemorySaved)
+    (active.runLogPath || active.taskStatus || showMemorySaved || showMemoryError)
   const recovery = active?.recovery ? recoveryCopy(active.recovery.kind) : null
   const summaryLabel =
     active?.lastRun?.status === 'cancelled'
@@ -1793,82 +1888,24 @@ export default function ByeoriPanel({
                 <span className="truncate text-[11px] text-[#9b9a97]">{active.runLogPath}</span>
               </button>
             )}
-            {active.memoryReview && active.memoryReview.bullets.length > 0 && (
-              <div className="space-y-2 rounded-md border border-[#eadfbd] bg-[#fffdf5] px-3 py-2 text-[11px] text-[#6f5b26]">
-                <div>
-                  <div className="font-medium">
-                    🧠 메모리 후보 검토 ({active.memoryReview.bullets.length}개 중 {selectedMemoryBullets.length}개 선택)
-                  </div>
-                  <p className="mt-0.5 text-[10px] leading-snug text-[#8a7950]">
-                    계속 기억할 항목을 선택하고 필요하면 문구를 고쳐 저장하세요. 선택하지 않은 항목은 저장되지 않습니다.
-                  </p>
-                </div>
-                <div className="space-y-1.5">
-                  {active.memoryReview.bullets.map((bullet, index) => {
-                    const selected = isMemoryReviewItemSelected(active.memoryReview!, index)
-                    return (
-                      <div
-                        key={index}
-                        className={`rounded border px-2 py-1.5 transition-colors ${
-                          selected ? 'border-[#ded3b0] bg-white' : 'border-[#ebe5d2] bg-[#faf8f1]'
-                        }`}
-                      >
-                        <label className="mb-1 flex w-fit cursor-pointer items-center gap-1.5 text-[10px] font-medium text-[#6f5b26]">
-                          <input
-                            type="checkbox"
-                            className="h-3.5 w-3.5 accent-[#6f5b26]"
-                            checked={selected}
-                            onChange={() => toggleMemoryReviewBullet(active.id, index)}
-                            disabled={active.memoryReviewSaving}
-                          />
-                          저장할 항목 {index + 1}
-                        </label>
-                        <textarea
-                          rows={2}
-                          maxLength={300}
-                          aria-label={`메모리 후보 ${index + 1} 문구`}
-                          className="w-full resize-y rounded border border-[#ded3b0] bg-white px-2 py-1.5 text-[11px] leading-snug text-[#37352f] outline-none focus:border-[#b9a56c] disabled:cursor-not-allowed disabled:bg-[#f5f3ec] disabled:text-[#9b9a97]"
-                          value={bullet}
-                          onChange={(event) => updateMemoryReviewBullet(active.id, index, event.target.value)}
-                          disabled={active.memoryReviewSaving || !selected}
-                        />
-                      </div>
-                    )
-                  })}
-                </div>
-                {active.memoryReviewError && (
-                  <p className="rounded bg-[#fff1f0] px-2 py-1 text-[10px] text-[#b42318]">{active.memoryReviewError}</p>
-                )}
-                <div className="flex gap-1.5">
-                  <button
-                    type="button"
-                    className="rounded-md bg-[#6f5b26] px-2.5 py-1 text-[11px] font-medium text-white hover:bg-[#59491f] disabled:opacity-50"
-                    onClick={() => void approveMemoryReview(active.id)}
-                    disabled={active.memoryReviewSaving || selectedMemoryBullets.length === 0}
-                  >
-                    {active.memoryReviewSaving
-                      ? '처리 중…'
-                      : `선택한 ${selectedMemoryBullets.length}개 저장`}
-                  </button>
-                  <button
-                    type="button"
-                    className="rounded-md border border-[#ded3b0] bg-white px-2.5 py-1 text-[11px] text-[#6f5b26] hover:bg-[#fff9e8] disabled:opacity-50"
-                    onClick={() => void discardMemoryReview(active.id)}
-                    disabled={active.memoryReviewSaving}
-                  >
-                    저장 안 함
-                  </button>
-                </div>
-              </div>
-            )}
             {showMemorySaved && active.memoryBullets && active.memoryBullets.length > 0 && (
               <div className="rounded-md border-l-2 border-[#c8b6ff] bg-[#faf7ff] px-3 py-1.5 text-[11px] text-[#6f5aa8]">
-                <div className="mb-0.5 font-medium">🧠 메모리에 저장됨 ({active.memoryBullets.length}개)</div>
+                <div className="mb-0.5 font-medium">
+                  {active.memoryAlreadySaved
+                    ? `🧠 이미 기억하고 있음 (${active.memoryBullets.length}개)`
+                    : `🧠 메모리에 저장됨 (${active.memoryBullets.length}개)`}
+                </div>
                 <ul className="ml-4 list-disc space-y-0.5">
                   {active.memoryBullets.map((b, i) => (
                     <li key={i}>{b}</li>
                   ))}
                 </ul>
+              </div>
+            )}
+            {showMemoryError && active.memoryError && (
+              <div className="rounded-md border-l-2 border-[#d92d20] bg-[#fff5f3] px-3 py-1.5 text-[11px] text-[#b42318]">
+                <div className="mb-0.5 font-medium">🧠 메모리를 저장하지 못했습니다</div>
+                <p>{active.memoryError}</p>
               </div>
             )}
           </div>
@@ -2016,7 +2053,7 @@ export default function ByeoriPanel({
             aria-haspopup="listbox"
             aria-expanded={scopePickerOpen}
             aria-label="질문 대상 프로젝트 선택"
-            title="프로젝트를 고르면 해당 경로를 작업 대상으로 하는 새 대화를 시작합니다. 기존 대화의 문맥은 유지됩니다."
+            title="프로젝트를 고르면 독립 문서·태스크 문맥의 새 대화를 시작합니다. 코드 경로가 있으면 함께 사용합니다."
           >
             <span className="min-w-0 flex-1 truncate">
               {active?.kind === 'chat' && active.scopeId
@@ -2081,14 +2118,16 @@ export default function ByeoriPanel({
                         <span className="block truncate text-[11px] font-medium">
                           {scope.project ? `${scope.project} · ${scope.label}` : scope.label}
                         </span>
-                        <span className="mt-0.5 block truncate text-[10px] text-[#9b9a97]">{scope.path}</span>
+                        <span className="mt-0.5 block truncate text-[10px] text-[#9b9a97]">
+                          {scope.path || '문서 전용 · 코드·분석 경로 없음'}
+                        </span>
                       </span>
                       {selected && <span className="shrink-0 text-[12px] text-[#37352f]">✓</span>}
                     </button>
                   )
                 })}
                 {scopes.length === 0 && (
-                  <p className="px-2.5 py-2 text-[10px] text-[#9b9a97]">프로젝트 관리에 경로가 등록된 프로젝트가 없습니다.</p>
+                  <p className="px-2.5 py-2 text-[10px] text-[#9b9a97]">아직 프로젝트가 없습니다.</p>
                 )}
               </div>
             </>
@@ -2099,6 +2138,11 @@ export default function ByeoriPanel({
           <p className="-mt-0.5 mb-1.5 px-1 text-[10px] text-[#a67c1b]">
             선택한 프로젝트({active.scopeId})를 찾을 수 없습니다. 다음 질문은 등록된 경로를 확인한 뒤 보내세요.
           </p>
+        )}
+        {taskScopeMismatch && !active?.busy && (
+          <div className="mb-1.5 rounded-md border border-[#f4dfab] bg-[#fff9eb] px-2 py-1.5 text-[11px] text-[#8a6817]" role="alert">
+            후속 요청은 이 세션에서 보낼 수 없습니다. 태스크 카드에서 ‘변경된 프로젝트로 새 실행’을 시작해주세요.
+          </div>
         )}
         {/* 선택 액션으로만 생기는 명시적 문서/텍스트 컨텍스트. 일반 채팅에는 만들지 않는다. */}
         {pendingContext && (
@@ -2188,7 +2232,9 @@ export default function ByeoriPanel({
             className="block min-h-[68px] w-full resize-none bg-transparent px-3 pb-1 pt-2.5 text-[13px] outline-none"
             rows={3}
             placeholder={
-              active?.busy
+              taskScopeMismatch && !active?.busy
+                ? '카드의 최신 프로젝트로 새 실행을 시작한 뒤 후속 요청을 보내세요.'
+                : active?.busy
                 ? active.turnId
                   ? '기존 작업에 이어서 추가 지시 (Enter 전송, Shift+Enter 줄바꿈)'
                   : '작업을 시작하거나 마무리하는 중입니다 — 다음 질문 초안 작성 가능'
@@ -2282,8 +2328,8 @@ export default function ByeoriPanel({
               onClick={active?.busy ? sendSteer : send}
               disabled={
                 active?.busy
-                  ? !prompt.trim() || !active.turnId || active.cancelRequested
-                  : (!prompt.trim() && attachments.length === 0) || limitBlocked
+                  ? (!prompt.trim() && attachments.length === 0) || !active.turnId || active.cancelRequested
+                  : (!prompt.trim() && attachments.length === 0) || limitBlocked || taskScopeMismatch
               }
               title={
                 active?.busy
@@ -2292,6 +2338,8 @@ export default function ByeoriPanel({
                     : '현재 작업 턴이 끝나 응답을 정리하고 있습니다. 완료 뒤 다음 질문으로 보내세요.'
                   : limitBlocked
                     ? `사용량 한도 초과 — ${limitResetHint}`
+                    : taskScopeMismatch
+                      ? '카드의 프로젝트가 변경되어 새 실행이 필요합니다.'
                     : '전송 (Enter)'
               }
             >

@@ -61,6 +61,24 @@
   --ui-scrollbar-thumb-active: #c4a7e7;
 }
 
+[data-theme='midnight'] {
+  --ui-scrollbar-thumb: #283653;
+  --ui-scrollbar-thumb-hover: #405779;
+  --ui-scrollbar-thumb-active: #60a5fa;
+}
+
+[data-theme='irisdark'] {
+  --ui-scrollbar-thumb: #3c3152;
+  --ui-scrollbar-thumb-hover: #665684;
+  --ui-scrollbar-thumb-active: #a78bfa;
+}
+
+[data-theme='plum'] {
+  --ui-scrollbar-thumb: #cfb4c3;
+  --ui-scrollbar-thumb-hover: #a7738d;
+  --ui-scrollbar-thumb-active: #7a284e;
+}
+
 html,
 body,
 #root {
@@ -446,4 +464,24 @@ body {
   --chat-mermaid-accent: #ebbcba;
   --chat-mermaid-source-bg: #15131e;
   --chat-mermaid-source-text: #e0def4;
+}
+[data-theme='midnight'] .chat-mermaid {
+  --chat-mermaid-bg: #0b1020;
+  --chat-mermaid-header-bg: #121a2d;
+  --chat-mermaid-border: #283653;
+  --chat-mermaid-text: #e6edf7;
+  --chat-mermaid-muted: #b9c5d6;
+  --chat-mermaid-accent: #60a5fa;
+  --chat-mermaid-source-bg: #080c18;
+  --chat-mermaid-source-text: #e6edf7;
+}
+[data-theme='irisdark'] .chat-mermaid {
+  --chat-mermaid-bg: #12101c;
+  --chat-mermaid-header-bg: #1b1729;
+  --chat-mermaid-border: #3c3152;
+  --chat-mermaid-text: #f2ecfa;
+  --chat-mermaid-muted: #b8acc8;
+  --chat-mermaid-accent: #a78bfa;
+  --chat-mermaid-source-bg: #0e0c16;
+  --chat-mermaid-source-text: #f2ecfa;
 }

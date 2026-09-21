@@ -69,11 +69,12 @@ class AIEngine(Protocol):
         turn_id: str,
         guidance: str,
         client_message_id: str | None = None,
+        images: list[str] | None = None,
     ) -> str | None:
         """실행 중 궤도 수정 지시를 주입하고, 새 활성 turn ID를 반환한다.
 
         ``client_message_id`` 는 엔진이 지원할 때 UI의 낙관적 말풍선과 엔진에 전달된
-        사용자 입력을 연결하는 용도다.
+        사용자 입력을 연결하는 용도다. ``images``는 검증이 끝난 로컬 이미지 경로다.
         """
         ...
 

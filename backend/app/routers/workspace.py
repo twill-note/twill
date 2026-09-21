@@ -28,7 +28,9 @@ router = APIRouter(prefix="/api/workspace", tags=["workspace"])
 # 뒤 단계가 실패하면 원본 바이트를 복구한다.
 _SCOPE_DELETION_LOCK = threading.RLock()
 _SCOPE_AGENTS_LOCK = threading.RLock()
+_PROJECT_PATH_LOCK = threading.RLock()
 PROJECT_AGENTS_FILE = "AGENTS.md"
+PROJECT_RUNTIME_DIR = ".projects"
 PROJECT_AGENTS_TEMPLATE = """# 프로젝트 작업 지침
 
 이 문서에서 이 프로젝트의 빌드·테스트·코딩 규칙을 관리합니다.
@@ -64,6 +66,9 @@ class SectionItem(BaseModel):
     # 섹션 생성 시 자동 등록되는 프로젝트 관리(스코프) 노트의 id. 사용자가 그 노트에 path를
     # 직접 채워야 실제 스코프로 쓸 수 있다 — 여기서 자동 주입하는 건 "빈 자리 등록"뿐.
     scope_id: str | None = None
+    # API 응답에서만 쓰는 파생값. 실제 원본은 scopes/<scope_id>.md 의 path이며
+    # .workspace.json 에 중복 저장하지 않는다.
+    project_path: str | None = None
 
 
 class SectionsPutRequest(BaseModel):
@@ -71,6 +76,14 @@ class SectionsPutRequest(BaseModel):
 
 
 class CreateProjectSectionRequest(BaseModel):
+    name: str
+
+
+class SetProjectPathRequest(BaseModel):
+    path: str
+
+
+class RenameProjectRequest(BaseModel):
     name: str
 
 
@@ -140,15 +153,173 @@ def _unique_project_dir(name: str) -> str:
     return candidate
 
 
+def _validated_project_id(raw_id: str) -> str:
+    project_id = str(raw_id or "").strip()
+    if (
+        not project_id
+        or project_id.startswith(".")
+        or "/" in project_id
+        or "\\" in project_id
+        or project_id != Path(project_id).name
+    ):
+        raise HTTPException(status_code=400, detail="올바르지 않은 프로젝트 식별자입니다")
+    return project_id
+
+
+def _ensure_scope_row(scope_id: str, name: str) -> Path:
+    """기존 project/section 식별자를 바꾸지 않고 누락된 프로젝트 관리 행만 복원한다."""
+    project_id = _validated_project_id(scope_id)
+    from .db import CONFIG_FILE as DB_CONFIG_FILE, SCOPES_BOARD_PRESET  # 지연 import (순환 방지)
+
+    root = config.notes_dir()
+    scopes_dir = root / "scopes"
+    scopes_dir.mkdir(parents=True, exist_ok=True)
+    cfg_path = scopes_dir / DB_CONFIG_FILE
+    if not cfg_path.is_file():
+        cfg_path.write_text(json.dumps(SCOPES_BOARD_PRESET, ensure_ascii=False, indent=2), encoding="utf-8")
+    row = scopes_dir / f"{project_id}.md"
+    if row.is_file():
+        return row
+    if row.exists():
+        raise HTTPException(status_code=409, detail="프로젝트 관리 행 경로가 파일이 아닙니다")
+
+    legacy_path = ""
+    raw_legacy = _read_workspace_json().get("scopes")
+    if isinstance(raw_legacy, list):
+        legacy = next(
+            (
+                item
+                for item in raw_legacy
+                if isinstance(item, dict) and str(item.get("id") or "") == project_id
+            ),
+            None,
+        )
+        legacy_path = str((legacy or {}).get("path") or "").strip()
+    post = frontmatter.Post("", project="", label=name, path=legacy_path)
+    try:
+        with row.open("x", encoding="utf-8") as handle:
+            handle.write(frontmatter.dumps(post) + "\n")
+    except FileExistsError:
+        return row
+    try:
+        indexer.index_file(row.relative_to(root).as_posix())
+    except Exception:  # noqa: BLE001
+        pass
+    return row
+
+
+def project_runtime_root(scope_id: str, *, create: bool = True) -> Path:
+    """코드 경로가 없는 프로젝트가 AI를 실행할 안전한 프로젝트별 cwd를 반환한다."""
+    project_id = _validated_project_id(scope_id)
+    workspace = config.notes_dir().resolve()
+    runtime_base = workspace / PROJECT_RUNTIME_DIR
+    if runtime_base.is_symlink():
+        raise HTTPException(status_code=400, detail="프로젝트 실행 저장소가 심볼릭 링크일 수 없습니다")
+    if create:
+        runtime_base.mkdir(parents=True, exist_ok=True)
+    try:
+        resolved_base = runtime_base.resolve()
+    except OSError as exc:
+        raise HTTPException(status_code=500, detail="프로젝트 실행 저장소를 준비하지 못했습니다") from exc
+    if resolved_base.parent != workspace:
+        raise HTTPException(status_code=400, detail="프로젝트 실행 저장소 경로가 올바르지 않습니다")
+
+    target = resolved_base / project_id
+    if target.is_symlink():
+        raise HTTPException(status_code=400, detail="프로젝트 실행 경로가 심볼릭 링크일 수 없습니다")
+    if create:
+        target.mkdir(parents=True, exist_ok=True)
+    try:
+        resolved = target.resolve()
+    except OSError as exc:
+        raise HTTPException(status_code=500, detail="프로젝트 실행 경로를 준비하지 못했습니다") from exc
+    if resolved.parent != resolved_base:
+        raise HTTPException(status_code=400, detail="프로젝트 실행 경로가 올바르지 않습니다")
+    return resolved
+
+
+def _ensure_agents_file(target: Path) -> bool:
+    if target.is_symlink():
+        raise HTTPException(status_code=400, detail="심볼릭 링크 AGENTS.md는 편집할 수 없습니다")
+    if target.exists() and not target.is_file():
+        raise HTTPException(status_code=409, detail="프로젝트의 AGENTS.md가 파일이 아닙니다")
+    if target.is_file():
+        return False
+    try:
+        with target.open("x", encoding="utf-8") as handle:
+            handle.write(PROJECT_AGENTS_TEMPLATE)
+        return True
+    except FileExistsError:
+        return False
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail="프로젝트에 AGENTS.md를 만들 권한이 없습니다") from exc
+    except OSError as exc:
+        raise HTTPException(status_code=500, detail="프로젝트 AGENTS.md를 만들지 못했습니다") from exc
+
+
+def _ensure_linked_agents(scope_id: str, target: Path) -> bool:
+    """외부 경로를 처음 연결할 때 내부 프로젝트 지침을 잃지 않고 이어 붙인다."""
+    if target.is_symlink():
+        raise HTTPException(status_code=400, detail="심볼릭 링크 AGENTS.md는 편집할 수 없습니다")
+    if target.exists():
+        if not target.is_file():
+            raise HTTPException(status_code=409, detail="프로젝트의 AGENTS.md가 파일이 아닙니다")
+        return False
+    internal = project_runtime_root(scope_id) / PROJECT_AGENTS_FILE
+    try:
+        content = internal.read_text(encoding="utf-8") if internal.is_file() else PROJECT_AGENTS_TEMPLATE
+        with target.open("x", encoding="utf-8") as handle:
+            handle.write(content)
+        return True
+    except FileExistsError:
+        return False
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail="프로젝트에 AGENTS.md를 만들 권한이 없습니다") from exc
+    except OSError as exc:
+        raise HTTPException(status_code=500, detail="프로젝트 AGENTS.md를 만들지 못했습니다") from exc
+
+
+def _project_path(scope_id: str | None) -> str:
+    if not scope_id:
+        return ""
+    try:
+        return str(_scope_record(scope_id).get("path") or "").strip()
+    except (HTTPException, OSError, UnicodeError, ValueError):
+        return ""
+
+
+def _project_response(item: dict) -> dict:
+    response = dict(item)
+    response["project_path"] = _project_path(str(item.get("scope_id") or "")) or None
+    return response
+
+
+def _ensure_project_migration(items: list[dict]) -> bool:
+    """기존 section 저장값에 프로젝트 연결과 내부 AI 실행 위치를 무손실로 보강한다."""
+    changed = False
+    for item in items:
+        scope_id = str(item.get("scope_id") or "").strip()
+        if not scope_id:
+            scope_id = _create_scope_for_section(str(item.get("name") or "프로젝트"))
+            item["scope_id"] = scope_id
+            changed = True
+        else:
+            _ensure_scope_row(scope_id, str(item.get("name") or "프로젝트"))
+        with _SCOPE_AGENTS_LOCK:
+            _ensure_agents_file(project_runtime_root(scope_id) / PROJECT_AGENTS_FILE)
+    return changed
+
+
 @router.get("/sections")
 def get_sections():
-    """사이드바 섹션 목록을 반환하고 레거시 섹션 메모리 설정을 제거한다."""
+    """사이드바 프로젝트 목록을 반환하고 기존 sections 저장값을 무손실 마이그레이션한다."""
     data = _read_workspace_json()
     sections, changed = _normalize_sections(data)
+    changed = _ensure_project_migration(sections) or changed
     if changed:
         data["sections"] = sections
         _write_workspace_json(data)
-    return {"sections": sections}
+    return {"sections": [_project_response(section) for section in sections]}
 
 
 @router.put("/sections")
@@ -157,24 +328,29 @@ def put_sections(req: SectionsPutRequest):
     out = []
     for s in req.sections:
         item = s.model_dump()
+        item.pop("project_path", None)
         if not item.get("scope_id"):
             item["scope_id"] = _create_scope_for_section(item["name"])
+        else:
+            _ensure_scope_row(item["scope_id"], item["name"])
+        with _SCOPE_AGENTS_LOCK:
+            _ensure_agents_file(project_runtime_root(item["scope_id"]) / PROJECT_AGENTS_FILE)
         out.append(item)
     data["sections"] = out
     _write_workspace_json(data)
-    return {"sections": out}
+    return {"sections": [_project_response(section) for section in out]}
 
 
 @router.post("/sections/project")
 def create_project_section(req: CreateProjectSectionRequest):
-    """새 섹션과 해당 섹션의 기본 프로젝트 폴더를 만든다.
+    """새 프로젝트와 독립 문서 저장소를 코드 경로보다 먼저 만든다.
 
     ERD는 특정 database 폴더에 묶지 않는다. 사용자는 파일 트리의 어느 폴더에서나
     우클릭으로 새 테이블(ERD)을 만들 수 있다.
     """
     name = req.name.strip()
     if not name:
-        raise HTTPException(status_code=422, detail="섹션 이름을 입력해주세요")
+        raise HTTPException(status_code=422, detail="프로젝트 이름을 입력해주세요")
     data = _read_workspace_json()
     sections, _ = _normalize_sections(data)
     item: dict = {
@@ -187,10 +363,113 @@ def create_project_section(req: CreateProjectSectionRequest):
     project_dir = _unique_project_dir(name)
     (config.notes_dir() / project_dir).mkdir(parents=True, exist_ok=True)
     item["items"] = [project_dir]
+    with _SCOPE_AGENTS_LOCK:
+        _ensure_agents_file(project_runtime_root(item["scope_id"]) / PROJECT_AGENTS_FILE)
     sections.append(item)
     data["sections"] = sections
     _write_workspace_json(data)
-    return {"section": item}
+    return {"section": _project_response(item)}
+
+
+@router.put("/sections/{section_id}/project-path")
+def set_project_path(section_id: str, req: SetProjectPathRequest):
+    """기존 문서·태스크·채팅 식별자를 유지한 채 코드·분석 폴더만 연결한다."""
+    project_id = _validated_project_id(section_id)
+    selected = Path(req.path).expanduser()
+    try:
+        selected = selected.resolve()
+    except OSError as exc:
+        raise HTTPException(status_code=400, detail="프로젝트 경로를 확인할 수 없습니다") from exc
+    if not selected.is_dir():
+        raise HTTPException(status_code=400, detail="선택한 프로젝트 경로가 존재하는 폴더가 아닙니다")
+    if selected == Path(selected.anchor):
+        raise HTTPException(status_code=400, detail="파일시스템 루트는 프로젝트 경로로 사용할 수 없습니다")
+
+    with _PROJECT_PATH_LOCK:
+        data = _read_workspace_json()
+        sections, changed = _normalize_sections(data)
+        project = next((item for item in sections if str(item.get("id") or "") == project_id), None)
+        if project is None:
+            raise HTTPException(status_code=404, detail="프로젝트를 찾을 수 없습니다")
+        scope_id = str(project.get("scope_id") or "").strip()
+        if not scope_id:
+            scope_id = _create_scope_for_section(str(project.get("name") or "프로젝트"))
+            project["scope_id"] = scope_id
+            changed = True
+        else:
+            _ensure_scope_row(scope_id, str(project.get("name") or "프로젝트"))
+        _, row = _scope_row_path(scope_id)
+        try:
+            post = frontmatter.load(row)
+            post["path"] = str(selected)
+            row.write_text(frontmatter.dumps(post) + "\n", encoding="utf-8")
+        except OSError as exc:
+            raise HTTPException(status_code=500, detail="프로젝트 경로를 저장하지 못했습니다") from exc
+        if changed:
+            data["sections"] = sections
+            _write_workspace_json(data)
+        with _SCOPE_AGENTS_LOCK:
+            agents_created = _ensure_linked_agents(scope_id, selected / PROJECT_AGENTS_FILE)
+        try:
+            indexer.index_file(row.relative_to(config.notes_dir()).as_posix())
+        except Exception:  # noqa: BLE001
+            pass
+        return {
+            "section": _project_response(project),
+            "path": str(selected),
+            "agents_path": str((selected / PROJECT_AGENTS_FILE).resolve()),
+            "agents_created": agents_created,
+        }
+
+
+@router.put("/sections/{section_id}/name")
+def rename_project(section_id: str, req: RenameProjectRequest):
+    """사이드바 프로젝트와 프로젝트 관리 행의 표시명을 함께 변경한다."""
+    project_id = _validated_project_id(section_id)
+    name = req.name.strip()
+    if not name:
+        raise HTTPException(status_code=422, detail="프로젝트 이름을 입력해주세요")
+    with _PROJECT_PATH_LOCK:
+        data = _read_workspace_json()
+        sections, _ = _normalize_sections(data)
+        project = next((item for item in sections if str(item.get("id") or "") == project_id), None)
+        if project is None:
+            raise HTTPException(status_code=404, detail="프로젝트를 찾을 수 없습니다")
+        scope_id = str(project.get("scope_id") or "").strip()
+        if not scope_id:
+            scope_id = _create_scope_for_section(name)
+            project["scope_id"] = scope_id
+        row = _ensure_scope_row(scope_id, name)
+        try:
+            post = frontmatter.load(row)
+            post["label"] = name
+            row.write_text(frontmatter.dumps(post) + "\n", encoding="utf-8")
+        except OSError as exc:
+            raise HTTPException(status_code=500, detail="프로젝트 이름을 저장하지 못했습니다") from exc
+        project["name"] = name
+        data["sections"] = sections
+        _write_workspace_json(data)
+        try:
+            indexer.index_file(row.relative_to(config.notes_dir()).as_posix())
+        except Exception:  # noqa: BLE001
+            pass
+        return {"section": _project_response(project)}
+
+
+@router.put("/scopes/{scope_id}/name")
+def rename_scope_project(scope_id: str, req: RenameProjectRequest):
+    """프로젝트 관리 행에서의 이름 변경을 연결된 사이드바 프로젝트에도 적용한다."""
+    normalized_scope_id, _ = _scope_row_path(scope_id)
+    data = _read_workspace_json()
+    sections, _ = _normalize_sections(data)
+    project = next(
+        (item for item in sections if str(item.get("scope_id") or "") == normalized_scope_id),
+        None,
+    )
+    if project is None:
+        raise HTTPException(status_code=404, detail="연결된 사이드바 프로젝트를 찾을 수 없습니다")
+    return rename_project(str(project.get("id") or ""), req)
+
 
 class LegacyScope(BaseModel):
     id: str
@@ -204,10 +483,6 @@ class CodexDefaults(BaseModel):
     # GPT-5.6 3티어 중 terra: gpt-5.5 동급 성능에 비용 절반 — 앱 기본값 (orchestrator.DEFAULT_MODEL 과 일치)
     default_model: str = "gpt-5.6-terra"
     default_effort: str = "xhigh"
-    # 태스크 완료 후 장기 기억 후보는 기본적으로 사용자가 확인해야만 저장한다.
-    memory_mode: Literal["off", "review", "auto"] = "review"
-    # 일반 채팅은 사용자가 명시적으로 켠 워크스페이스에서만 장기 기억 후보를 추출한다.
-    learn_from_chat: bool = False
 
 
 class ExplorerSettings(BaseModel):
@@ -231,8 +506,6 @@ def get_settings():
     codex_clean = {
         k: v for k, v in codex_raw.items() if k in CodexDefaults.model_fields and v not in ("", None)
     }
-    if codex_clean.get("memory_mode") not in {None, "off", "review", "auto"}:
-        codex_clean.pop("memory_mode", None)
     settings = WorkspaceSettingsModel(
         name=str(data.get("name") or ""),
         scopes=data.get("scopes") if isinstance(data.get("scopes"), list) else [],
@@ -310,7 +583,8 @@ def _read_scopes_db(dir_rel: str = "scopes") -> list[dict]:
     각 노트 frontmatter: project(select) / label(text) / path(path, 워크스페이스
     상대 또는 절대). id 는 파일명(stem) — label 이 바뀌어도 태스크의 scope 참조가
     깨지지 않도록 파일명을 고정 식별자로 쓴다 (db.py 프리셋과 동일한 규약).
-    `path` 가 없는 노트는 아직 미완성 스코프로 보고 건너뛴다.
+    `path` 가 없는 노트도 문서 전용 프로젝트로 반환한다. AI는 이 경우 프로젝트별
+    내부 실행 경로를 사용하므로 태스크와 직접 질문의 선택 대상에서 제외하지 않는다.
     """
     root = config.notes_dir()
     d = root / dir_rel
@@ -324,16 +598,18 @@ def _read_scopes_db(dir_rel: str = "scopes") -> list[dict]:
             continue
         props = note.get("props") or {}
         raw_path = str(props.get("path") or "").strip()
-        if not raw_path:
-            continue
-        path_obj = Path(raw_path).expanduser()
-        if not path_obj.is_absolute():
-            path_obj = root / path_obj
+        resolved_path = ""
+        if raw_path:
+            path_obj = Path(raw_path).expanduser()
+            if not path_obj.is_absolute():
+                path_obj = root / path_obj
+            resolved_path = str(path_obj)
         out.append(
             {
                 "id": p.stem,
                 "label": str(props.get("label") or p.stem),
-                "path": str(path_obj),
+                "path": resolved_path,
+                "has_path": bool(resolved_path),
                 "project": str(props.get("project") or ""),
                 "note_path": p.relative_to(root).as_posix(),
             }
@@ -355,6 +631,7 @@ def _read_legacy_scopes() -> list[dict]:
                     "id": str(s["id"]),
                     "label": str(s.get("label") or s["id"]),
                     "path": str(s["path"]),
+                    "has_path": True,
                     "project": "",
                     "note_path": "",
                 }
@@ -370,8 +647,16 @@ def list_scopes():
     DB 쪽이 우선이며, 같은 id 가 레거시에도 있으면 레거시 쪽은 무시.
     """
     db_scopes = _read_scopes_db()
+    legacy_by_id = {scope["id"]: scope for scope in _read_legacy_scopes()}
+    # 전환기 데이터에서 새 DB 행의 path가 비어 있고 같은 id의 레거시 경로가 있으면
+    # 기존 코드 연결을 잃지 않는다. DB 행에 값이 생기는 즉시 DB가 다시 우선한다.
+    for scope in db_scopes:
+        legacy_scope = legacy_by_id.get(scope["id"])
+        if not scope.get("path") and legacy_scope and legacy_scope.get("path"):
+            scope["path"] = legacy_scope["path"]
+            scope["has_path"] = True
     known_ids = {s["id"] for s in db_scopes}
-    legacy = [s for s in _read_legacy_scopes() if s["id"] not in known_ids]
+    legacy = [s for s in legacy_by_id.values() if s["id"] not in known_ids]
     return {"scopes": db_scopes + legacy}
 
 
@@ -422,7 +707,8 @@ def _scope_record(scope_id: str) -> dict[str, str]:
             raise HTTPException(status_code=422, detail="프로젝트 관리 행을 읽을 수 없습니다") from exc
         raw_path = str(post.metadata.get("path") or "").strip()
         if not raw_path:
-            raise HTTPException(status_code=422, detail="프로젝트 경로를 먼저 설정해주세요")
+            legacy = next((item for item in _read_legacy_scopes() if item["id"] == normalized), None)
+            raw_path = str((legacy or {}).get("path") or "").strip()
         return {
             "id": normalized,
             "label": str(post.metadata.get("label") or normalized),
@@ -440,7 +726,10 @@ def _scope_record(scope_id: str) -> dict[str, str]:
 
 
 def _scope_project_root(record: dict[str, str]) -> Path:
-    raw = Path(record["path"]).expanduser()
+    raw_path = str(record.get("path") or "").strip()
+    if not raw_path:
+        raise HTTPException(status_code=422, detail="프로젝트에 코드·분석 경로가 연결되지 않았습니다")
+    raw = Path(raw_path).expanduser()
     if not raw.is_absolute():
         raw = config.notes_dir() / raw
     try:
@@ -456,7 +745,7 @@ def _scope_project_root(record: dict[str, str]) -> Path:
 
 def _scope_agents_path(scope_id: str) -> tuple[dict[str, str], Path]:
     record = _scope_record(scope_id)
-    root = _scope_project_root(record)
+    root = _scope_project_root(record) if record.get("path") else project_runtime_root(record["id"])
     target = root / PROJECT_AGENTS_FILE
     if target.is_symlink():
         raise HTTPException(status_code=400, detail="심볼릭 링크 AGENTS.md는 편집할 수 없습니다")
@@ -486,6 +775,20 @@ def resolve_registered_scope_agents(
     matched_scope_ids: set[str] = set()
     matched_target: Path | None = None
     for scope in list_scopes()["scopes"]:
+        scope_id = str(scope.get("id") or "").strip()
+        if not scope_id:
+            continue
+        if not scope.get("path"):
+            try:
+                runtime_target = project_runtime_root(scope_id, create=False) / PROJECT_AGENTS_FILE
+            except HTTPException:
+                continue
+            if candidate == runtime_target:
+                if require_file and not runtime_target.is_file():
+                    raise HTTPException(status_code=404, detail="AGENTS.md를 찾을 수 없습니다")
+                matched_target = runtime_target
+                matched_scope_ids.add(scope_id)
+            continue
         try:
             root = _scope_project_root(scope)
         except HTTPException:
@@ -498,7 +801,6 @@ def resolve_registered_scope_agents(
         if require_file and not target.is_file():
             raise HTTPException(status_code=404, detail="AGENTS.md를 찾을 수 없습니다")
         matched_target = target
-        scope_id = str(scope.get("id") or "").strip()
         if scope_id:
             matched_scope_ids.add(scope_id)
     if matched_target is not None:
@@ -512,22 +814,14 @@ def resolve_registered_scope_agents_path(raw_path: str, *, require_file: bool = 
 
 @router.post("/scopes/{scope_id}/ensure-agents")
 def ensure_scope_agents(scope_id: str):
-    """프로젝트 경로에 실제 AGENTS.md를 보장하고 내부 편집기에서 열 절대 경로를 반환한다."""
+    """외부 경로 또는 프로젝트별 내부 폴백에 AGENTS.md를 보장한다."""
     with _SCOPE_AGENTS_LOCK:
         record, target = _scope_agents_path(scope_id)
-        created = False
-        if not target.exists():
-            try:
-                with target.open("x", encoding="utf-8") as handle:
-                    handle.write(PROJECT_AGENTS_TEMPLATE)
-                created = True
-            except FileExistsError:
-                # 동시에 같은 프로젝트를 등록한 요청이 먼저 만들었다.
-                pass
-            except PermissionError as exc:
-                raise HTTPException(status_code=403, detail="프로젝트 경로에 AGENTS.md를 만들 권한이 없습니다") from exc
-            except OSError as exc:
-                raise HTTPException(status_code=500, detail="프로젝트 AGENTS.md를 만들지 못했습니다") from exc
+        created = (
+            _ensure_linked_agents(record["id"], target)
+            if record.get("path")
+            else _ensure_agents_file(target)
+        )
 
         if target.is_symlink() or not target.is_file():
             raise HTTPException(status_code=409, detail="프로젝트의 AGENTS.md를 일반 파일로 확인할 수 없습니다")
@@ -536,6 +830,7 @@ def ensure_scope_agents(scope_id: str):
             "label": record["label"],
             "path": str(target),
             "created": created,
+            "internal": not bool(record.get("path")),
         }
 
 

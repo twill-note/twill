@@ -1,3 +1,4 @@
+import CodexUpdateNotice from './components/CodexUpdateNotice'
 import { useEffect } from 'react'
 import AiToasts from './components/AiToasts'
 import CalendarView from './components/CalendarView'
@@ -196,6 +197,7 @@ export default function App() {
   return (
     <div className="flex h-full flex-col bg-white">
       <DesktopTitleBar />
+      <CodexUpdateNotice />
       <div className="flex min-h-0 flex-1">
         <Sidebar />
         <main className="flex min-w-0 flex-1 flex-col">

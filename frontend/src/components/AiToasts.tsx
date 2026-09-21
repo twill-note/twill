@@ -41,18 +41,20 @@ export default function AiToasts() {
               ✕
             </button>
           </div>
-          <div className="mt-2 flex justify-end gap-1.5">
-            <button
-              className="rounded-md bg-[#37352f] px-2.5 py-1 text-[11px] font-medium text-white hover:bg-[#2b2925]"
-              onClick={() => {
-                selectSession(t.sessionId)
-                openRightTab(SYSTEM_AI_TAB)
-                dismissToast(t.id)
-              }}
-            >
-              결과 보기
-            </button>
-          </div>
+          {t.sessionId && (
+            <div className="mt-2 flex justify-end gap-1.5">
+              <button
+                className="rounded-md bg-[#37352f] px-2.5 py-1 text-[11px] font-medium text-white hover:bg-[#2b2925]"
+                onClick={() => {
+                  selectSession(t.sessionId!)
+                  openRightTab(SYSTEM_AI_TAB)
+                  dismissToast(t.id)
+                }}
+              >
+                결과 보기
+              </button>
+            </div>
+          )}
         </div>
       ))}
     </div>

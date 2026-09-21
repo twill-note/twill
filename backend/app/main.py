@@ -9,6 +9,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import config, indexer, watcher
+from .skillbook import initialize_skillbook
 from .ai.engine import registry as engine_registry
 from .ai import sessions as ai_sessions
 from .plugins.codex_assistant.codex_engine import engine as codex_engine
@@ -21,6 +22,7 @@ from .routers import ai, assets, db, events, files, notes, plugins, quick_memos,
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     config.ensure_dirs()
+    initialize_skillbook()
     # 브라우저 새로고침과 달리 서버 재시작은 메모리의 실행을 복원할 수 없다.
     # 고아 active_run을 running으로 남기지 않아 사용자가 즉시 재시도할 수 있게 한다.
     ai_sessions.reconcile_stale_active_runs()

@@ -12,10 +12,11 @@ from typing import Any
 
 import frontmatter
 
-from .config import REPO_ROOT
+from .config import CONFIG_PATH, REPO_ROOT
 
 
-SKILLBOOK_ROOT = REPO_ROOT / "skillbook"
+SKILLBOOK_ROOT = Path(os.environ.get("NOTE_APP_SKILLBOOK_DIR", CONFIG_PATH.parent / "skillbook")).expanduser().resolve()
+BUNDLED_SKILLBOOK_ROOT = REPO_ROOT / "skillbook"
 APP_SKILLS_DIR = SKILLBOOK_ROOT / "skills"
 TRASH_DIR = SKILLBOOK_ROOT / ".trash"
 SYSTEM_MANUAL_DIR = REPO_ROOT / "backend" / "app" / "system_manual"
@@ -24,6 +25,8 @@ SKILL_ID_PREFIX = "skillbook:"
 MANUAL_ID_PREFIX = "system-manual:"
 READ_ONLY_SKILL_NAMES = frozenset({"create-system-skill"})
 SKILL_NAME_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+SEARCH_TERM_RE = re.compile(r"[^\W_]+", re.UNICODE)
+STRONG_SEARCH_MATCH_MIN = 7_000
 MAX_TEXT_BYTES = 1_000_000
 TEXT_SUFFIXES = {
     ".md", ".markdown", ".txt", ".json", ".yaml", ".yml", ".toml", ".ini",
@@ -58,6 +61,52 @@ class SkillBookValidationError(SkillBookError):
 def ensure_skillbook_dirs() -> None:
     APP_SKILLS_DIR.mkdir(parents=True, exist_ok=True)
     TRASH_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def initialize_skillbook(legacy_roots: list[Path] | None = None) -> dict[str, Any]:
+    """Copy legacy skills out of the install directory without overwriting user data.
+
+    A source is imported once so deleted/renamed skills do not reappear on startup.
+    Copies are staged before rename; failed imports never receive a completion marker.
+    """
+    import hashlib
+
+    ensure_skillbook_dirs()
+    imported: list[str] = []
+    for source in legacy_roots if legacy_roots is not None else [BUNDLED_SKILLBOOK_ROOT]:
+        source = source.resolve()
+        if source == SKILLBOOK_ROOT.resolve() or not source.is_dir():
+            continue
+        key = hashlib.sha256(str(source).encode()).hexdigest()[:20]
+        marker = SKILLBOOK_ROOT / f".migrated-{key}.json"
+        if marker.exists():
+            continue
+        for directory, destination in [(source / "skills", APP_SKILLS_DIR), (source / ".trash", TRASH_DIR)]:
+            if not directory.is_dir() or directory.is_symlink():
+                continue
+            for entry in sorted(directory.iterdir()):
+                target = destination / entry.name
+                if not entry.is_dir() or entry.is_symlink() or entry.name.startswith(".") or target.exists():
+                    continue
+                with tempfile.TemporaryDirectory(prefix=".import-", dir=SKILLBOOK_ROOT) as staging:
+                    staged = Path(staging) / entry.name
+                    shutil.copytree(entry, staged, ignore=lambda folder, names: [
+                        name for name in names if (Path(folder) / name).is_symlink()
+                    ])
+                    staged.rename(target)
+                imported.append(f"{directory.name}/{entry.name}")
+        marker.write_text(json.dumps({"source": str(source), "imported": imported}, ensure_ascii=False), encoding="utf-8")
+
+    # This built-in guide contains the storage contract and must follow app updates.
+    # Editable user skills are never replaced by bundled defaults.
+    for name in READ_ONLY_SKILL_NAMES:
+        source = BUNDLED_SKILLBOOK_ROOT / "skills" / name
+        target = APP_SKILLS_DIR / name
+        if source.is_dir() and not source.is_symlink() and source.resolve() != target.resolve():
+            if target.is_symlink():
+                raise SkillBookValidationError("기본 스킬 저장 경로에 심볼릭 링크가 있습니다.")
+            shutil.copytree(source, target, dirs_exist_ok=True)
+    return {"path": str(SKILLBOOK_ROOT), "imported": imported}
 
 
 def _markdown_title_and_description(path: Path) -> tuple[str, str]:
@@ -166,6 +215,64 @@ def _manual_summaries() -> list[dict[str, Any]]:
     return summaries
 
 
+def _normalized_search_text(value: Any) -> str:
+    return re.sub(r"\s+", " ", str(value or "")).strip().casefold()
+
+
+def _skillbook_search_score(entry: dict[str, Any], query: str) -> int:
+    """Return a positive relevance score when an entry matches a natural-language query.
+
+    The tool is commonly called with a whole user request rather than a single keyword.
+    An exact catalog name embedded in that request must therefore remain discoverable,
+    while individual terms provide a fallback for punctuation or reordered wording.
+    """
+    needle = _normalized_search_text(query)
+    if not needle:
+        return 0
+
+    name = _normalized_search_text(entry.get("name"))
+    description = _normalized_search_text(entry.get("description"))
+    entry_id = _normalized_search_text(entry.get("id"))
+    score = 0
+
+    if needle == name:
+        score = max(score, 10_000)
+    elif name and name in needle:
+        score = max(score, 9_000 + len(name))
+    elif needle in name:
+        score = max(score, 8_000 + len(needle))
+
+    if needle in description:
+        score = max(score, 7_000 + len(needle))
+    if needle in entry_id:
+        score = max(score, 7_500 + len(needle))
+
+    terms = {
+        term
+        for term in SEARCH_TERM_RE.findall(needle)
+        if len(term) >= 2
+    }
+    matched_terms = 0
+    term_score = 0
+    for term in terms:
+        best = 0
+        if term == name:
+            best = 120
+        elif term in name:
+            best = 80
+        elif term in entry_id:
+            best = 60
+        elif term in description:
+            best = 40
+        if best:
+            matched_terms += 1
+            term_score += best
+
+    if matched_terms:
+        score = max(score, term_score + matched_terms * 10)
+    return score
+
+
 def list_skillbook(
     *,
     query: str | None = None,
@@ -174,16 +281,30 @@ def list_skillbook(
     entries = [*_app_skill_summaries(), *_manual_summaries()]
     if source and source != "all":
         entries = [entry for entry in entries if entry["source"] == source]
-    needle = (query or "").strip().casefold()
-    if needle:
-        entries = [
-            entry
-            for entry in entries
-            if needle in entry["name"].casefold()
-            or needle in entry["description"].casefold()
-            or needle in entry["id"].casefold()
-        ]
-    return sorted(entries, key=lambda entry: (entry["source"], entry["name"].casefold()))
+    needle = _normalized_search_text(query)
+    if not needle:
+        return sorted(entries, key=lambda entry: (entry["source"], entry["name"].casefold()))
+
+    scored_entries = [
+        (_skillbook_search_score(entry, needle), entry)
+        for entry in entries
+    ]
+    positive_entries = [item for item in scored_entries if item[0] > 0]
+    strong_entries = [
+        item for item in positive_entries if item[0] >= STRONG_SEARCH_MATCH_MIN
+    ]
+    matched_entries = strong_entries or positive_entries
+    return [
+        entry
+        for score, entry in sorted(
+            matched_entries,
+            key=lambda item: (
+                -item[0],
+                item[1]["source"],
+                item[1]["name"].casefold(),
+            ),
+        )
+    ]
 
 
 def get_skillbook_summary(entry_id: str) -> dict[str, Any]:
@@ -481,6 +602,7 @@ def list_skillbook_tool(arguments: Any) -> str:
         if summary["valid"]
     ]
     payload = {
+        "storage_path": str(SKILLBOOK_ROOT),
         "skills": [
             {
                 key: summary[key]

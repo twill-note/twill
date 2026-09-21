@@ -16,7 +16,7 @@ EXCLUDED_DIRS = {"assets", ".trash"}
 # 왼쪽 파일 탐색기의 워크스페이스 루트에서만 숨기는 앱 관리 폴더. 폴더가 실제로
 # 존재하지 않아도 단순 이름 필터로만 동작하므로 새 워크스페이스를 열 때 선행 생성이
 # 필요하지 않다.
-TREE_HIDDEN_ROOT_DIRS = {"assets", "memories", "runs", "scopes", "tasks"}
+TREE_HIDDEN_ROOT_DIRS = {"assets", "memories", "runs", "scopes", "tasks", ".projects"}
 
 _state: dict = {"root": DEFAULT_NOTES_DIR, "recent": [], "plugins": {}}
 

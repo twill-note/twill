@@ -22,6 +22,7 @@ class SystemIdentityPromptTests(unittest.TestCase):
         self.assertIn("일반 질문 답변, 작업 진행 안내, 완료·오류 보고에서는 이름을 주어로 반복하지 마세요", prompt)
         self.assertIn("첫 문장을 ‘Twill AI가 …’처럼 시작하지 마세요", prompt)
         self.assertIn("list_skillbook", prompt)
+        self.assertIn("검색어 없이 전체 목록", prompt)
         self.assertIn("read_skillbook", prompt)
         self.assertNotIn("erd-designer.md", prompt)
         self.assertIn("필수 문서 저장 정책", prompt)
@@ -30,6 +31,8 @@ class SystemIdentityPromptTests(unittest.TestCase):
         self.assertIn("스스로 판단해 구현·검증까지 마무리", prompt)
         self.assertIn("결정 없이는 안전하고 올바르게 진행할 수 없을 때만 현재 대화에서 질문", prompt)
         self.assertIn("태스크 카드는 사용자가 명시적으로 등록을 요청한 경우에만", prompt)
+        self.assertIn("일반 대화나 태스크 실행 결과에서 장기 메모리를 자동으로 추출하거나 저장하지 마세요", prompt)
+        self.assertIn("`MEMORIES.md`를 도구로 직접 수정하지 말고", prompt)
         self.assertEqual(SYSTEM_AI_NAME, "Twill AI")
 
     def test_legacy_task_report_heading_is_still_recognized(self):

@@ -1,7 +1,9 @@
 import asyncio
 import importlib
 import json
+import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 from app.ai.orchestrator import Orchestrator, RunContext, RunRequest, _ActiveRun
@@ -15,7 +17,11 @@ codex_engine_module = importlib.import_module("app.plugins.codex_assistant.codex
 class SteerEngine:
     id = "steer-test"
 
-    async def steer(self, *, thread_id, turn_id, guidance, client_message_id=None):
+    def __init__(self):
+        self.last_images = None
+
+    async def steer(self, *, thread_id, turn_id, guidance, client_message_id=None, images=None):
+        self.last_images = images
         if guidance == "실패 지시":
             raise RuntimeError("turn/steer rejected")
         return "turn-2"
@@ -38,6 +44,15 @@ class SteerDeliveryTests(unittest.TestCase):
         self.assertTrue(delivered)
         self.assertFalse(rejected)
         self.assertEqual("turn-2", self.orchestrator._active["run-1"].turn_id)
+
+    def test_orchestrator_resolves_and_delivers_steer_images(self):
+        with patch("app.ai.orchestrator._resolve_image_paths", return_value=["/tmp/steer-image.png"]):
+            delivered = asyncio.run(
+                self.orchestrator.steer("run-1", "이 이미지도 확인해줘", images=["/assets/image.png"])
+            )
+
+        self.assertTrue(delivered)
+        self.assertEqual(["/tmp/steer-image.png"], self.engine.last_images)
 
     def test_steer_completion_resumes_the_original_run(self):
         class ContinuingEngine:
@@ -106,6 +121,7 @@ class SteerDeliveryTests(unittest.TestCase):
                     turn_id="turn-1",
                     guidance="지시",
                     client_message_id="steer-1",
+                    images=["/tmp/steer-image.png"],
                 )
             )
 
@@ -118,6 +134,9 @@ class SteerDeliveryTests(unittest.TestCase):
                 "input": [{
                     "type": "text",
                     "text": codex_engine_module._compose_continuing_steer_input("지시"),
+                }, {
+                    "type": "localImage",
+                    "path": "/tmp/steer-image.png",
                 }],
                 "clientUserMessageId": "steer-1",
             },
@@ -227,7 +246,13 @@ class SteerDeliveryTests(unittest.TestCase):
             def __init__(self):
                 self.messages = [
                     json.dumps({"session_id": "session-1", "prompt": "원래 요청"}),
-                    json.dumps({"type": "steer", "guidance": "추가 지시", "client_message_id": "steer-1"}),
+                    json.dumps({
+                        "type": "steer",
+                        "guidance": "추가 지시",
+                        "client_message_id": "steer-1",
+                        "images": ["/assets/steer.png"],
+                        "image_attachments": [{"url": "/assets/steer.png", "name": "화면.png"}],
+                    }),
                 ]
                 self.sent: list[dict] = []
 
@@ -253,23 +278,33 @@ class SteerDeliveryTests(unittest.TestCase):
             await asyncio.wait_for(steered.wait(), timeout=1)
             yield {"type": "session_updated", "session_id": "session-1"}
 
-        async def fake_steer(run_id, guidance, *, client_message_id=None):
+        async def fake_steer(run_id, guidance, *, client_message_id=None, images=None):
             self.assertEqual("run-1", run_id)
             self.assertEqual("추가 지시", guidance)
             self.assertEqual("steer-1", client_message_id)
+            self.assertEqual(["/assets/steer.png"], images)
             steered.set()
             return True
 
         ws = SteeringWebSocket()
-        with (
-            patch.object(ai_router.orchestrator, "run", new=fake_run),
-            patch.object(ai_router.orchestrator, "steer", new=fake_steer),
-            patch.object(ai_router.orchestrator, "active_turn_id", return_value="turn-2"),
-            patch.object(ai_router.ai_sessions, "append_message") as append_message,
-        ):
-            asyncio.run(ai_router.run_ws(ws))
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            assets = Path(temporary_directory)
+            (assets / "steer.png").write_bytes(b"image")
+            with (
+                patch.object(ai_router.orchestrator, "run", new=fake_run),
+                patch.object(ai_router.orchestrator, "steer", new=fake_steer),
+                patch.object(ai_router.orchestrator, "active_turn_id", return_value="turn-2"),
+                patch("app.ai.orchestrator.config.assets_dir", return_value=assets),
+                patch.object(ai_router.ai_sessions, "append_message") as append_message,
+            ):
+                asyncio.run(ai_router.run_ws(ws))
 
-        append_message.assert_called_once_with("session-1", "user", "추가 지시")
+        append_message.assert_called_once_with(
+            "session-1",
+            "user",
+            "추가 지시",
+            images=[{"url": "/assets/steer.png", "name": "화면.png", "alt": "화면.png"}],
+        )
         self.assertIn(
             {"type": "steer_ack", "ok": True, "client_message_id": "steer-1", "turn_id": "turn-2"},
             ws.sent,

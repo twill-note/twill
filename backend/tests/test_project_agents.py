@@ -86,6 +86,19 @@ class ProjectAgentsTests(unittest.TestCase):
             get_external_content(str(target))
         self.assertEqual(raised.exception.status_code, 403)
 
+    def test_pathless_project_uses_editable_internal_agents_file(self):
+        row = frontmatter.Post("", title="docs", label="문서 전용", path="")
+        (self.root / "scopes" / "docs.md").write_text(frontmatter.dumps(row) + "\n", encoding="utf-8")
+
+        result = ensure_scope_agents("docs")
+        target = self.root / ".projects" / "docs" / "AGENTS.md"
+
+        self.assertTrue(result["internal"])
+        self.assertEqual(str(target.resolve()), result["path"])
+        self.assertTrue(target.is_file())
+        opened = get_external_content(result["path"])
+        self.assertIn("프로젝트 작업 지침", opened["body"])
+
 
 if __name__ == "__main__":
     unittest.main()

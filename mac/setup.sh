@@ -28,12 +28,22 @@ require_command "$PYTHON_BIN"
 require_command node
 require_command npm
 
-PYTHON_VERSION="$($PYTHON_BIN --version 2>&1)"
+if ! "$PYTHON_BIN" -c 'import sys; sys.exit(not ((3, 11) <= sys.version_info < (4,)))'; then
+  echo "[error] Python 3.11 이상이 필요합니다. 권장 버전은 .python-version을 확인하세요." >&2
+  exit 1
+fi
+if ! node -e 'const [major, minor] = process.versions.node.split(".").map(Number); process.exit(major > 22 || (major === 22 && minor >= 12) ? 0 : 1)'; then
+  echo "[error] Node.js 22.12 이상이 필요합니다. 권장 버전은 .node-version을 확인하세요." >&2
+  exit 1
+fi
+
+PYTHON_VERSION="$("$PYTHON_BIN" --version 2>&1)"
 BACKEND_STAMP="$PLATFORM|$PYTHON_VERSION|$(checksum backend/requirements.txt)"
 FRONTEND_STAMP="$PLATFORM|$(node --version)|$(npm --version)|$(checksum frontend/package-lock.json)"
 
 # 다른 OS에서 복사한 venv는 실행할 수 없으므로 새로 만듭니다.
-if ! "$VENV_PYTHON" -c 'import fastapi, uvicorn' >/dev/null 2>&1; then
+if ! "$VENV_PYTHON" -c 'import fastapi, uvicorn' >/dev/null 2>&1 ||
+   [ "$("$VENV_PYTHON" --version 2>&1)" != "$PYTHON_VERSION" ]; then
   if [ -e "$VENV_DIR" ]; then
     echo "[setup] 호환되지 않는 백엔드 가상환경을 다시 생성합니다..."
     rm -rf "$VENV_DIR"

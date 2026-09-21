@@ -13,7 +13,7 @@ echo "[package] Preparing development dependencies..."
 "$SCRIPT_DIR/setup.sh"
 
 echo "[package] Installing the backend packager..."
-"$VENV_PYTHON" -m pip install 'pyinstaller==6.16.0'
+"$VENV_PYTHON" -m pip install --requirement "$BACKEND_DIR/requirements-build.txt"
 
 echo "[package] Downloading the latest official Codex CLI runtime..."
 "$VENV_PYTHON" "$ROOT_DIR/scripts/prepare_codex_runtime.py"
@@ -33,7 +33,8 @@ rm -rf "$BACKEND_OUTPUT"
   --specpath "$BACKEND_DIR/build" \
   --paths "$BACKEND_DIR" \
   --collect-submodules app \
-  --add-data "$ROOT_DIR/skillbook:skillbook" \
+  --add-data "$ROOT_DIR/skillbook/skills/create-system-skill:skillbook/skills/create-system-skill" \
+  --add-data "$ROOT_DIR/skillbook/skills/write-project-wiki:skillbook/skills/write-project-wiki" \
   --add-data "$BACKEND_DIR/app/system_manual:backend/app/system_manual" \
   "$BACKEND_DIR/desktop_main.py"
 

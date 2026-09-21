@@ -2,6 +2,51 @@
 
 Twill은 로컬에서 실행되는 노트 애플리케이션입니다. Python 기반 백엔드와 React/Electron 기반 데스크톱 화면으로 구성되어 있습니다.
 
+## 공통 개발 설정과 Git 관리
+
+- 권장 런타임: Node.js 24 (`.node-version`), Python 3.12 (`.python-version`).
+- 최소 런타임: Node.js 22.12, Python 3.11. npm은 Node.js와 함께 설치합니다.
+- `frontend/package-lock.json`을 커밋하고 각 OS에서 `npm ci`로 의존성을 설치합니다.
+- `backend/requirements.txt`는 실행 의존성, `backend/requirements-build.txt`는 설치 프로그램 빌드 의존성입니다.
+- `.gitattributes`와 `.editorconfig`가 소스와 Windows 스크립트의 줄바꿈을 관리합니다.
+
+Windows와 Mac 사이에는 Git으로 소스를 공유하세요. `node_modules`, `.venv`, `dist`,
+`build`, `release`는 OS별로 생성되므로 복사하지 말고 각 환경의 설정 스크립트로 다시 만듭니다.
+개인 노트(`notes/`), 사용자 스킬, `.env`와 인증서, 에디터 설정, 캐시와 로그는
+`.gitignore`로 제외합니다. 앱 소스, 테스트, 내장 스킬 2종, 아이콘, 잠금 파일은 커밋합니다.
+사용자 노트와 스킬은 Git에 올라가지 않으므로 별도로 백업하세요.
+
+## 자동 검증과 설치 프로그램 빌드
+
+`.github/workflows/desktop.yml`은 `main` 푸시와 PR에서 Windows·macOS 각각의
+의존성 설치, 백엔드·프런트엔드 테스트, lint, 프런트엔드 빌드와 Electron 시작 검증을 실행합니다.
+GitHub **Actions → Desktop CI → Run workflow**에서 `build_installers`를 켜면 검증 후
+각 runner 아키텍처의 서명되지 않은 EXE·DMG를 빌드하고 Artifacts에 14일간 보관합니다.
+GitHub Release에는 자동 게시하지 않습니다. Intel Mac용 DMG가 필요하면 Intel Mac에서
+아래 로컬 빌드 스크립트를 실행하세요.
+
+로컬 검증 명령은 다음과 같습니다. 백엔드 명령은 `backend` 폴더에서 실행합니다.
+
+```bash
+# macOS
+.venv/bin/python -m unittest discover -s tests
+```
+
+```powershell
+# Windows
+.\.venv\Scripts\python.exe -m unittest discover -s tests
+```
+
+프런트엔드 명령은 두 OS 모두 `frontend` 폴더에서 실행합니다.
+
+```text
+npm test
+npm run desktop:check
+npm run lint
+npm run build
+npm run desktop:smoke
+```
+
 ## Windows에서 빠르게 시작하기
 
 저장소를 내려받은 뒤 PowerShell에서 다음 명령을 실행합니다.
@@ -13,7 +58,7 @@ cd C:\Users\사용자이름\Desktop\twill\window
 
 첫 실행 시 스크립트가 다음 작업을 자동으로 수행합니다.
 
-1. Python 3.11 이상과 Node.js 20 이상을 확인합니다.
+1. Python 3.11 이상과 Node.js 22.12 이상을 확인합니다.
 2. 필요한 프로그램이 없으면 `winget`으로 설치합니다.
 3. `backend\.venv` Python 가상환경을 만듭니다.
 4. 백엔드 및 프런트엔드 패키지를 설치합니다.
@@ -50,7 +95,7 @@ cd C:\Users\사용자이름\Desktop\twill\window
 
 ## macOS 및 Linux
 
-macOS/Linux용 스크립트는 Python 3, Node.js 및 npm이 이미 설치되어 있다고 가정합니다.
+macOS/Linux용 스크립트는 Python 3.11 이상, Node.js 22.12 이상 및 npm이 이미 설치되어 있다고 가정합니다. 공통 개발·CI 기준은 Python 3.12와 Node.js 24입니다. 버전 관리 도구에서는 저장소의 `.python-version`과 `.node-version`을 사용하세요.
 
 ```bash
 cd /path/to/twill
@@ -74,7 +119,7 @@ cd /path/to/twill
 자동 설치를 사용하지 않는 경우 다음 프로그램이 필요합니다.
 
 - Python 3.11 이상
-- Node.js 20 이상과 npm
+- Node.js 22.12 이상과 npm
 - 인터넷 연결: 최초 Python 및 npm 패키지 설치에 필요
 
 Windows에서는 Microsoft Store의 Python 실행 별칭보다 [python.org](https://www.python.org/downloads/windows/) 설치본 사용을 권장합니다.
@@ -155,7 +200,7 @@ C:\Users\사용자이름\Documents\Twill
 
 ## macOS 설치 프로그램 만들기
 
-macOS 설치 이미지는 대상 Mac에서 직접 빌드해야 합니다. Python 3.11 이상, Node.js 20 이상과 npm을 설치한 뒤 다음 명령을 실행합니다.
+macOS 설치 이미지는 대상 Mac에서 직접 빌드해야 합니다. Python 3.11 이상, Node.js 22.12 이상과 npm을 설치한 뒤 다음 명령을 실행합니다.
 
 ```bash
 cd /path/to/twill
@@ -171,7 +216,7 @@ chmod +x mac/build-installer.sh
 frontend/release/Twill-<버전>-<아키텍처>.dmg
 ```
 
-DMG 파일 하나를 GitHub Releases에 올리면 됩니다. 사용자는 DMG를 연 뒤 Twill을 Applications 폴더로 끌어 놓아 설치할 수 있습니다.
+DMG 파일 하나를 GitHub Releases에 올리면 됩니다. 사용자는 DMG를 연 뒤 Twill을 Applications 폴더로 끌어 놓아 설치할 수 있으며, 별도의 Codex CLI 설치는 필요하지 않습니다.
 
 ## Codex 업데이트와 재로그인
 

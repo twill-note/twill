@@ -42,5 +42,13 @@ echo "  📝 노트 앱: http://$HOST:$FRONTEND_PORT"
 echo "  (종료: Ctrl+C)"
 echo
 
-# 둘 중 하나가 비정상 종료하면 남은 프로세스도 정리합니다.
-wait -n "$BACKEND_PID" "$FRONTEND_PID"
+# macOS 기본 Bash 3.2에는 wait -n이 없다. 먼저 끝난 서비스의 종료 코드를
+# 반환하면 EXIT trap이 나머지 서비스를 정리한다.
+while kill -0 "$BACKEND_PID" 2>/dev/null && kill -0 "$FRONTEND_PID" 2>/dev/null; do
+  sleep 1
+done
+if ! kill -0 "$BACKEND_PID" 2>/dev/null; then
+  wait "$BACKEND_PID"
+else
+  wait "$FRONTEND_PID"
+fi

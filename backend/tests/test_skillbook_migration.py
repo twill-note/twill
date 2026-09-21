@@ -49,15 +49,22 @@ class SkillbookMigrationTests(unittest.TestCase):
         skillbook.initialize_skillbook([self.old])
         self.assertFalse(target.exists())
 
-    def test_failed_copy_can_retry_and_symlinks_are_not_followed(self):
-        source = self.write(self.old, 'retry')
-        (source / 'external').symlink_to(self.root / 'outside')
+    def test_failed_copy_can_retry(self):
+        self.write(self.old, 'retry')
         with patch.object(shutil, 'copytree', side_effect=OSError('full disk')):
             with self.assertRaises(OSError):
                 skillbook.initialize_skillbook([self.old])
         self.assertEqual(list(self.new.glob('.migrated-*')), [])
         skillbook.initialize_skillbook([self.old])
         self.assertTrue((self.new / 'skills/retry/SKILL.md').exists())
+
+    def test_symlinks_are_not_followed(self):
+        source = self.write(self.old, 'retry')
+        try:
+            (source / 'external').symlink_to(self.root / 'outside')
+        except OSError as exc:
+            self.skipTest(f'symlink creation is not available: {exc}')
+        skillbook.initialize_skillbook([self.old])
         self.assertFalse((self.new / 'skills/retry/external').is_symlink())
 
     def test_builtin_updates_without_replacing_editable_skill(self):

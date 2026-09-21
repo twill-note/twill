@@ -17,21 +17,22 @@ export function desktopAppProfile(isPackaged, appDataPath) {
  * 데스크톱 프로세스에 일반적인 사용자 명령 경로를 보충한다.
  */
 export function desktopCommandPath(currentPath, platform = process.platform, homeDirectory = '') {
-  const existing = String(currentPath || '').split(path.delimiter).filter(Boolean)
-  if (platform !== 'darwin') return existing.join(path.delimiter)
+  const delimiter = platform === 'win32' ? ';' : ':'
+  const existing = String(currentPath || '').split(delimiter).filter(Boolean)
+  if (platform !== 'darwin') return existing.join(delimiter)
 
   const macosCommandPaths = [
     '/opt/homebrew/bin',
     '/usr/local/bin',
     ...(homeDirectory
       ? [
-          path.join(homeDirectory, '.local', 'bin'),
-          path.join(homeDirectory, '.npm-global', 'bin'),
-          path.join(homeDirectory, '.volta', 'bin'),
+          path.posix.join(homeDirectory, '.local', 'bin'),
+          path.posix.join(homeDirectory, '.npm-global', 'bin'),
+          path.posix.join(homeDirectory, '.volta', 'bin'),
         ]
       : []),
   ]
-  return [...new Set([...existing, ...macosCommandPaths])].join(path.delimiter)
+  return [...new Set([...existing, ...macosCommandPaths])].join(delimiter)
 }
 
 export function isExpectedFrontendHtml(html, expectedHtml = null) {

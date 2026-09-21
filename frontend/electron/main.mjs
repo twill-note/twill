@@ -1346,6 +1346,11 @@ async function runSmokeTest() {
     },
   }
   console.log(`NOTE_DESKTOP_SMOKE ${JSON.stringify({ main: mainResult, quickMemo: quickMemoResult, byeori: byeoriResult, windowControls: windowControlsResult, nativeFrame, screenshotPath })}`)
+  for (const [name, result] of [['main', mainResult], ['quickMemo', quickMemoResult], ...(byeoriResult ? [['byeori', byeoriResult]] : [])]) {
+    if (!result.rootMounted || !result.desktopBridge) {
+      throw new Error(`Desktop smoke test failed: ${name} renderer or preload did not initialize`)
+    }
+  }
   const pauseMs = Math.min(Math.max(Number.parseInt(process.env.NOTE_APP_SMOKE_PAUSE_MS || '0', 10) || 0, 0), 30_000)
   if (pauseMs) await new Promise((resolve) => setTimeout(resolve, pauseMs))
   app.quit()
@@ -1371,7 +1376,8 @@ function installMenu() {
 
 const hasSingleInstanceLock = app.requestSingleInstanceLock()
 if (!hasSingleInstanceLock) {
-  app.quit()
+  if (smokeTest) app.exit(1)
+  else app.quit()
 } else {
   app.on('second-instance', () => {
     if (!mainWindow) return
@@ -1476,6 +1482,14 @@ if (!hasSingleInstanceLock) {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       console.error(`[desktop] 시작 실패: ${message}`)
+      if (smokeTest) {
+        try {
+          await stopBackend()
+        } finally {
+          app.exit(1)
+        }
+        return
+      }
       dialog.showErrorBox('Twill 시작 실패', message)
       app.quit()
     }

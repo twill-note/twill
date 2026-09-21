@@ -15,7 +15,7 @@ Write-Host '[package] Preparing development dependencies...'
 if ($LASTEXITCODE -ne 0) { throw 'Project setup failed.' }
 
 Write-Host '[package] Installing the backend packager...'
-& $venvPython -m pip install 'pyinstaller==6.16.0'
+& $venvPython -m pip install --requirement (Join-Path $backendRoot 'requirements-build.txt')
 if ($LASTEXITCODE -ne 0) { throw 'PyInstaller installation failed.' }
 
 Write-Host '[package] Downloading the latest official Codex CLI runtime...'
@@ -45,7 +45,8 @@ if (Test-Path -LiteralPath $backendOutput) {
     --specpath (Join-Path $backendRoot 'build') `
     --paths $backendRoot `
     --collect-submodules app `
-    --add-data "$(Join-Path $projectRoot 'skillbook');skillbook" `
+    --add-data "$(Join-Path $projectRoot 'skillbook\skills\create-system-skill');skillbook/skills/create-system-skill" `
+    --add-data "$(Join-Path $projectRoot 'skillbook\skills\write-project-wiki');skillbook/skills/write-project-wiki" `
     --add-data "$(Join-Path $backendRoot 'app\system_manual');backend/app/system_manual" `
     (Join-Path $backendRoot 'desktop_main.py')
 if ($LASTEXITCODE -ne 0) { throw 'Backend build failed.' }

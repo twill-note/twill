@@ -4,6 +4,9 @@
   "version": "0.1.5",
   "type": "module",
   "main": "electron/main.mjs",
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",

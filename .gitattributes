@@ -1,4 +1,9 @@
-# WSL/Linux 소스는 LF로 통일하고, 배치 파일만 Windows 형식으로 유지합니다.
+# macOS/Linux 소스는 LF로 통일하고, Windows 배치 파일은 CRLF로 유지합니다.
 * text=auto eol=lf
 *.sh text eol=lf
 *.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+*.png binary
+*.icns binary
+*.ico binary

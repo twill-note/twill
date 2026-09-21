@@ -14,7 +14,7 @@ function Write-Step([string]$Message) {
 function Refresh-ProcessPath {
     $machinePath = [Environment]::GetEnvironmentVariable('Path', 'Machine')
     $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
-    $env:Path = "$machinePath;$userPath"
+    $env:Path = "$env:Path;$machinePath;$userPath"
 }
 
 function Test-Python([string]$Path) {
@@ -30,13 +30,13 @@ function Test-Python([string]$Path) {
 
 function Find-Python {
     $candidates = [System.Collections.Generic.List[string]]::new()
+    Get-Command python.exe -All -ErrorAction SilentlyContinue |
+        ForEach-Object { $candidates.Add($_.Source) }
     $localPrograms = Join-Path $env:LOCALAPPDATA 'Programs\Python'
     if (Test-Path -LiteralPath $localPrograms) {
         Get-ChildItem -LiteralPath $localPrograms -Filter python.exe -File -Recurse -ErrorAction SilentlyContinue |
             ForEach-Object { $candidates.Add($_.FullName) }
     }
-    Get-Command python.exe -All -ErrorAction SilentlyContinue |
-        ForEach-Object { $candidates.Add($_.Source) }
     foreach ($candidate in ($candidates | Select-Object -Unique)) {
         if (Test-Python $candidate) { return $candidate }
     }
@@ -46,8 +46,8 @@ function Find-Python {
 function Get-NodeInfo {
     try {
         $command = Get-Command node.exe -ErrorAction Stop
-        $version = (& $command.Source --version).Trim().TrimStart('v').Split('.')[0]
-        if ($LASTEXITCODE -eq 0 -and [int]$version -ge 20) {
+        $version = (& $command.Source --version).Trim().TrimStart('v').Split('.')
+        if ($LASTEXITCODE -eq 0 -and ([int]$version[0] -gt 22 -or ([int]$version[0] -eq 22 -and [int]$version[1] -ge 12))) {
             return $command.Source
         }
     } catch {}
@@ -88,10 +88,13 @@ Write-Step "Node.js: $(& $node --version) ($node)"
 $nodeDirectory = Split-Path -Parent $node
 $pythonDirectory = Split-Path -Parent $python
 $pythonScripts = Join-Path $pythonDirectory 'Scripts'
-@(
+$environmentLines = @(
     '@echo off'
+    'chcp 65001 >nul'
     "set `"TWILL_PYTHON=$python`""
     "set `"PATH=$pythonDirectory;$pythonScripts;$nodeDirectory;%PATH%`""
-) | Set-Content -LiteralPath $environmentFile -Encoding Ascii
+)
+# Preserve Korean user names and project paths without a UTF-8 BOM in the batch file.
+[System.IO.File]::WriteAllLines($environmentFile, $environmentLines, [System.Text.UTF8Encoding]::new($false))
 
 Write-Step 'All required runtimes are available.'

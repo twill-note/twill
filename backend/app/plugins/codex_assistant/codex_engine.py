@@ -8,12 +8,12 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
-import shutil
 from typing import Any, AsyncIterator
 
 from ...memories import search_memories_tool
 from ...skillbook import list_skillbook_tool, read_skillbook_tool
 from .app_server import client as app_server, AppServerError
+from .codex_cli import resolve_codex_installation
 
 from .cli import codex_command
 
@@ -522,8 +522,8 @@ class CodexEngine:
         return next_turn_id
 
     async def status(self) -> dict[str, Any]:
-        binary = shutil.which("codex")
-        if not binary:
+        installation = resolve_codex_installation()
+        if not installation:
             return {"available": False, "logged_in": False, "detail": "codex CLI가 설치되어 있지 않습니다"}
         try:
             proc = await asyncio.create_subprocess_exec(
@@ -535,7 +535,12 @@ class CodexEngine:
             return {"available": False, "logged_in": False, "detail": "codex CLI를 실행할 수 없습니다"}
         text = (out.decode(errors="ignore") + err.decode(errors="ignore")).strip()
         logged_in = proc.returncode == 0 and ("logged in" in text.lower() or "@" in text or "signed in" in text.lower())
-        return {"available": True, "logged_in": bool(logged_in), "detail": text}
+        return {
+            "available": True,
+            "logged_in": bool(logged_in),
+            "detail": text,
+            **installation.as_status(),
+        }
 
     async def list_models(self) -> list[dict[str, Any]]:
         data = []

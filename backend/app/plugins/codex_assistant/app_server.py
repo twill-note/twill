@@ -33,6 +33,16 @@ class AppServerError(RuntimeError):
     pass
 
 
+def _app_server_command(binary: str) -> tuple[str, str]:
+    """Return the Codex app-server command.
+
+    Stdio is the app-server's default transport. Recent CLI versions expose a
+    ``--stdio`` alias, but older supported versions reject that flag, so the bare
+    command is the most broadly compatible form.
+    """
+    return binary, "app-server"
+
+
 # codex app-server 가 클라이언트에게 보내는 승인 요청(id 있는 request) 에 대한 기본 응답.
 # sandbox="workspace-write" 로 워크스페이스 내부 파일 작업은 대부분 승인 요청 자체가 없지만,
 # 커맨드 실행/네트워크 접근 등 sandbox 밖 escalation 은 여전히 요청이 올 수 있음.

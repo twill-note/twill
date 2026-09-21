@@ -6,7 +6,7 @@ import unittest
 from unittest.mock import AsyncMock, patch
 
 from fastapi import HTTPException
-from app.plugins.codex_assistant import updates, cli
+from app.plugins.codex_assistant import updates, cli, codex_cli
 from app.plugins.codex_assistant.app_server import AppServerClient, AppServerError
 from app.plugins.codex_assistant.codex_engine import CodexEngine
 from app.routers import ai
@@ -86,10 +86,28 @@ class MaintenanceTests(unittest.IsolatedAsyncioTestCase):
 
 
 class UpdateTests(unittest.IsolatedAsyncioTestCase):
+    async def test_bundled_runtime_updates_without_system_codex_or_npm(self):
+        installation = codex_cli.CodexInstallation('/Twill/codex', '0.99.0', 'bundled')
+        with (
+            patch.object(updates, '_cache', None),
+            patch.object(updates, 'codex_binary', return_value=installation.binary),
+            patch.object(updates, 'resolve_codex_installation', return_value=installation),
+            patch.object(updates, 'installed_version', AsyncMock(side_effect=['0.99.0', '0.154.0'])),
+            patch.object(updates, 'latest_release', return_value='0.154.0'),
+            patch.object(updates, 'download_latest_codex_runtime') as download,
+            patch.object(updates, 'managed_runtime_dir', return_value=Path('/Twill/runtime')),
+            patch.object(updates, 'update_command') as system_update,
+        ):
+            result = await updates.install_update()
+        download.assert_called_once_with(Path('/Twill/runtime'))
+        system_update.assert_not_called()
+        self.assertEqual(result['current_version'], '0.154.0')
+        self.assertFalse(result['update_available'])
+
     async def test_version_comparison_and_cached_checks(self):
         self.assertGreater(updates.version_key('0.154.0'), updates.version_key('0.99.0'))
         self.assertGreater(updates.version_key('0.154.0'), updates.version_key('0.154.0-beta.1'))
-        with patch.object(updates, '_cache', None), patch.object(updates.shutil, 'which', return_value='/bin/codex'), patch.object(updates, 'installed_version', AsyncMock(return_value='0.99.0')), patch.object(updates, 'latest_release', return_value='0.154.0') as latest:
+        with patch.object(updates, '_cache', None), patch.object(updates, 'codex_binary', return_value='/bin/codex'), patch.object(updates, 'resolve_codex_installation', return_value=codex_cli.CodexInstallation('/bin/codex', '0.99.0', 'path')), patch.object(updates, 'installed_version', AsyncMock(return_value='0.99.0')), patch.object(updates, 'latest_release', return_value='0.154.0') as latest:
             results = await asyncio.gather(updates.check_update(), updates.check_update())
             self.assertTrue(all(r['update_available'] for r in results))
             latest.assert_called_once()
@@ -98,7 +116,7 @@ class UpdateTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(updates, 'check_update', AsyncMock(return_value={'installed': True, 'update_available': False})), patch.object(updates, 'run_command', AsyncMock()) as run:
             await updates.install_update()
             run.assert_not_awaited()
-        with patch.object(updates, 'check_update', AsyncMock(return_value={'installed': True, 'update_available': True, 'latest_version': '0.154.0'})), patch.object(updates.shutil, 'which', return_value='/bin/codex'), patch.object(updates, 'run_command', AsyncMock()), patch.object(updates, 'installed_version', AsyncMock(return_value='0.99.0')):
+        with patch.object(updates, 'check_update', AsyncMock(return_value={'installed': True, 'update_available': True, 'latest_version': '0.154.0'})), patch.object(updates, 'codex_binary', return_value='/bin/codex'), patch.object(updates, 'resolve_codex_installation', return_value=codex_cli.CodexInstallation('/bin/codex', '0.99.0', 'path')), patch.object(updates, 'run_command', AsyncMock()), patch.object(updates, 'installed_version', AsyncMock(return_value='0.99.0')):
             with self.assertRaisesRegex(RuntimeError, '이전 Codex'):
                 await updates.install_update()
 
@@ -136,6 +154,6 @@ class UpdateTests(unittest.IsolatedAsyncioTestCase):
             js.parent.mkdir(parents=True)
             js.touch()
             (root / 'node.exe').touch()
-            with patch.object(cli, 'os', SimpleNamespace(name='nt')), patch.object(cli.shutil, 'which', return_value=str(root / 'codex.cmd')):
+            with patch.object(cli, 'os', SimpleNamespace(name='nt')), patch.object(codex_cli, 'codex_binary', return_value=str(root / 'codex.cmd')):
                 self.assertEqual(cli.codex_command('login'), [str(root / 'node.exe'), str(js), 'login'])
                 self.assertEqual(cli.codex_command('app-server')[-1], 'app-server')

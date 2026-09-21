@@ -376,6 +376,7 @@ export const api = {
   /** 벼리(오케스트레이터) — 세션·모델·엔진 상태. 실행 스트림은 aiStore 의 WS 가 담당. */
   ai: {
     status: () => request<AiEngineStatus>('/api/ai/status'),
+    updateCodexCli: () => request<AiCodexCliUpdate>('/api/ai/codex-cli/update', { method: 'POST' }),
     models: () => request<{ models: AiModel[] }>('/api/ai/models'),
     usageLimits: () => request<AiUsageLimits>('/api/ai/usage-limits'),
     runtimeInfo: () => request<AiRuntimeInfo>('/api/ai/runtime-info'),
@@ -420,6 +421,18 @@ export type AiEngineStatus = {
   logged_in: boolean
   detail: string
   engine: string | null
+  binary?: string
+  version?: string
+  source?: 'override' | 'managed' | 'bundled' | 'standalone' | 'path' | string
+  bundled?: boolean
+  managed?: boolean
+}
+
+export type AiCodexCliUpdate = {
+  ok: boolean
+  version: string
+  source: string
+  restart_required: boolean
 }
 
 /** 사용자가 명시적으로 허용한, 이 기기의 Codex Git 메타데이터 쓰기 규칙 상태. */

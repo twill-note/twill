@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { dialog } from '../../dialog'
 import { displayCombo } from '../../shortcuts'
+import { useBackdropDismiss } from '../../useBackdropDismiss'
 import { toSql } from './exporter'
 import { parseSqlDdl } from './importer'
 import TableBox from './TableBox'
@@ -735,7 +736,7 @@ export default function ErdDesigner({
             type="button"
             className="rounded-md border border-amber-300 bg-amber-50 px-2 py-1 text-[11px] font-medium text-amber-700 hover:bg-amber-100"
             onClick={() => void refreshFromDisk()}
-            title="외부에서 변경된 파일을 다시 불러옵니다"
+            title="다시 불러오기"
           >
             외부 변경됨
           </button>
@@ -747,7 +748,7 @@ export default function ErdDesigner({
           className="grid h-8 w-8 place-items-center rounded-md border border-[#e3e2e0] text-[#5f5e5b] hover:bg-[#f1f1ef] disabled:cursor-not-allowed disabled:text-[#c9c8c4]"
           onClick={() => void refreshFromDisk()}
           disabled={!savedPath || refreshing}
-          title={savedPath ? '파일에서 다시 불러오기' : '저장한 뒤 다시 불러올 수 있습니다'}
+          title="다시 불러오기"
           aria-label="ERD 새로고침"
         >
           <RefreshIcon spinning={refreshing} />
@@ -764,7 +765,7 @@ export default function ErdDesigner({
           }`}
           onClick={() => { void save('manual') }}
           disabled={saving || (!dirty && !pathEditing && !!savedPath)}
-          title={`저장 (${displayCombo('Mod+KeyS')})`}
+          title="저장"
         >
           {saving ? '저장 중…' : `저장 (${displayCombo('Mod+KeyS')})`}
         </button>
@@ -930,14 +931,14 @@ export default function ErdDesigner({
               <button
                 className="rounded px-2 py-1 text-[#5f5e5b] hover:bg-[#f1f1ef]"
                 onClick={() => setDdlImportOpen(true)}
-                title="SQL DDL의 테이블과 관계를 현재 설계에 추가"
+                title="SQL DDL 가져오기"
               >
                 📥 DDL 가져오기
               </button>
               <button
                 className="rounded px-2 py-1 text-[#5f5e5b] hover:bg-[#f1f1ef]"
                 onClick={() => setSqlOpen(true)}
-                title="현재 테이블과 관계를 SQL DDL로 한 번에 내보내기"
+                title="SQL DDL 내보내기"
               >
                 📤 DDL 내보내기
               </button>
@@ -1167,6 +1168,7 @@ function TrashIcon() { return <SvgIcon><path d="M3.5 5h9M6.3 3.5h3.4M5 5l.5 7h5l
 // SQL 내보내기 다이얼로그
 // ─────────────────────────────────────────────────────────
 function SqlExportDialog({ sql, filename, onClose }: { sql: string; filename: string; onClose: () => void }) {
+  const dismissFromBackdrop = useBackdropDismiss<HTMLDivElement>(onClose, filename)
   const [copied, setCopied] = useState(false)
   const copy = async () => {
     try {
@@ -1187,7 +1189,7 @@ function SqlExportDialog({ sql, filename, onClose }: { sql: string; filename: st
     URL.revokeObjectURL(url)
   }
   return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50" onClick={onClose}>
+    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50" onClick={dismissFromBackdrop}>
       <div
         className="flex h-[80vh] w-[900px] max-w-[92vw] flex-col overflow-hidden rounded-xl border border-[#e3e2e0] bg-white shadow-2xl"
         onClick={(e) => e.stopPropagation()}
@@ -1224,8 +1226,9 @@ function SqlExportDialog({ sql, filename, onClose }: { sql: string; filename: st
 
 function SqlImportDialog({ onImport, onClose }: { onImport: (sql: string) => boolean; onClose: () => void }) {
   const [sql, setSql] = useState('')
+  const dismissFromBackdrop = useBackdropDismiss<HTMLDivElement>(onClose)
   return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50" onClick={onClose}>
+    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50" onClick={dismissFromBackdrop}>
       <div
         className="flex h-[80vh] w-[900px] max-w-[92vw] flex-col overflow-hidden rounded-xl border border-[#e3e2e0] bg-white shadow-2xl"
         onClick={(e) => e.stopPropagation()}

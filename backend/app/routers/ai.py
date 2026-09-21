@@ -21,6 +21,7 @@ from ..ai.orchestrator import (
     prompt_runtime_info,
 )
 from ..plugins.codex_assistant.app_server import client as codex_app_server
+from ..plugins.codex_assistant.codex_cli import download_latest_codex_runtime, managed_runtime_dir
 
 from ..plugins.codex_assistant.cli import codex_command, stop_codex_process
 from ..plugins.codex_assistant import updates
@@ -83,6 +84,30 @@ async def engine_status():
         return {"available": False, "logged_in": False, "detail": "설치된 AI 엔진이 없습니다", "engine": None}
     st = await engine.status()
     return {**st, "engine": engine.id}
+
+
+@router.post("/codex-cli/update")
+async def update_codex_cli():
+    """공식 OpenAI 릴리스의 최신 Codex CLI를 Twill 전용 폴더에 설치한다."""
+    async with engine_maintenance("Codex 업데이트 중입니다. 완료 후 다시 시도해 주세요."):
+        try:
+            installation = await asyncio.to_thread(
+                download_latest_codex_runtime,
+                managed_runtime_dir(),
+            )
+            updates._cache = None
+        except Exception as exc:  # noqa: BLE001
+            log.exception("Codex CLI update failed")
+            raise HTTPException(
+                status_code=502,
+                detail=f"Codex CLI를 업데이트하지 못했습니다: {exc}",
+            ) from exc
+    return {
+        "ok": True,
+        "version": installation.version,
+        "source": installation.source,
+        "restart_required": True,
+    }
 
 
 @router.post("/logout")

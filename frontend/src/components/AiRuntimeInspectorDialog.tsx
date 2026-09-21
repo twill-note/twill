@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api, type AiRuntimeInfo, type SkillMeta } from '../api'
+import { useBackdropDismiss } from '../useBackdropDismiss'
 
 function PromptDetails({ prompt }: { prompt: AiRuntimeInfo['prompts'][number] }) {
   const inactiveLabel =
@@ -82,6 +83,7 @@ export default function AiRuntimeInspectorDialog({ onClose }: { onClose: () => v
   const [skillBodies, setSkillBodies] = useState<Record<string, string>>({})
   const [loadingSkills, setLoadingSkills] = useState<Set<string>>(() => new Set())
   const [error, setError] = useState<string | null>(null)
+  const dismissFromBackdrop = useBackdropDismiss<HTMLDivElement>(onClose)
 
   const load = () => {
     setError(null)
@@ -116,10 +118,7 @@ export default function AiRuntimeInspectorDialog({ onClose }: { onClose: () => v
   return (
     <div
       className="fixed inset-0 z-[60] flex items-start justify-center bg-black/30 pt-[4vh]"
-      onClick={(e) => {
-        e.stopPropagation()
-        onClose()
-      }}
+      onClick={dismissFromBackdrop}
     >
       <div
         className="max-h-[90vh] w-[840px] max-w-[95vw] overflow-y-auto rounded-lg bg-white shadow-xl"

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { api } from '../api'
 import { useAppStore } from '../store'
 import type { BrowseResult } from '../types'
+import { useBackdropDismiss } from '../useBackdropDismiss'
 
 export default function FolderPicker({ onClose }: { onClose: () => void }) {
   const { root, recent, openWorkspace } = useAppStore()
@@ -9,6 +10,7 @@ export default function FolderPicker({ onClose }: { onClose: () => void }) {
   const [pathInput, setPathInput] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [opening, setOpening] = useState(false)
+  const dismissFromBackdrop = useBackdropDismiss<HTMLDivElement>(onClose)
 
   const navigate = async (path?: string) => {
     setError(null)
@@ -40,7 +42,7 @@ export default function FolderPicker({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/20 pt-[12vh]" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/20 pt-[12vh]" onClick={dismissFromBackdrop}>
       <div
         className="flex max-h-[70vh] w-[520px] max-w-[90vw] flex-col overflow-hidden rounded-xl border border-[#e3e2e0] bg-white shadow-2xl"
         onClick={(e) => e.stopPropagation()}

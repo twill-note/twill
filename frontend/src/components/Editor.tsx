@@ -1005,14 +1005,14 @@ function NoteEditor({
       <header className="flex items-center gap-2 border-b border-[#efefed] px-4 py-2">
         <button
           className="rounded px-1.5 py-0.5 text-[14px] text-[#9b9a97] hover:bg-[#f1f1ef] hover:text-[#37352f]"
-          title="이전 노트 (Alt+←)"
+          title="이전 노트"
           onClick={() => window.history.back()}
         >
           ←
         </button>
         <button
           className="rounded px-1.5 py-0.5 text-[14px] text-[#9b9a97] hover:bg-[#f1f1ef] hover:text-[#37352f]"
-          title="다음 노트 (Alt+→)"
+          title="다음 노트"
           onClick={() => window.history.forward()}
         >
           →
@@ -1022,11 +1022,7 @@ function NoteEditor({
         <button
           type="button"
           className="rounded px-1.5 py-0.5 text-[13px] text-[#9b9a97] hover:bg-[#f1f1ef] hover:text-[#37352f] disabled:cursor-not-allowed disabled:text-[#d3d1cb]"
-          title={
-            content.path.startsWith('/')
-              ? '문서 작업 등록은 워크스페이스 노트에서만 사용할 수 있습니다'
-              : '문서 작업 등록 — 검토·개선 작업을 태스크 보드에 추가'
-          }
+          title="문서 작업 등록"
           aria-label="문서 작업 등록"
           onClick={() => setDocumentTaskOpen(true)}
           disabled={content.path.startsWith('/')}
@@ -1036,7 +1032,7 @@ function NoteEditor({
         <SpellcheckToggleButton enabled={spellcheck} onToggle={toggleSpellcheck} />
         <button
           className="rounded px-1.5 py-0.5 text-[13px] text-[#9b9a97] hover:bg-[#f1f1ef] hover:text-[#37352f]"
-          title={`에디터 너비: ${WIDTH_LABEL[editorWidth]} (클릭해서 변경)`}
+          title={`에디터 너비: ${WIDTH_LABEL[editorWidth]}`}
           onClick={cycleWidth}
         >
           ↔ {WIDTH_LABEL[editorWidth]}

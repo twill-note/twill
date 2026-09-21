@@ -6,8 +6,9 @@ import { SYSTEM_AI_TAB, useAppStore } from '../store'
 import { TASK_PROJECT_CHANGED_MESSAGE, taskSessionAction } from '../taskExecutionScope'
 import type { FileContent, NoteRow } from '../types'
 import DbCell from './DbCell'
-import NoteBodyEditor from './NoteBodyEditor'
+import NoteBodyEditor, { type NoteBodySaveStatus } from './NoteBodyEditor'
 import SpellcheckToggleButton from './SpellcheckToggleButton'
+import { useBackdropDismiss } from '../useBackdropDismiss'
 
 interface Props {
   row: NoteRow
@@ -47,7 +48,9 @@ export default function TaskCardPopup({ row, config, onClose, onCellChange, onRo
   const [content, setContent] = useState<FileContent | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [spellcheck, setSpellcheck] = useState(false)
+  const [bodySaveStatus, setBodySaveStatus] = useState<NoteBodySaveStatus>('idle')
   const [openingWork, setOpeningWork] = useState(false)
+  const dismissFromBackdrop = useBackdropDismiss<HTMLDivElement>(onClose, row.path)
   const runTask = useAiStore((s) => s.runTask)
   const loadSessions = useAiStore((s) => s.loadSessions)
   const selectSession = useAiStore((s) => s.selectSession)
@@ -191,7 +194,7 @@ export default function TaskCardPopup({ row, config, onClose, onCellChange, onRo
   return (
     <div
       className="fixed inset-0 z-50 flex items-start justify-center bg-black/25 pt-[6vh]"
-      onClick={onClose}
+      onClick={dismissFromBackdrop}
       role="presentation"
     >
       <div
@@ -264,15 +267,39 @@ export default function TaskCardPopup({ row, config, onClose, onCellChange, onRo
 
         {/* 설명 — 본편집기와 동일한 마크다운 미리보기+편집 */}
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-3">
-          <div className="relative mb-1.5 flex items-center justify-between gap-2">
+          <div className="mb-1.5 flex items-center justify-between gap-2">
             <span className="text-[10px] uppercase tracking-wide text-[#9b9a97]">설명</span>
-            <SpellcheckToggleButton
-              enabled={spellcheck}
-              onToggle={() => setSpellcheck((value) => !value)}
-            />
+            <div className="flex items-center gap-2">
+              {bodySaveStatus !== 'idle' && (
+                <span
+                  className={`text-[10px] ${
+                    bodySaveStatus === 'error'
+                      ? 'text-red-500'
+                      : bodySaveStatus === 'saved'
+                        ? 'text-green-600'
+                        : 'text-[#9b9a97]'
+                  }`}
+                >
+                  {bodySaveStatus === 'saving'
+                    ? '저장 중…'
+                    : bodySaveStatus === 'saved'
+                      ? '저장됨 ✓'
+                      : '저장 실패'}
+                </span>
+              )}
+              <SpellcheckToggleButton
+                enabled={spellcheck}
+                onToggle={() => setSpellcheck((value) => !value)}
+              />
+            </div>
           </div>
           {content ? (
-            <NoteBodyEditor key={content.path} content={content} spellCheck={spellcheck} />
+            <NoteBodyEditor
+              key={content.path}
+              content={content}
+              spellCheck={spellcheck}
+              onSaveStatusChange={setBodySaveStatus}
+            />
           ) : error ? (
             <p className="text-[12px] text-[#c92a2a]">{error}</p>
           ) : (

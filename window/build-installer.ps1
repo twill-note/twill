@@ -18,6 +18,10 @@ Write-Host '[package] Installing the backend packager...'
 & $venvPython -m pip install 'pyinstaller==6.16.0'
 if ($LASTEXITCODE -ne 0) { throw 'PyInstaller installation failed.' }
 
+Write-Host '[package] Downloading the latest official Codex CLI runtime...'
+& $venvPython (Join-Path $projectRoot 'scripts\prepare_codex_runtime.py')
+if ($LASTEXITCODE -ne 0) { throw 'Codex CLI runtime preparation failed.' }
+
 Write-Host '[package] Building the frontend...'
 Push-Location $frontendRoot
 try {

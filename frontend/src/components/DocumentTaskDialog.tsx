@@ -3,6 +3,7 @@ import { api } from '../api'
 import { dbApi } from '../dbschema'
 import { useAppStore } from '../store'
 import type { Section } from '../types'
+import { useBackdropDismiss } from '../useBackdropDismiss'
 
 type TemplateId = 'review' | 'improve' | 'custom'
 
@@ -94,6 +95,9 @@ export default function DocumentTaskDialog({ documentPath, onClose }: { document
   const titleRef = useRef<HTMLInputElement>(null)
   const dialogRef = useRef<HTMLDivElement>(null)
   const section = useMemo(() => sectionForDocument(documentPath, sections), [documentPath, sections])
+  const dismissFromBackdrop = useBackdropDismiss<HTMLDivElement>(() => {
+    if (!busy) onClose()
+  }, documentPath)
 
   useEffect(() => {
     titleRef.current?.focus()
@@ -162,9 +166,7 @@ export default function DocumentTaskDialog({ documentPath, onClose }: { document
     <div
       className="fixed inset-0 z-[60] flex items-start justify-center bg-black/20 px-4 pt-[12vh]"
       role="presentation"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget && !busy) onClose()
-      }}
+      onClick={dismissFromBackdrop}
     >
       <div
         ref={dialogRef}

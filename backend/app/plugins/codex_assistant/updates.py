@@ -10,6 +10,8 @@ import shutil
 import time
 from urllib.request import Request, urlopen
 
+from .codex_cli import codex_binary, resolve_codex_installation, download_latest_codex_runtime, managed_runtime_dir
+
 VERSION_RE = re.compile(r"(?<![\d.])(\d+\.\d+\.\d+(?:-[\w.-]+)?)(?![\d.])")
 _cache: tuple[float, dict] | None = None
 _check_lock = asyncio.Lock()
@@ -111,7 +113,7 @@ async def check_update(*, force: bool = False) -> dict:
     async with _check_lock:
         if not force and _cache and time.monotonic() - _cache[0] < 3600:
             return dict(_cache[1])
-        binary = shutil.which("codex")
+        binary = await asyncio.to_thread(codex_binary)
         if not binary:
             return {"installed": False, "current_version": None, "latest_version": None, "update_available": False}
         current, latest = await asyncio.gather(installed_version(binary), asyncio.to_thread(latest_release))
@@ -128,11 +130,18 @@ async def install_update() -> dict:
         raise RuntimeError("codex CLI가 설치되어 있지 않습니다.")
     if not before["update_available"]:
         return before
-    binary = shutil.which("codex")
-    if not binary:
+    installation = await asyncio.to_thread(resolve_codex_installation)
+    if not installation:
         raise RuntimeError("codex CLI를 찾을 수 없습니다.")
     _cache = None
-    await run_command(update_command(binary), timeout=600)
+    if installation.source in {"bundled", "managed"}:
+        await asyncio.to_thread(download_latest_codex_runtime, managed_runtime_dir())
+        binary = await asyncio.to_thread(codex_binary)
+        if not binary:
+            raise RuntimeError("업데이트한 Codex CLI를 찾을 수 없습니다.")
+    else:
+        binary = installation.binary
+        await run_command(update_command(binary), timeout=600)
     current = await installed_version(binary)
     if version_key(current) < version_key(before["latest_version"]):
         raise RuntimeError("업데이트 후에도 이전 Codex가 실행됩니다. Codex 설치 경로와 권한을 확인해 주세요.")

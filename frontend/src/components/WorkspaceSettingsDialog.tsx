@@ -15,6 +15,7 @@ import {
 } from '../shortcuts'
 import { DEFAULT_THEME, THEMES, useThemeStore } from '../theme'
 import { APP_BUILD_INFO, formatBuildTime } from '../buildInfo'
+import { isRepeatedClick, useBackdropDismiss } from '../useBackdropDismiss'
 
 // 모델 목록을 아직 못 받았을 때의 강도 후보 (GPT-5.6부터 max·ultra 가 추가됨 — 실제 지원
 // 여부는 모델별 supportedEfforts 가 우선)
@@ -143,7 +144,9 @@ function ThemePicker() {
       <button
         type="button"
         className="flex w-full items-center gap-2.5 rounded-md border border-[#e3e2e0] bg-white px-2.5 py-2 text-left hover:border-[#c8c7c4]"
-        onClick={() => setOpen((v) => !v)}
+        onClick={(event) => {
+          if (!isRepeatedClick(event)) setOpen((v) => !v)
+        }}
         aria-expanded={open}
         title="테마 선택"
       >
@@ -296,8 +299,14 @@ export default function WorkspaceSettingsDialog({ onClose }: { onClose: () => vo
       ? [{ id: settings.codex.default_model, displayName: settings.codex.default_model, isDefault: false, supportedEfforts: [] }, ...models]
       : models
 
+  const dismissFromBackdrop = useBackdropDismiss<HTMLDivElement>(onClose)
+
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/25 pt-[6vh]" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center bg-black/25 pt-[6vh]"
+      onClick={dismissFromBackdrop}
+      data-testid="workspace-settings-dialog"
+    >
       <div
         className="w-[640px] max-w-[95vw] max-h-[85vh] overflow-y-auto rounded-lg bg-white shadow-xl"
         onClick={(e) => e.stopPropagation()}

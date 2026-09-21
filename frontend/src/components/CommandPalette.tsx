@@ -3,6 +3,7 @@ import { api } from '../api'
 import { useAppStore } from '../store'
 import { usePluginRegistry } from '../plugins/registry'
 import type { SearchResult } from '../types'
+import { useBackdropDismiss } from '../useBackdropDismiss'
 
 type CommandPaletteItem = { kind: 'command'; id: string; title: string; onInvoke: () => void }
 type NotePaletteItem = { kind: 'note'; result: SearchResult }
@@ -16,6 +17,7 @@ export default function CommandPalette() {
   const pluginCommands = usePluginRegistry((s) => s.commands)
   const inputRef = useRef<HTMLInputElement>(null)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const dismissFromBackdrop = useBackdropDismiss<HTMLDivElement>(() => setPaletteOpen(false), paletteOpen)
 
   useEffect(() => {
     if (paletteOpen) {
@@ -65,7 +67,7 @@ export default function CommandPalette() {
   return (
     <div
       className="fixed inset-0 z-50 flex items-start justify-center bg-black/20 pt-[15vh]"
-      onClick={() => setPaletteOpen(false)}
+      onClick={dismissFromBackdrop}
     >
       <div
         className="w-[560px] max-w-[90vw] overflow-hidden rounded-xl border border-[#e3e2e0] bg-white shadow-2xl"

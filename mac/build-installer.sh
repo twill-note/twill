@@ -15,6 +15,9 @@ echo "[package] Preparing development dependencies..."
 echo "[package] Installing the backend packager..."
 "$VENV_PYTHON" -m pip install 'pyinstaller==6.16.0'
 
+echo "[package] Downloading the latest official Codex CLI runtime..."
+"$VENV_PYTHON" "$ROOT_DIR/scripts/prepare_codex_runtime.py"
+
 echo "[package] Building the frontend..."
 (cd "$FRONTEND_DIR" && npm run build)
 

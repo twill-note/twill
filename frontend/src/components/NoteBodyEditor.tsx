@@ -18,8 +18,18 @@ import { fromMarkdownBlocks, schema, toMarkdownBlocks } from './Editor'
  * 본문만 갈아끼운다 — 같은 팝업의 DbCell(상태·승인 정책 등)이 frontmatter 를 병행 수정하므로
  * 처음 열 때의 스냅샷으로 덮어쓰면 그 변경이 되돌아가는 사고를 막기 위함.
  */
-export default function NoteBodyEditor({ content, spellCheck = false }: { content: FileContent; spellCheck?: boolean }) {
-  const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+export type NoteBodySaveStatus = 'idle' | 'saving' | 'saved' | 'error'
+
+export default function NoteBodyEditor({
+  content,
+  spellCheck = false,
+  onSaveStatusChange,
+}: {
+  content: FileContent
+  spellCheck?: boolean
+  onSaveStatusChange?: (status: NoteBodySaveStatus) => void
+}) {
+  const [status, setStatus] = useState<NoteBodySaveStatus>('idle')
   const appTheme = useThemeStore((s) => s.theme)
   const loadedRef = useRef(false)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -43,6 +53,10 @@ export default function NoteBodyEditor({ content, spellCheck = false }: { conten
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useEffect(() => {
+    onSaveStatusChange?.(status)
+  }, [onSaveStatusChange, status])
 
   const save = useCallback(async () => {
     if (!loadedRef.current) return
@@ -81,15 +95,8 @@ export default function NoteBodyEditor({ content, spellCheck = false }: { conten
   )
 
   return (
-    <div className="note-body-editor relative" spellCheck={spellCheck}>
+    <div className="note-body-editor" spellCheck={spellCheck}>
       <BlockNoteView editor={editor} theme={isDarkTheme(appTheme) ? 'dark' : 'light'} onChange={scheduleSave} />
-      <span
-        className={`pointer-events-none absolute -top-6 right-0 text-[10px] ${
-          status === 'error' ? 'text-red-500' : status === 'saved' ? 'text-green-600' : 'text-[#9b9a97]'
-        }`}
-      >
-        {status === 'saving' ? '저장 중…' : status === 'saved' ? '저장됨 ✓' : status === 'error' ? '저장 실패' : ''}
-      </span>
     </div>
   )
 }

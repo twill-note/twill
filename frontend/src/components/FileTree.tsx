@@ -7,6 +7,7 @@ import { displayCombo, IS_MAC } from '../shortcuts'
 import ProjectPathDialog from './ProjectPathDialog'
 import { useAiStore } from '../aiStore'
 import { notifyWorkspaceScopesChanged } from '../workspaceScopeEvents'
+import { useBackdropDismiss } from '../useBackdropDismiss'
 
 interface MenuState {
   x: number
@@ -919,6 +920,7 @@ function TemplateModal({
   const [selected, setSelected] = useState<string | null>(null)
   const [name, setName] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const dismissFromBackdrop = useBackdropDismiss<HTMLDivElement>(onClose, dir)
 
   useEffect(() => {
     api.templates().then((t) => {
@@ -953,7 +955,7 @@ function TemplateModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/20 pt-[18vh]" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/20 pt-[18vh]" onClick={dismissFromBackdrop}>
       <div
         className="w-[440px] max-w-[90vw] overflow-hidden rounded-xl border border-[#e3e2e0] bg-white shadow-2xl"
         onClick={(e) => e.stopPropagation()}

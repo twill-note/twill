@@ -1,6 +1,6 @@
 """Twill AI의 Codex 엔진 구현 모듈.
 
-- OAuth 로그인은 시스템에 설치된 `codex` CLI 에 위임한다 (vibe와 동일 접근).
+- OAuth 로그인은 Twill이 선택한 최신 `codex` CLI(관리·번들·시스템 후보)에 위임한다.
 - 챗·태스크 실행은 모두 오케스트레이터(`/api/ai/run`)를 통해 흐른다 — 이 플러그인은
   엔진 어댑터(CodexEngine)를 레지스트리에 등록하고, codex 고유 기능(로그인/로그아웃/상태)만
   라우터로 노출한다. (과거 자체 챗 WebSocket·세션 저장은 오케스트레이터/코어 세션으로 이관됨.)
@@ -14,12 +14,12 @@ import asyncio
 import json
 import logging
 import re
-import shutil
 
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 
 from . import session_store
 from .app_server import client as app_server, AppServerError
+from .codex_cli import codex_binary
 from .codex_engine import engine as codex_engine
 from ...ai.engine import registry as engine_registry
 
@@ -50,7 +50,7 @@ MANIFEST = {
 # codex CLI 헬퍼
 # ─────────────────────────────────────────────────────────────
 def _codex_binary() -> str:
-    return shutil.which("codex") or "codex"
+    return codex_binary() or "codex"
 
 
 URL_RE = re.compile(r"https?://[\w./%?=&#:_-]+")

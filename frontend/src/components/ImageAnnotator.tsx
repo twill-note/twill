@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../api'
 import { dialog } from '../dialog'
 import { APP_UI_FONT_FAMILY } from '../fontFamilies'
+import { useBackdropDismiss } from '../useBackdropDismiss'
 
 // ─────────────────────────────────────────────────────────
 // 주석 데이터 모델 — 좌표는 항상 "이미지 원본 픽셀 공간"
@@ -33,6 +34,7 @@ interface Props {
 }
 
 export default function ImageAnnotator({ imageUrl, onSave, onClose }: Props) {
+  const dismissFromBackdrop = useBackdropDismiss<HTMLDivElement>(onClose, imageUrl)
   const [tool, setTool] = useState<Tool>('rect')
   const [color, setColor] = useState<Color>('#ef4444')
   const [stroke, setStroke] = useState<number>(6)
@@ -222,7 +224,7 @@ export default function ImageAnnotator({ imageUrl, onSave, onClose }: Props) {
   const dirty = items.length > 0
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60" onClick={onClose}>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60" onClick={dismissFromBackdrop}>
       <div
         className="flex h-[92vh] w-[1200px] max-w-[96vw] flex-col overflow-hidden rounded-xl border border-[#e3e2e0] bg-white shadow-2xl"
         onClick={(e) => e.stopPropagation()}
@@ -251,7 +253,7 @@ export default function ImageAnnotator({ imageUrl, onSave, onClose }: Props) {
             }`}
             onClick={save}
             disabled={saving || !img}
-            title="⌘S / Ctrl+S"
+            title="저장"
           >
             {saving ? '저장 중…' : '저장 (⌘S)'}
           </button>
@@ -384,7 +386,7 @@ export default function ImageAnnotator({ imageUrl, onSave, onClose }: Props) {
                   className="rounded border border-[#e3e2e0] px-2 py-1 text-[12px] text-[#5f5e5b] hover:bg-[#f1f1ef] disabled:opacity-40"
                   onClick={undo}
                   disabled={items.length === 0}
-                  title="⌘Z / Ctrl+Z"
+                  title="되돌리기"
                 >
                   ↶ 실행 취소 ({items.length})
                 </button>

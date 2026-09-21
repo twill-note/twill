@@ -784,7 +784,7 @@ function EditorPane({
                     active ? 'bg-white text-[#37352f]' : 'text-[#7d7c78] hover:bg-[#ececea]'
                   } ${tabDropSide === 'before' ? 'border-l-2 border-l-[#4a9eff]' : ''} ${tabDropSide === 'after' ? 'border-r-2 border-r-[#4a9eff]' : ''}`}
                 >
-                  <button className="flex max-w-[200px] items-center gap-1 truncate" onClick={() => onActivateTab(panel.id, tab)} title={`${tab.target} — 우클릭: 상단바 고정`}>
+                  <button className="flex max-w-[200px] items-center gap-1 truncate" onClick={() => onActivateTab(panel.id, tab)} title={tab.target}>
                     {pinnedNotes.includes(tab.target) && <span className="text-[9px]">📌</span>}
                     <span className="text-[13px]">{tab.icon}</span>
                     <span className="truncate">{tab.title}</span>
@@ -893,7 +893,7 @@ function EditorPane({
           <button
             className="h-full shrink-0 border-l border-[#e9e9e7] px-2 text-[12px] text-[#9b9a97] hover:bg-[#ececea] hover:text-[#37352f]"
             onClick={() => onClosePanel(panel.id)}
-            title="이 패널의 탭을 인접 패널에 합치고 패널 닫기"
+            title="패널 닫기"
             aria-label="패널 닫기"
           >
             ×

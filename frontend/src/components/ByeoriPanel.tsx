@@ -806,6 +806,12 @@ function recoveryCopy(kind: NonNullable<AiSession['recovery']>['kind']) {
   }
 }
 
+function shouldOfferCodexUpdate(recovery: NonNullable<AiSession['recovery']>): boolean {
+  if (recovery.kind === 'cli') return true
+  if (recovery.kind !== 'auth' && recovery.kind !== 'backend') return false
+  return /401|unauthorized|model.+not supported|app-server|종료 코드\s*2|codex cli/i.test(recovery.message)
+}
+
 function sessionContextLabel(session: AiSession, scopes: WorkspaceScopeEntry[] = []): string {
   if (session.kind === 'task') return `태스크 · ${pathLabel(session.taskPath || session.title)}`
   const project = session.scopeId
@@ -933,6 +939,7 @@ export default function ByeoriPanel({
   const [usageLimits, setUsageLimits] = useState<AiUsageLimits | null>(null)
   const [loginBusy, setLoginBusy] = useState(false)
   const [loginUrl, setLoginUrl] = useState<string | null>(null)
+  const [cliUpdateBusy, setCliUpdateBusy] = useState(false)
   const [uiError, setUiError] = useState<string | null>(null)
   const [sessionListOpen, setSessionListOpen] = useState(false)
   const [sessionQuery, setSessionQuery] = useState('')
@@ -1478,6 +1485,29 @@ export default function ByeoriPanel({
     ws.onclose = () => setLoginBusy(false)
   }
 
+  const updateCodexCliAndRestart = async () => {
+    const currentVersion = status?.version ? `현재 버전은 ${status.version}입니다.` : '현재 버전을 확인할 수 없습니다.'
+    const ok = await dialog.confirm('Codex CLI를 최신 버전으로 업데이트할까요?', {
+      detail: `${currentVersion}\n\n공식 OpenAI 릴리스에서 Twill 전용 CLI를 설치한 뒤 앱을 재시작합니다. 로그인 정보와 문서는 유지됩니다.`,
+      confirmLabel: '업데이트 및 재시작',
+    })
+    if (!ok) return
+    setCliUpdateBusy(true)
+    setUiError(null)
+    try {
+      await api.ai.updateCodexCli()
+      if (window.noteDesktop?.restart) {
+        await window.noteDesktop.restart()
+        return
+      }
+      window.location.reload()
+    } catch (error) {
+      setUiError((error as Error).message)
+    } finally {
+      setCliUpdateBusy(false)
+    }
+  }
+
   // ── 상태별 화면 ──
   if (!status) {
     return <div className="p-4 text-[12px] text-[#9b9a97]">상태 확인 중…</div>
@@ -1492,9 +1522,16 @@ export default function ByeoriPanel({
         ) : (
           <>
             <p>AI 실행에 필요한 Codex CLI가 설치되어 있지 않습니다.</p>
-            <p className="text-[12px] text-[#9b9a97]">
-              <code className="rounded bg-[#f1f1ef] px-1.5">npm install -g @openai/codex</code> 후 다시 시도하세요.
-            </p>
+            <p className="text-[12px] text-[#9b9a97]">Twill 전용 최신 CLI를 설치하면 앱이 자동으로 재시작됩니다.</p>
+            <button
+              type="button"
+              className="mt-1 rounded-md bg-[#37352f] px-3 py-1.5 text-[12px] font-medium text-white hover:bg-[#2b2925] disabled:opacity-60"
+              onClick={() => void updateCodexCliAndRestart()}
+              disabled={cliUpdateBusy}
+            >
+              {cliUpdateBusy ? 'Codex CLI 업데이트 중…' : 'Codex CLI 설치 및 재시작'}
+            </button>
+            {uiError && <p className="text-[11px] text-[#c92a2a]">{uiError}</p>}
           </>
         )}
       </div>
@@ -1561,7 +1598,7 @@ export default function ByeoriPanel({
             setScopePickerOpen(false)
           }}
           aria-expanded={sessionListOpen}
-          title={sessionListOpen ? '대화 목록 닫기' : '대화 목록 열기'}
+          title="대화 목록"
         >
           <span aria-hidden="true">🤖</span>
           <span className="min-w-0 flex-1 truncate">{active ? active.title : 'Twill AI'}</span>
@@ -1603,7 +1640,7 @@ export default function ByeoriPanel({
           type="button"
           className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-[#9b9a97] hover:bg-[#efefed] hover:text-[#37352f]"
           onClick={() => void logout()}
-          title="Codex 계정 로그아웃 — 다시 로그인할 때까지 Twill AI를 사용할 수 없습니다"
+          title="Codex 계정 로그아웃"
           aria-label="Codex 계정 로그아웃"
         >
           <svg
@@ -1671,7 +1708,7 @@ export default function ByeoriPanel({
                 <button
                   className="mt-2 w-full rounded border border-[#e3e2e0] px-2 py-1 text-[10px] text-[#9b9a97] hover:bg-[#f7f7f5]"
                   onClick={() => setSessionModel(active.id, null, null)}
-                  title="세션 오버라이드 해제 (워크스페이스 기본값 사용)"
+                  title="대화별 모델 설정 해제"
                 >
                   기본값으로 초기화
                 </button>
@@ -1994,6 +2031,22 @@ export default function ByeoriPanel({
                     </p>
                   </>
                 )}
+                {shouldOfferCodexUpdate(active.recovery) && (
+                  <div className="mt-2 rounded border border-current/15 bg-white/55 p-2">
+                    <p className="text-[10px] opacity-80">
+                      이 오류는 오래된 Codex CLI에서 발생할 수 있습니다.
+                      {status?.version ? ` 현재 버전: ${status.version}` : ''}
+                    </p>
+                    <button
+                      type="button"
+                      className="mt-1.5 rounded bg-[#37352f] px-2 py-1 text-[11px] font-medium text-white hover:bg-[#2b2925] disabled:opacity-60"
+                      onClick={() => void updateCodexCliAndRestart()}
+                      disabled={cliUpdateBusy || active.busy}
+                    >
+                      {cliUpdateBusy ? '업데이트 중…' : 'Codex CLI 업데이트 및 재시작'}
+                    </button>
+                  </div>
+                )}
               </div>
               <button
                 type="button"
@@ -2033,7 +2086,7 @@ export default function ByeoriPanel({
         {activeTaskProjectName ? (
           <div
             className="mb-1.5 flex min-w-0 items-center gap-2 rounded-md border border-[#d5e6ff] bg-[#f5f8ff] px-2 py-1 text-[11px] text-[#2f6fd0]"
-            title={`태스크 카드에서 고정된 대상 프로젝트: ${activeTaskProjectName}`}
+            title={`대상 프로젝트: ${activeTaskProjectName}`}
           >
             <span className="shrink-0 text-[#5f7fb5]">대상 프로젝트</span>
             <span className="min-w-0 flex-1 truncate font-medium text-[#275eab]">{activeTaskProjectName}</span>
@@ -2053,7 +2106,7 @@ export default function ByeoriPanel({
             aria-haspopup="listbox"
             aria-expanded={scopePickerOpen}
             aria-label="질문 대상 프로젝트 선택"
-            title="프로젝트를 고르면 독립 문서·태스크 문맥의 새 대화를 시작합니다. 코드 경로가 있으면 함께 사용합니다."
+            title="프로젝트 선택"
           >
             <span className="min-w-0 flex-1 truncate">
               {active?.kind === 'chat' && active.scopeId
@@ -2204,7 +2257,7 @@ export default function ByeoriPanel({
                     type="button"
                     className="rounded px-1 py-0.5 text-[11px] text-[#9b9a97] hover:bg-[#efefed] hover:text-[#37352f]"
                     onClick={() => setAnnotatingUrl(att.url)}
-                    title="주석 달기 — 사각형·화살표·텍스트로 표시한 뒤 첨부"
+                  title="주석 달기"
                   >
                     ✏️
                   </button>
@@ -2290,7 +2343,7 @@ export default function ByeoriPanel({
               className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[#7d7c78] hover:bg-[#f1f1ef] hover:text-[#37352f] disabled:opacity-50"
               onClick={() => fileInputRef.current?.click()}
               disabled={uploadBusy}
-              title="파일 첨부 — 이미지는 AI가 직접 보고, 일반 파일은 경로로 전달되어 열어봅니다. 이미지 클립보드 붙여넣기 가능, 첨부 후 ✏️ 로 주석 편집."
+              title="파일 첨부"
               aria-label={uploadBusy ? '파일 업로드 중' : '파일 첨부'}
             >
               {uploadBusy ? (

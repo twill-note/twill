@@ -72,12 +72,16 @@ const projectRoot = path.resolve(process.env.NOTE_APP_PROJECT_ROOT || path.join(
 const backendRoot = path.join(projectRoot, 'backend')
 const packagedBackendName = process.platform === 'win32' ? 'twill-backend.exe' : 'twill-backend'
 const packagedBackend = path.join(process.resourcesPath, 'backend', 'twill-backend', packagedBackendName)
+const packagedCodexName = process.platform === 'win32' ? 'codex.exe' : 'codex'
+const packagedCodex = path.join(process.resourcesPath, 'codex-runtime', 'bin', packagedCodexName)
 const frontendDist = path.resolve(process.env.NOTE_APP_FRONTEND_DIST || (
   app.isPackaged ? path.join(process.resourcesPath, 'frontend-dist') : path.join(frontendRoot, 'dist')
 ))
 const appIconPath = path.join(electronDir, 'assets', 'twill-icon.png')
 const options = parseDesktopOptions(process.argv.slice(2))
 const smokeTest = process.argv.includes('--smoke-test')
+const smokeUserData = smokeTest ? process.env.NOTE_APP_SMOKE_USER_DATA?.trim() : ''
+if (smokeUserData) app.setPath('userData', path.resolve(smokeUserData))
 
 let appUrl = options.uiUrl
 let backendProcess = null
@@ -228,6 +232,8 @@ async function startOrReuseBackend() {
       env: {
         ...process.env,
         ...(app.isPackaged && !process.env.NOTES_DIR ? { NOTES_DIR: path.join(app.getPath('documents'), 'Twill') } : {}),
+        ...(app.isPackaged && fs.existsSync(packagedCodex) ? { TWILL_BUNDLED_CODEX_BINARY: packagedCodex } : {}),
+        TWILL_CODEX_MANAGED_DIR: path.join(app.getPath('userData'), 'codex-runtime'),
         NOTE_APP_FRONTEND_DIST: frontendDist,
         NOTE_APP_DESKTOP: '1',
         PYTHONUNBUFFERED: '1',
@@ -957,6 +963,7 @@ async function openQuickMemo() {
 }
 
 async function runSmokeTest() {
+  let singleActivationResult = null
   if (process.env.NOTE_APP_SMOKE_NOTE) {
     await mainWindow.webContents.executeJavaScript(`(async () => {
       const sleep = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds))
@@ -1002,6 +1009,50 @@ async function runSmokeTest() {
       }
       return false
     })()`)
+  }
+  if (process.env.NOTE_APP_SMOKE_TEST_SINGLE_ACTIVATION === '1') {
+    const target = await mainWindow.webContents.executeJavaScript(`(() => {
+      window.__twillSingleActivationClicks = []
+      document.addEventListener('click', (event) => {
+        window.__twillSingleActivationClicks.push({
+          detail: event.detail,
+          testId: event.target?.closest?.('[data-testid]')?.getAttribute('data-testid') || null,
+        })
+      }, { capture: true })
+      const button = document.querySelector('[data-testid="workspace-settings-button"]')
+      const rect = button?.getBoundingClientRect()
+      return rect ? { x: Math.round(rect.left + rect.width / 2), y: Math.round(rect.top + rect.height / 2) } : null
+    })()`)
+    if (target) {
+      const sendClick = (clickCount) => {
+        mainWindow.webContents.sendInputEvent({ type: 'mouseMove', ...target })
+        mainWindow.webContents.sendInputEvent({ type: 'mouseDown', ...target, button: 'left', clickCount })
+        mainWindow.webContents.sendInputEvent({ type: 'mouseUp', ...target, button: 'left', clickCount })
+      }
+      sendClick(1)
+      await new Promise((resolve) => setTimeout(resolve, 100))
+      const afterSingle = await mainWindow.webContents.executeJavaScript(`({
+        open: Boolean(document.querySelector('[data-testid="workspace-settings-dialog"]')),
+        clicks: window.__twillSingleActivationClicks.slice(),
+      })`)
+      sendClick(2)
+      await new Promise((resolve) => setTimeout(resolve, 100))
+      const afterRapidRepeat = await mainWindow.webContents.executeJavaScript(`({
+        open: Boolean(document.querySelector('[data-testid="workspace-settings-dialog"]')),
+        clicks: window.__twillSingleActivationClicks.slice(),
+      })`)
+      await new Promise((resolve) => setTimeout(resolve, 300))
+      mainWindow.webContents.sendInputEvent({ type: 'mouseMove', x: 8, y: 80 })
+      mainWindow.webContents.sendInputEvent({ type: 'mouseDown', x: 8, y: 80, button: 'left', clickCount: 1 })
+      mainWindow.webContents.sendInputEvent({ type: 'mouseUp', x: 8, y: 80, button: 'left', clickCount: 1 })
+      await new Promise((resolve) => setTimeout(resolve, 100))
+      const afterIntentionalDismiss = await mainWindow.webContents.executeJavaScript(
+        `Boolean(document.querySelector('[data-testid="workspace-settings-dialog"]'))`,
+      )
+      singleActivationResult = { target, afterSingle, afterRapidRepeat, openAfterIntentionalDismiss: afterIntentionalDismiss }
+    } else {
+      singleActivationResult = { error: 'settings button not found' }
+    }
   }
   const displayBefore = screen.getDisplayMatching(mainWindow.getBounds())
   const cursorPoint = screen.getCursorScreenPoint()
@@ -1253,6 +1304,7 @@ async function runSmokeTest() {
           .map((entry) => ({ name: entry.name.split('/').pop(), size: entry.transferSize })),
       },
       navigationMs: Math.round(performance.getEntriesByType('navigation')[0]?.duration || 0),
+      singleActivation: ${JSON.stringify(singleActivationResult)},
     }
   })()`)
   const screenshotPath = process.env.NOTE_APP_SMOKE_SCREENSHOT

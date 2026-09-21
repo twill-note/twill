@@ -5,9 +5,15 @@ import shutil
 
 
 def codex_command(*args: str) -> list[str]:
-    binary = shutil.which("codex")
+    from .codex_cli import codex_binary
+
+    binary = codex_binary()
     if not binary:
         raise FileNotFoundError("codex CLI가 설치되어 있지 않습니다")
+    return command_for_binary(binary, *args)
+
+
+def command_for_binary(binary: str, *args: str) -> list[str]:
     if os.name == "nt" and Path(binary).suffix.lower() in {".cmd", ".bat"}:
         launcher = Path(binary).parent / "node_modules" / "@openai" / "codex" / "bin" / "codex.js"
         sibling_node = Path(binary).parent / "node.exe"

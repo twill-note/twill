@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useDialogStore } from '../dialog'
+import { useBackdropDismiss } from '../useBackdropDismiss'
 
 /** 공통 팝업 렌더러 — dialog.alert/confirm/prompt 요청을 큐 순서대로 표시. App에 한 번만 마운트. */
 export default function DialogHost() {
@@ -26,15 +27,17 @@ export default function DialogHost() {
     }, 0)
   }, [current])
 
+  const cancelValue = current?.kind === 'prompt' ? null : false
+  const dismissFromBackdrop = useBackdropDismiss<HTMLDivElement>(() => finish(cancelValue), current)
+
   if (!current) return null
 
-  const cancelValue = current.kind === 'prompt' ? null : false
   const submit = () => finish(current.kind === 'prompt' ? (inputRef.current?.value ?? '') : true)
 
   return (
     <div
       className="fixed inset-0 z-[60] flex items-start justify-center bg-black/20 pt-[22vh]"
-      onClick={() => finish(cancelValue)}
+      onClick={dismissFromBackdrop}
       onKeyDown={(e) => {
         if (e.key === 'Escape') finish(cancelValue)
       }}

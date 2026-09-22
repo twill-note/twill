@@ -8,6 +8,8 @@ import ProjectPathDialog from './ProjectPathDialog'
 import { useAiStore } from '../aiStore'
 import { notifyWorkspaceScopesChanged } from '../workspaceScopeEvents'
 import { useBackdropDismiss } from '../useBackdropDismiss'
+import ProjectAiTasks from './ProjectAiTasks'
+import { sessionProjectId } from '../aiProjectGroups'
 
 interface MenuState {
   x: number
@@ -88,6 +90,29 @@ export default function FileTree() {
   const [templating, setTemplating] = useState<{ dir: string } | null>(null)
   const [dragOver, setDragOver] = useState<string | null>(null)
   const [dragOverSection, setDragOverSection] = useState<string | null>(null)
+  const sessions = useAiStore((s) => s.sessions)
+  const [sessionsError, setSessionsError] = useState('')
+
+  useEffect(() => {
+    let disposed = false
+    const refresh = async () => {
+      try {
+        await useAiStore.getState().loadSessions()
+        if (!disposed) setSessionsError('')
+      } catch { if (!disposed) setSessionsError('AI 작업 목록을 불러오지 못했습니다.') }
+    }
+    void refresh()
+    const timer = window.setInterval(() => void refresh(), 5000)
+    return () => { disposed = true; window.clearInterval(timer) }
+  }, [root])
+
+  const projectSessions = new Map<string, typeof sessions>()
+  for (const session of sessions) {
+    const projectId = sessionProjectId(session, sections) ?? UNASSIGNED_ID
+    const items = projectSessions.get(projectId) ?? []
+    items.push(session)
+    projectSessions.set(projectId, items)
+  }
 
   useEffect(() => {
     refreshSections().catch(() => {})
@@ -202,7 +227,7 @@ export default function FileTree() {
     })
   }
   const unassigned = tree.filter((n) => !assigned.has(n.path))
-  if (unassigned.length > 0) {
+  if (unassigned.length > 0 || projectSessions.has(UNASSIGNED_ID) || sections.length === 0) {
     displaySections.push({
       id: UNASSIGNED_ID, name: 'Root', expanded: rootExpanded, nodes: unassigned,
       system: true,
@@ -657,6 +682,7 @@ export default function FileTree() {
                   (비어있음 — 폴더/노트를 여기로 드래그)
                 </p>
               )}
+              <ProjectAiTasks key={`${root}:${s.id}`} projectId={s.id} sessions={projectSessions.get(s.id) ?? []} error={sessionsError} />
             </div>
           )}
         </div>

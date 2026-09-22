@@ -40,7 +40,7 @@ function taskSessionForPath(session: AiSession, taskPath: string): boolean {
  * · 설명은 plain text 미리보기가 아니라 본편집기와 동일한 BlockNote 마크다운 에디터
  *   (미리보기 = 편집) — 표/보드 뷰로 나가지 않고 팝업 안에서 바로 수정.
  * · 실행은 aiStore.runTask — 카드 하나당 벼리 세션(탭) 하나가 생성되고,
- *   동시 실행 상한/같은 프로젝트 직렬화 정책에 따라 즉시 시작되거나 대기열에 들어간다.
+ *   개별 작업은 즉시 시작하며, 사용자가 확정한 배치의 선행 순서만 기다린다.
  */
 export default function TaskCardPopup({ row, config, onClose, onCellChange, onRowUpdated }: Props) {
   const openFile = useAppStore((s) => s.openFile)

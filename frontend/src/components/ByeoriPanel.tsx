@@ -1192,7 +1192,8 @@ export default function ByeoriPanel({
     })
     const trimmed = title?.trim()
     if (!trimmed || trimmed === session.title) return
-    await renameSession(session.id, trimmed)
+    try { await renameSession(session.id, trimmed) }
+    catch (error) { setUiError('대화 이름을 저장하지 못했습니다: ' + (error as Error).message) }
   }
 
   const requestDelete = (session: AiSession) => {

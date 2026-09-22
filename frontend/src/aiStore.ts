@@ -1461,13 +1461,10 @@ export const useAiStore = create<AiStoreState>((set, get) => {
     },
 
     renameSession: async (id, title) => {
-      const updatedAt = Date.now() / 1000
-      patch(id, { title, updatedAt })
-      try {
-        await api.ai.updateSession(id, { title })
-      } catch {
-        /* ignore */
-      }
+      const updated = await api.ai.updateSession(id, { title })
+      patch(id, { title: updated.title, updatedAt: updated.updated_at })
+      await get().loadSessions()
+      await useAppStore.getState().refreshTree()
     },
 
     setSessionModel: async (id, model, effort) => {

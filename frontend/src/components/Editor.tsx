@@ -795,7 +795,8 @@ function NoteEditor({
       setSaveStatus('saving')
       try {
         const blocks = editor.document
-      const body = await preserveBlocks(await editor.blocksToMarkdownLossy(toMarkdownBlocks(blocks)), blocks)
+      const markdown = await editor.blocksToMarkdownLossy(toMarkdownBlocks(blocks))
+      const body = isExternal ? markdown : await preserveBlocks(markdown, blocks)
         const res = isExternal
           ? await api.saveContentExternal(content.path, fmRef.current, body, mtimeRef.current, force)
           : await api.saveContent(content.path, fmRef.current, body, mtimeRef.current, force)

@@ -19,3 +19,7 @@ test('plain Markdown and damaged snapshots do not prevent opening a document', a
   assert.equal(await restoreBlocks('# 제목'), null)
   assert.equal(await restoreBlocks('본문\n<!-- twill:blocks:v1:abcd -->'), null)
 })
+
+test('ordinary text stays plain Markdown without redundant layout data', async () => {
+  assert.equal(await preserveBlocks('한글', [{ type: 'paragraph', content: '한글' }]), '한글\n')
+})

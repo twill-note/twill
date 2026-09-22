@@ -14,6 +14,12 @@ export function markdownWithoutSnapshot(body: string): string {
 
 export async function preserveBlocks(markdown: string, blocks: readonly unknown[]): Promise<string> {
   const text = markdownWithoutSnapshot(markdown).trimEnd()
+  const needsLayout = (block: unknown): boolean => {
+    if (!block || typeof block !== 'object') return false
+    const value = block as { type?: string; children?: unknown[] }
+    return ['columnList', 'column', 'image'].includes(value.type ?? '') || Boolean(value.children?.some(needsLayout))
+  }
+  if (!blocks.some(needsLayout)) return text + '\n'
   const json = JSON.stringify({ digest: await digest(text), blocks })
   const bytes = new TextEncoder().encode(json)
   let binary = ''

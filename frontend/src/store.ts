@@ -39,6 +39,8 @@ interface AppState {
   activeRightTab: string
   /** Electron에서 벼리 패널이 독립 BrowserWindow로 이동한 상태. */
   byeoriDetached: boolean
+  aiLocation: 'editor' | 'right'
+  moveAi: (location: 'editor' | 'right') => void
   dbDir: string | null
   /** 완료 요약 등에서 특정 카드 집합만 바로 검토할 때 쓰는 일시적 DB 행 필터. */
   dbRowFilter: string[] | null
@@ -132,6 +134,14 @@ export const useAppStore = create<AppState>((set, get) => ({
   rightDockOpen: false,
   activeRightTab: SYSTEM_TERMINAL_TAB,
   byeoriDetached: false,
+  aiLocation: localStorage.getItem('ai-location') === 'editor' ? 'editor' : 'right',
+  moveAi: (aiLocation) => {
+    localStorage.setItem('ai-location', aiLocation)
+    const state = get()
+    set({ aiLocation, ...(aiLocation === 'editor'
+      ? { view: 'ai' as const, ...(state.activeRightTab === SYSTEM_AI_TAB ? { rightDockOpen: false } : {}) }
+      : { rightDockOpen: true, activeRightTab: SYSTEM_AI_TAB, ...(state.view === 'ai' ? { view: 'editor' as const } : {}) }) })
+  },
   dbDir: null,
   dbRowFilter: null,
   pluginViewId: null,
@@ -278,6 +288,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   openRightTab: (id) => {
     if (id === SYSTEM_AI_TAB && get().byeoriDetached && window.noteDesktop) {
       void window.noteDesktop.focusByeoriWindow()
+      return
+    }
+    if (id === SYSTEM_AI_TAB && get().aiLocation === 'editor') {
+      set({ view: 'ai' })
       return
     }
     set({ rightDockOpen: true, activeRightTab: id })

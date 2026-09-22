@@ -4,7 +4,7 @@ import { useAiStore } from '../aiStore'
 import { usePluginRegistry } from '../plugins/registry'
 import { SYSTEM_AI_TAB, SYSTEM_TERMINAL_TAB, useAppStore } from '../store'
 import { isRepeatedClick } from '../useBackdropDismiss'
-import ByeoriPanel from './ByeoriPanel'
+function AiDockHost() { return <div id="ai-dock-host" className="h-full" /> }
 import TerminalPanel from './TerminalPanel'
 
 const MIN_WIDTH = 320
@@ -29,7 +29,7 @@ const AI_TAB: TabSpec = {
   id: SYSTEM_AI_TAB,
   title: 'Twill AI',
   icon: '✦',
-  component: ByeoriPanel,
+  component: AiDockHost,
 }
 
 function ToolIcon({ tab, compact = false }: { tab: TabSpec; compact?: boolean }) {
@@ -69,7 +69,7 @@ export default function RightDock() {
   const [width, setWidth] = useState(480)
   const [detachError, setDetachError] = useState<string | null>(null)
   // 닫았다 다시 열어도 터미널 세션 등 이미 사용한 도구의 컴포넌트는 유지한다.
-  const [activated, setActivated] = useState<Set<string>>(() => new Set([SYSTEM_TERMINAL_TAB]))
+  const [activated, setActivated] = useState<Set<string>>(() => new Set([SYSTEM_AI_TAB, SYSTEM_TERMINAL_TAB]))
 
   const tabs = useMemo<TabSpec[]>(() => [AI_TAB, TERMINAL_TAB, ...pluginTabs], [pluginTabs])
   const activeTool = tabs.find((tab) => tab.id === activeRightTab) ?? TERMINAL_TAB
@@ -136,7 +136,10 @@ export default function RightDock() {
   }
 
   return (
-    <div className="flex h-full shrink-0">
+    <div className="flex h-full shrink-0"
+      onDragOver={(event) => { if (event.dataTransfer.types.includes('application/x-note-right-tab')) event.preventDefault() }}
+      onDrop={(event) => { if (event.dataTransfer.getData('application/x-note-right-tab') === SYSTEM_AI_TAB) { event.preventDefault(); useAppStore.getState().moveAi('right') } }}
+    >
       <aside
         id="right-tool-panel"
         className={`relative h-full shrink-0 flex-col border-l border-[#e9e9e7] bg-white ${rightDockOpen ? 'flex' : 'hidden'}`}
@@ -235,7 +238,7 @@ export default function RightDock() {
               aria-label={tab.id === SYSTEM_AI_TAB && aiBusyCount > 0 ? `${tab.title}, ${aiBusyCount}개 실행 중` : tab.title}
               aria-pressed={selected}
               aria-controls="right-tool-panel"
-              draggable={Boolean(window.noteDesktop && tab.id === SYSTEM_AI_TAB && !byeoriDetached)}
+              draggable={Boolean(tab.id === SYSTEM_AI_TAB && !byeoriDetached)}
               onClick={(event) => {
                 if (!isRepeatedClick(event)) toggleTool(tab.id)
               }}

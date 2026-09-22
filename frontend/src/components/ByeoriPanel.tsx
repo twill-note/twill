@@ -1868,6 +1868,7 @@ export default function ByeoriPanel({
         </>
       )}
 
+      {active?.sourceTask && <div className="shrink-0 border-b border-[#e9e9e7] px-3 py-2"><TaskSourceBanner session={active} openFile={openFile} /></div>}
       {/* 메시지 스트림 */}
       <div ref={scrollRef} onScroll={onScroll} className="min-h-0 flex-1 space-y-2.5 overflow-y-auto p-3">
         {!active && sessionsLoaded && (
@@ -1880,7 +1881,6 @@ export default function ByeoriPanel({
             </p>
           </div>
         )}
-        {active && <TaskSourceBanner session={active} openFile={openFile} />}
         {active && messages.length === 0 && !active.busy && (
           <p className="mt-8 text-center text-[12px] text-[#9b9a97]">
             {active.kind === 'task'

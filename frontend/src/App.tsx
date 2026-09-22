@@ -1,3 +1,4 @@
+import AiPlacement from './components/AiPlacement'
 import CodexUpdateNotice from './components/CodexUpdateNotice'
 import { useEffect } from 'react'
 import AiToasts from './components/AiToasts'
@@ -200,9 +201,13 @@ export default function App() {
       <CodexUpdateNotice />
       <div className="flex min-h-0 flex-1">
         <Sidebar />
-        <main className="flex min-w-0 flex-1 flex-col">
+        <main className="flex min-w-0 flex-1 flex-col"
+          onDragOver={(event) => { if (event.dataTransfer.types.includes('application/x-note-right-tab')) event.preventDefault() }}
+          onDrop={(event) => { if (event.dataTransfer.getData('application/x-note-right-tab') === SYSTEM_AI_TAB) { event.preventDefault(); useAppStore.getState().moveAi('editor') } }}
+        >
           <TabBar />
-          <div className="min-h-0 flex-1 overflow-auto">
+          <div id="ai-editor-host" className={view === 'ai' ? 'min-h-0 flex-1' : 'hidden'} />
+          <div className={view === 'ai' ? 'hidden' : 'min-h-0 flex-1 overflow-auto'}>
             {view === 'plugin' ? (
               <MissingPluginView />
             ) : view === 'calendar' ? (
@@ -222,6 +227,7 @@ export default function App() {
         </main>
         <RightDock />
       </div>
+      <AiPlacement />
       <CommandPalette />
       <DialogHost />
       <AiToasts />

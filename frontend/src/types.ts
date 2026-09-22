@@ -59,7 +59,7 @@ export interface TagCount {
 
 export type SaveStatus = 'idle' | 'saving' | 'saved' | 'conflict' | 'error'
 /** `erd`는 플러그인 설치와 무관하게 제공되는 기본 DB 설계 화면이다. */
-export type ViewMode = 'editor' | 'calendar' | 'todos' | 'skillbook' | 'database' | 'plugin' | 'erd'
+export type ViewMode = 'ai' | 'editor' | 'calendar' | 'todos' | 'skillbook' | 'database' | 'plugin' | 'erd'
 
 export interface NoteRow {
   path: string

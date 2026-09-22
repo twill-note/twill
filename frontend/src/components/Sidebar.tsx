@@ -4,6 +4,7 @@ import { useAppStore } from '../store'
 import type { NoteMeta } from '../types'
 import { dialog } from '../dialog'
 import { displayCombo, useShortcutStore } from '../shortcuts'
+import ConversationList from './ConversationList'
 import FileTree from './FileTree'
 import FolderPicker from './FolderPicker'
 import WorkspaceSettingsDialog from './WorkspaceSettingsDialog'
@@ -121,7 +122,6 @@ export default function Sidebar() {
         </kbd>
       </button>
 
-      {/* 이 패널은 파일·섹션 탐색 전용이다. 벼리는 상단 🤖 도크에서 연다. */}
 
 
       {tagFilter ? (
@@ -150,6 +150,8 @@ export default function Sidebar() {
           <FileTree />
         </div>
       )}
+
+      <ConversationList />
 
       {tags.length > 0 && (
         <div className="border-t border-[#e9e9e7] px-3 py-2">

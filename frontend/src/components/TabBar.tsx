@@ -31,14 +31,16 @@ export default function TabBar() {
   const [dragOverId, setDragOverId] = useState<string | null>(null)
   const [pinMenu, setPinMenu] = useState<{ x: number; y: number; path: string } | null>(null)
 
-  // 가운데 탭 줄에는 일반 DB 탭만 — 파일은 편집기 그룹, 캘린더/할일/보드류는 고정 토글 버튼 담당
-  const viewTabs = openTabs.filter((t) => t.kind === 'db' && t.target !== 'tasks' && t.target !== 'scopes')
+  // 편집기 그룹이 가려지는 보드/패널 화면에서도 열린 문서로 돌아갈 탭을 유지한다.
+  const viewTabs = openTabs.filter((t) => (t.kind === 'db' && t.target !== 'tasks' && t.target !== 'scopes') || ((view !== 'editor' && view !== 'erd') && (t.kind === 'file' || t.kind === 'erd')))
   const activeId = activeTabId({ view, currentPath, dbDir, erdTabId })
   const taskBoardActive = view === 'database' && dbDir === 'tasks'
   const scopesActive = view === 'database' && dbDir === 'scopes'
 
   const activate = (t: DocTab) => {
-    if (t.kind === 'db') openDatabase(t.target)
+    if (t.kind === 'file') openFile(t.target)
+    else if (t.kind === 'erd') useAppStore.getState().activateErdTab(t.id)
+    else if (t.kind === 'db') openDatabase(t.target)
     else if (t.kind === 'view') setView(t.target as 'calendar' | 'todos' | 'editor' | 'database')
   }
 

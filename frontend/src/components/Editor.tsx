@@ -1,3 +1,4 @@
+import { markdownWithoutSnapshot, preserveBlocks, restoreBlocks } from '../blockPersistence'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import '@blocknote/core/fonts/inter.css'
 import {
@@ -763,9 +764,10 @@ function NoteEditor({
   useEffect(() => {
     let cancelled = false
     ;(async () => {
-      const blocks = await editor.tryParseMarkdownToBlocks(content.body)
+      const snapshot = await restoreBlocks(content.body)
+      const blocks = snapshot ?? fromMarkdownBlocks(await editor.tryParseMarkdownToBlocks(markdownWithoutSnapshot(content.body)))
       if (cancelled) return
-      editor.replaceBlocks(editor.document, fromMarkdownBlocks(blocks))
+      editor.replaceBlocks(editor.document, blocks as Parameters<typeof editor.replaceBlocks>[1])
       loadedRef.current = true
       // 블록 교체가 DOM 에 반영된 다음에 복원해야 긴 노트도 브라우저가 위치를 잘라내지 않는다.
       requestAnimationFrame(() => {
@@ -787,7 +789,8 @@ function NoteEditor({
       }
       setSaveStatus('saving')
       try {
-        const body = await editor.blocksToMarkdownLossy(toMarkdownBlocks(editor.document))
+        const blocks = editor.document
+      const body = await preserveBlocks(await editor.blocksToMarkdownLossy(toMarkdownBlocks(blocks)), blocks)
         const res = isExternal
           ? await api.saveContentExternal(content.path, fmRef.current, body, mtimeRef.current, force)
           : await api.saveContent(content.path, fmRef.current, body, mtimeRef.current, force)

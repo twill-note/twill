@@ -1,3 +1,4 @@
+import { markdownWithoutSnapshot, preserveBlocks, restoreBlocks } from '../blockPersistence'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useCreateBlockNote } from '@blocknote/react'
 import { BlockNoteView } from '@blocknote/mantine'
@@ -44,9 +45,10 @@ export default function NoteBodyEditor({
   useEffect(() => {
     let cancelled = false
     ;(async () => {
-      const blocks = await editor.tryParseMarkdownToBlocks(content.body)
+      const snapshot = await restoreBlocks(content.body)
+      const blocks = snapshot ?? fromMarkdownBlocks(await editor.tryParseMarkdownToBlocks(markdownWithoutSnapshot(content.body)))
       if (cancelled) return
-      editor.replaceBlocks(editor.document, fromMarkdownBlocks(blocks))
+      editor.replaceBlocks(editor.document, blocks as Parameters<typeof editor.replaceBlocks>[1])
       loadedRef.current = true
     })()
     return () => {
@@ -67,7 +69,8 @@ export default function NoteBodyEditor({
     }
     setStatus('saving')
     try {
-      const body = await editor.blocksToMarkdownLossy(toMarkdownBlocks(editor.document))
+      const blocks = editor.document
+      const body = await preserveBlocks(await editor.blocksToMarkdownLossy(toMarkdownBlocks(blocks)), blocks)
       // 최신 frontmatter/mtime 을 읽어 본문만 교체 (병행 수정된 메타 필드 보존)
       const latest = await api.getContent(content.path)
       await api.saveContent(content.path, latest.frontmatter, body, latest.mtime)

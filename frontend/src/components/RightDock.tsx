@@ -5,9 +5,10 @@ import { usePluginRegistry } from '../plugins/registry'
 import { SYSTEM_AI_TAB, SYSTEM_TERMINAL_TAB, useAppStore } from '../store'
 import { isRepeatedClick } from '../useBackdropDismiss'
 import { AiPanelHost } from './AiPlacement'
+import { isAiTab, sessionIdFromAiTab } from '../aiTabs'
 function AiDockHost() {
-  const location = useAppStore((s) => s.aiLocation)
-  return location === 'right' ? <AiPanelHost /> : null
+  const tabId = useAppStore((s) => s.dockedAiTabId)
+  return tabId ? <AiPanelHost tabId={tabId} onFocus={() => useAiStore.setState({ activeSessionId: sessionIdFromAiTab(tabId) })} /> : null
 }
 import TerminalPanel from './TerminalPanel'
 
@@ -62,6 +63,7 @@ export default function RightDock() {
     rightDockOpen,
     activeRightTab,
     byeoriDetached,
+    dockedAiTabId,
     setRightDockOpen,
     setActiveRightTab,
     setByeoriDetached,
@@ -70,6 +72,7 @@ export default function RightDock() {
   const pluginTabs = usePluginRegistry((state) => state.rightTabs)
   const aiBusyCount = useAiStore((state) => state.sessions.filter((session) => session.busy).length)
   const aiQueuedCount = useAiStore((state) => state.sessions.filter((session) => session.queued).length)
+  const dockedTitle = useAiStore((state) => state.sessions.find((session) => session.id === sessionIdFromAiTab(dockedAiTabId ?? ''))?.title)
   const [width, setWidth] = useState(480)
   const [detachError, setDetachError] = useState<string | null>(null)
   const [aiDropOver, setAiDropOver] = useState(false)
@@ -120,7 +123,7 @@ export default function RightDock() {
 
   const startByeoriDrag = (event: React.DragEvent) => {
     event.dataTransfer.effectAllowed = 'move'
-    event.dataTransfer.setData('text/doc-tab', SYSTEM_AI_TAB)
+    event.dataTransfer.setData('text/doc-tab', dockedAiTabId ?? useAppStore.getState().aiTabId ?? SYSTEM_AI_TAB)
     event.dataTransfer.setData('text/doc-tab-source', 'right-dock')
     event.dataTransfer.setData('application/x-twill-ai', '1')
   }
@@ -158,9 +161,10 @@ export default function RightDock() {
       onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setAiDropOver(false) }}
       onDrop={(event) => {
         setAiDropOver(false)
-        if (event.dataTransfer.getData('text/doc-tab') !== SYSTEM_AI_TAB) return
+        const tabId = event.dataTransfer.getData('text/doc-tab')
+        if (!isAiTab(tabId)) return
         event.preventDefault()
-        useAppStore.getState().moveAi('right')
+        useAppStore.getState().moveAi('right', tabId)
       }}
     >
       {aiDropOver && <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center bg-[#4a9eff]/10"><span className="rounded bg-white px-2 py-1 text-[11px] text-[#2f6fd0] shadow">여기에 AI 배치</span></div>}
@@ -182,7 +186,7 @@ export default function RightDock() {
             onDragEnd={finishByeoriDrag}
             title={activeTool.id === SYSTEM_AI_TAB ? '드래그하여 문서와 함께 배치' : undefined}>
             <ToolIcon tab={activeTool} compact />
-            <span className="truncate">{activeTool.title}</span>
+            <span className="truncate" title={dockedTitle}>{activeTool.id === SYSTEM_AI_TAB ? dockedTitle ?? activeTool.title : activeTool.title}</span>
             {activeTool.id === SYSTEM_AI_TAB && aiBusyCount > 0 && (
               <span className="flex shrink-0 items-center gap-1 text-[10px] font-normal text-[#2f6fd0]">
                 <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#4a9eff]" />

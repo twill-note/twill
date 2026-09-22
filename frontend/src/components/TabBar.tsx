@@ -19,6 +19,7 @@ export default function TabBar() {
   const currentPath = useAppStore((s) => s.currentPath)
   const dbDir = useAppStore((s) => s.dbDir)
   const erdTabId = useAppStore((s) => s.erdTabId)
+  const aiTabId = useAppStore((s) => s.aiTabId)
   const pinnedNotes = useAppStore((s) => s.pinnedNotes)
   const togglePinnedNote = useAppStore((s) => s.togglePinnedNote)
   const openFile = useAppStore((s) => s.openFile)
@@ -33,14 +34,14 @@ export default function TabBar() {
 
   // 편집기 그룹이 가려지는 보드/패널 화면에서도 열린 문서로 돌아갈 탭을 유지한다.
   const viewTabs = openTabs.filter((t) => (t.kind === 'db' && t.target !== 'tasks' && t.target !== 'scopes') || ((view !== 'editor' && view !== 'erd' && view !== 'ai') && (t.kind === 'file' || t.kind === 'erd' || t.kind === 'ai')))
-  const activeId = activeTabId({ view, currentPath, dbDir, erdTabId })
+  const activeId = activeTabId({ view, currentPath, dbDir, erdTabId, aiTabId })
   const taskBoardActive = view === 'database' && dbDir === 'tasks'
   const scopesActive = view === 'database' && dbDir === 'scopes'
 
   const activate = (t: DocTab) => {
     if (t.kind === 'file') openFile(t.target)
     else if (t.kind === 'erd') useAppStore.getState().activateErdTab(t.id)
-    else if (t.kind === 'ai') useAppStore.getState().moveAi('editor')
+    else if (t.kind === 'ai') useAppStore.getState().moveAi('editor', t.id)
     else if (t.kind === 'db') openDatabase(t.target)
     else if (t.kind === 'view') setView(t.target as 'calendar' | 'todos' | 'editor' | 'database')
   }

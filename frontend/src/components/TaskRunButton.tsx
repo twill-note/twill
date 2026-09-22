@@ -32,14 +32,15 @@ export default function TaskRunButton({ row, onStarted }: { row: NoteRow; onStar
 
   const onClick = async (e: React.MouseEvent) => {
     e.stopPropagation()
-    openRightTab(SYSTEM_AI_TAB)
     if (session) {
       // 이미 실행/대기 중 → 해당 세션 탭으로 포커스만 이동
       selectSession(session.id)
+      openRightTab(SYSTEM_AI_TAB)
       return
     }
     if (sourceSession?.busy || sourceSession?.queued) {
       selectSession(sourceSession.id)
+      openRightTab(SYSTEM_AI_TAB)
       return
     }
     setStartError(null)
@@ -55,7 +56,10 @@ export default function TaskRunButton({ row, onStarted }: { row: NoteRow; onStar
       sourceSessionId: sourceSessionId ?? undefined,
       onError: setStartError,
     })
-    if (sessionId) onStarted?.()
+    if (sessionId) {
+      useAppStore.getState().openAiSession(sessionId)
+      onStarted?.()
+    }
   }
 
   if (session?.busy) {
@@ -123,12 +127,11 @@ export default function TaskRunButton({ row, onStarted }: { row: NoteRow; onStar
  */
 export async function runAllTasks(rows: NoteRow[]): Promise<void> {
   if (rows.length === 0) return
-  useAppStore.getState().openRightTab(SYSTEM_AI_TAB)
   const store = useAiStore.getState()
 
   if (rows.length === 1) {
     const row = rows[0]
-    await store.runTask({
+    const id = await store.runTask({
       taskPath: row.path,
       title: row.title || row.path,
       scopeId: (row.props.scope as string) || undefined,
@@ -138,10 +141,12 @@ export async function runAllTasks(rows: NoteRow[]): Promise<void> {
       maxTimeSec:
         typeof row.props.max_time_min === 'number' ? (row.props.max_time_min as number) * 60 : undefined,
     })
+    if (id) useAppStore.getState().openAiSession(id)
     return
   }
 
   // 계획 세션 시작 — 판단 과정은 벼리 패널에서 스트리밍되고,
   // 완료되면 "제안 순서 + ▶ 이 순서로 실행" 확정 카드가 세션 안에 표시된다.
-  await store.startRunOrderPlan(rows)
+  const id = await store.startRunOrderPlan(rows)
+  if (id) useAppStore.getState().openAiSession(id)
 }

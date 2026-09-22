@@ -1,25 +1,29 @@
-import { useLayoutEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useAppStore } from '../store'
 import ByeoriPanel from './ByeoriPanel'
+import { useAiStore } from '../aiStore'
+import { sessionIdFromAiTab } from '../aiTabs'
 
-let container: HTMLDivElement | undefined
-function panelContainer() {
+const containers = new Map<string, HTMLDivElement>()
+function panelContainer(tabId: string) {
+  let container = containers.get(tabId)
   if (!container) {
     container = document.createElement('div')
     container.className = 'h-full min-h-0'
+    containers.set(tabId, container)
   }
   return container
 }
 
 /** Reparent the same container so drafts survive moves between editor groups and the dock. */
-export function AiPanelHost({ onFocus }: { onFocus?: () => void }) {
+export function AiPanelHost({ tabId, onFocus }: { tabId: string; onFocus?: () => void }) {
   const host = useRef<HTMLDivElement>(null)
   const focus = useRef(onFocus)
   focus.current = onFocus
   useLayoutEffect(() => {
     const target = host.current!
-    const element = panelContainer()
+    const element = panelContainer(tabId)
     target.appendChild(element)
     const focusPane = () => focus.current?.()
     // Portal events follow AiPlacement's React ancestry. Forward body drops from
@@ -44,11 +48,43 @@ export function AiPanelHost({ onFocus }: { onFocus?: () => void }) {
       target.removeEventListener('drop', forwardDrag)
       if (element.parentElement === target) element.remove()
     }
-  }, [])
-  return <div ref={host} className="h-full min-h-0" data-ai-panel-host />
+  }, [tabId])
+  return <div ref={host} className="h-full min-h-0" data-ai-panel-host={tabId} />
 }
 
 export default function AiPlacement() {
   const detached = useAppStore((s) => s.byeoriDetached)
-  return detached ? null : createPortal(<ByeoriPanel />, panelContainer())
+  const tabs = useAppStore((s) => s.openTabs)
+  const dockedId = useAppStore((s) => s.dockedAiTabId)
+  const sessions = useAiStore((s) => s.sessions)
+  const loaded = useAiStore((s) => s.sessionsLoaded)
+  useEffect(() => {
+    const open = new Set(tabs.filter((tab) => tab.kind === 'ai').map((tab) => tab.id))
+    if (dockedId) open.add(dockedId)
+    for (const id of containers.keys()) if (!open.has(id)) containers.delete(id)
+  }, [tabs, dockedId])
+  useEffect(() => {
+    if (!loaded) return
+    const byId = new Map(sessions.map((session) => [session.id, session]))
+    const state = useAppStore.getState()
+    for (const tab of state.openTabs) {
+      if (tab.kind === 'ai' && tab.target && !byId.has(tab.target)) state.closeTab(tab.id)
+    }
+    const current = useAppStore.getState()
+    const next = current.openTabs.map((tab) => {
+      const session = tab.kind === 'ai' ? byId.get(tab.target) : null
+      return session && session.title !== tab.title ? { ...tab, title: session.title } : tab
+    })
+    if (next.some((tab, index) => tab !== current.openTabs[index])) useAppStore.setState({ openTabs: next })
+    const dockedSession = current.dockedAiTabId && sessionIdFromAiTab(current.dockedAiTabId)
+    if (dockedSession && !byId.has(dockedSession)) useAppStore.setState({ dockedAiTabId: 'system:ai' })
+  }, [sessions, loaded])
+  const ids = new Set(tabs.filter((tab) => tab.kind === 'ai').map((tab) => tab.id))
+  if (dockedId) ids.add(dockedId)
+  return [...ids].map((id) => detached && id === dockedId ? null : <SessionPortal key={id} tabId={id} />)
+}
+
+function SessionPortal({ tabId }: { tabId: string }) {
+  const container = panelContainer(tabId)
+  return createPortal(<ByeoriPanel sessionId={sessionIdFromAiTab(tabId)} />, container)
 }

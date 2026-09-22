@@ -7,6 +7,7 @@ import {
   useCallback,
   useDeferredValue,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -23,6 +24,7 @@ import {
   type WorkspaceScopeEntry,
 } from '../api'
 import { aiBus } from '../aiBus'
+import { clearAiDraft, initialAiDraft, seedAiDraft } from '../aiDrafts'
 import { useAiStore, type AiSession, type AiMessage, type ChatImage } from '../aiStore'
 import { isMemorySavedForRun } from '../aiMemory'
 import { useAppStore } from '../store'
@@ -858,6 +860,8 @@ function SessionSelectionCheckbox({
 }
 
 type ByeoriPanelProps = {
+  /** Main-window panes are pinned to one conversation; undefined is the detached window. */
+  sessionId?: string | null
   /** 분리 창에서는 문서 링크를 숨은 자식 렌더러가 아니라 기본 창에 연다. */
   onOpenFile?: (path: string) => void
   onOpenErdDesigner?: (path?: string | null, directory?: string | null) => void
@@ -869,7 +873,9 @@ export default function ByeoriPanel({
   onOpenFile,
   onOpenErdDesigner: onOpenErd,
   onReattach,
+  sessionId,
 }: ByeoriPanelProps = {}) {
+  const panelId = useId()
   const root = useAppStore((s) => s.root)
   const workspaceTree = useAppStore((s) => s.tree)
   const currentPath = useAppStore((s) => s.currentPath)
@@ -880,13 +886,20 @@ export default function ByeoriPanel({
   const openErdDesigner = onOpenErd ?? storeOpenErdDesigner
 
   const sessions = useAiStore((s) => s.sessions)
-  const activeSessionId = useAiStore((s) => s.activeSessionId)
+  const selectedSessionId = useAiStore((s) => s.activeSessionId)
+  const activeSessionId = sessionId === undefined ? selectedSessionId : sessionId
+  const [initialDraft] = useState(() => initialAiDraft(sessionId))
+  useEffect(() => { clearAiDraft(sessionId) }, [sessionId])
   const sessionsLoaded = useAiStore((s) => s.sessionsLoaded)
   // 액션을 통째 스토어에서 꺼내면 무관한 전역 상태 변경에도 패널이 구독된다.
   // 각각 selector로 읽어 입력 중 렌더링 범위를 active session 상태에 한정한다.
   const loadSessions = useAiStore((s) => s.loadSessions)
   const newChatSession = useAiStore((s) => s.newChatSession)
-  const selectSession = useAiStore((s) => s.selectSession)
+  const storeSelectSession = useAiStore((s) => s.selectSession)
+  const selectSession = (id: string) => {
+    storeSelectSession(id)
+    if (sessionId !== undefined) useAppStore.getState().openAiSession(id)
+  }
   const closeSession = useAiStore((s) => s.closeSession)
   const closeAllSessions = useAiStore((s) => s.closeAllSessions)
   const renameSession = useAiStore((s) => s.renameSession)
@@ -921,21 +934,21 @@ export default function ByeoriPanel({
   // 워크스페이스 기본 모델/강도 (.workspace.json → 없으면 앱 기본값 terra/xhigh 가 내려옴)
   const [wsDefaults, setWsDefaults] = useState<{ model: string; effort: string }>({ model: '', effort: '' })
   const [pickerOpen, setPickerOpen] = useState(false)
-  const [prompt, setPrompt] = useState('')
-  const [pendingContext, setPendingContext] = useState('')
+  const [prompt, setPrompt] = useState(initialDraft?.prompt ?? '')
+  const [pendingContext, setPendingContext] = useState(initialDraft?.context ?? '')
   /** 선택 액션으로 명시적으로 허용된 이번 요청의 문서 첨부 여부. */
-  const [pendingIncludeDocument, setPendingIncludeDocument] = useState(false)
+  const [pendingIncludeDocument, setPendingIncludeDocument] = useState(initialDraft?.includeDocument ?? false)
   /** 첨부 파일 (업로드 완료된 에셋). 이미지는 엔진에 이미지 입력으로, 일반 파일은 경로 참조로 전달.
    *  annotatingUrl 은 ✏️ 주석 편집 중인 이미지. */
-  const [attachments, setAttachments] = useState<Array<{ url: string; name: string; kind: 'image' | 'file' }>>([])
+  const [attachments, setAttachments] = useState<Array<{ url: string; name: string; kind: 'image' | 'file' }>>(initialDraft?.attachments ?? [])
   const [annotatingUrl, setAnnotatingUrl] = useState<string | null>(null)
   const [previewImage, setPreviewImage] = useState<ChatImage | null>(null)
   const closePreviewImage = useCallback(() => setPreviewImage(null), [])
   const [uploadBusy, setUploadBusy] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   /** 복구한 명시적 문서 요청은 사용자가 다른 문서를 열었어도 원래 경로를 다시 보낸다. */
-  const [draftDocumentPath, setDraftDocumentPath] = useState<string | null>(null)
-  const [mentionedPaths, setMentionedPaths] = useState<string[]>([])
+  const [draftDocumentPath, setDraftDocumentPath] = useState<string | null>(initialDraft?.documentPath ?? null)
+  const [mentionedPaths, setMentionedPaths] = useState<string[]>(initialDraft?.mentionedPaths ?? [])
   const [usageLimits, setUsageLimits] = useState<AiUsageLimits | null>(null)
   const [loginBusy, setLoginBusy] = useState(false)
   const [loginUrl, setLoginUrl] = useState<string | null>(null)
@@ -1024,10 +1037,10 @@ export default function ByeoriPanel({
   // 세션 실행은 서버가 맡는다. 새로고침 뒤에는 기존 WebSocket을 되살릴 수 없으므로
   // 채팅·태스크 모두 세션 메타를 확인해 진행 표시와 완료 상태를 이어받는다.
   useEffect(() => {
-    if (!status?.logged_in || !hasRecoverableWork) return
+    if (sessionId !== undefined || !status?.logged_in || !hasRecoverableWork) return
     const timer = window.setInterval(() => void loadSessions(), 2500)
     return () => window.clearInterval(timer)
-  }, [status?.logged_in, hasRecoverableWork, loadSessions])
+  }, [sessionId, status?.logged_in, hasRecoverableWork, loadSessions])
 
   useEffect(() => {
     if (active?.recovery?.kind === 'limit') void refreshUsageLimits()
@@ -1049,14 +1062,15 @@ export default function ByeoriPanel({
   useEffect(() => {
     return aiBus.subscribe((msg) => {
       if (msg.type === 'insertContext') {
+        if (sessionId === undefined && msg.sessionId) storeSelectSession(msg.sessionId)
         setPendingContext(msg.text)
         setDraftDocumentPath(msg.documentPath ?? null)
         setPendingIncludeDocument(Boolean(msg.includeDocument && msg.documentPath))
         if (msg.prompt !== undefined) setPrompt(msg.prompt)
         setTimeout(() => inputRef.current?.focus(), 50)
       }
-    })
-  }, [])
+    }, sessionId)
+  }, [sessionId, storeSelectSession])
 
   useEffect(() => {
     if (!sessionListOpen) {
@@ -1148,11 +1162,12 @@ export default function ByeoriPanel({
     })
   }
 
-  const startNewChat = async (scope?: WorkspaceScopeEntry | null) => {
+  const startNewChat = async (scope?: WorkspaceScopeEntry | null, transferDraft = false) => {
     setUiError(null)
     const id = await newChatSession({
       title: scope ? `${scope.label} 대화` : undefined,
-      scopeId: scope?.id,
+      scopeId: scope === undefined ? active?.scopeId : scope?.id,
+      sectionId: scope === undefined || scope?.id === active?.scopeId ? active?.sectionId : undefined,
     })
     if (!id) {
       setUiError('새 대화를 만들 수 없습니다')
@@ -1160,13 +1175,17 @@ export default function ByeoriPanel({
     }
     setSessionListOpen(false)
     setSessionQuery('')
+    if (sessionId !== undefined) {
+      if (transferDraft) seedAiDraft(id, { prompt, context: pendingContext, includeDocument: pendingIncludeDocument, documentPath: draftDocumentPath, mentionedPaths, attachments })
+      useAppStore.getState().openAiSession(id)
+    }
     return id
   }
 
   /**
    * Codex 스레드는 한 프로젝트의 파일 문맥을 이어서 가진다. 따라서 실행 대상만 기존
    * 대화에서 바꾸지 않고, 사용자가 고른 프로젝트로 새 대화를 열어 문맥이 섞이지 않게 한다.
-   * 작성 중인 입력·첨부는 컴포넌트 상태에 남아 있어 바로 새 대화로 보낼 수 있다.
+   * 작성 중인 입력·첨부도 새 대화의 독립 입력창으로 복사한다.
    */
   const selectQuestionTarget = async (scopeId: string) => {
     // 태스크 보드에서 시작한 실행에는 카드의 scope가 절대 우선이다. UI 밖에서 이 함수를
@@ -1178,7 +1197,7 @@ export default function ByeoriPanel({
 
     setScopePickerBusy(true)
     try {
-      await startNewChat(nextScope)
+      await startNewChat(nextScope, true)
     } finally {
       setScopePickerBusy(false)
     }
@@ -1418,6 +1437,7 @@ export default function ByeoriPanel({
       mentionPaths: request.mentionPaths,
     })
     dismissRecovery(session.id)
+    if (sessionId !== undefined) useAppStore.getState().openAiSession(id)
   }
 
   const onKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -1587,7 +1607,7 @@ export default function ByeoriPanel({
         : '실행 요약'
 
   return (
-    <div className="relative flex h-full flex-col bg-white">
+    <div className="relative flex h-full flex-col bg-white" data-ai-conversation={activeSessionId ?? 'new'}>
       {/* 헤더에는 선택한 대화 하나만 두고, 목록·수정은 드롭다운에서 처리한다. */}
       <div className="relative flex h-8 shrink-0 items-center gap-2 border-b border-[#e9e9e7] bg-[#f7f7f5] px-3 text-[12px] text-[#5f5e5b]">
         <button
@@ -1602,7 +1622,7 @@ export default function ByeoriPanel({
           title="대화 목록"
         >
           <span aria-hidden="true">🤖</span>
-          <span className="min-w-0 flex-1 truncate">{active ? active.title : 'Twill AI'}</span>
+          <span className="min-w-0 flex-1 truncate">{sessionId !== undefined ? '대화 목록' : active ? active.title : 'Twill AI'}</span>
           <span className="text-[9px] text-[#9b9a97]">▾</span>
         </button>
         {currentModel && (
@@ -1755,13 +1775,13 @@ export default function ByeoriPanel({
             </div>
 
           <div className="border-t border-[#efefed] px-2 pb-2 pt-1.5">
-            <label className="sr-only" htmlFor="byeori-session-search">
+            <label className="sr-only" htmlFor={`${panelId}-session-search`}>
               대화 검색
             </label>
             <div className="flex items-center rounded-md border border-[#e3e2e0] bg-white px-2 focus-within:border-[#a8a6a1]">
               <span className="mr-1 text-[11px] text-[#9b9a97]">⌕</span>
               <input
-                id="byeori-session-search"
+                id={`${panelId}-session-search`}
                 value={sessionQuery}
                 onChange={(event) => setSessionQuery(event.target.value)}
                 placeholder="대화·문서·태스크 검색"
@@ -1871,7 +1891,7 @@ export default function ByeoriPanel({
 
       {active?.sourceTask && <div className="shrink-0 border-b border-[#e9e9e7] px-3 py-2"><TaskSourceBanner session={active} openFile={openFile} /></div>}
       {/* 메시지 스트림 */}
-      <div ref={scrollRef} onScroll={onScroll} className="min-h-0 flex-1 space-y-2.5 overflow-y-auto p-3">
+      <div ref={scrollRef} onScroll={onScroll} data-ai-message-scroll className="min-h-0 flex-1 space-y-2.5 overflow-y-auto p-3">
         {!active && sessionsLoaded && (
           <div className="mt-10 flex flex-col items-center gap-2 text-center text-[12px] text-[#9b9a97]">
             <span className="text-2xl">🤖</span>
@@ -2334,9 +2354,9 @@ export default function ByeoriPanel({
               multiple
               className="hidden"
               onChange={(e) => {
-                const files = e.target.files
+                const files = Array.from(e.target.files ?? [])
                 e.target.value = ''
-                if (files?.length) void attachFiles(files)
+                if (files.length) void attachFiles(files)
               }}
             />
             <button
@@ -2428,8 +2448,8 @@ export default function ByeoriPanel({
           <div
             role="alertdialog"
             aria-modal="true"
-            aria-labelledby="byeori-session-delete-title"
-            aria-describedby="byeori-session-delete-detail"
+            aria-labelledby={`${panelId}-session-delete-title`}
+            aria-describedby={`${panelId}-session-delete-detail`}
             className="w-full max-w-sm overflow-hidden rounded-xl border border-[#e3e2e0] bg-white shadow-2xl"
             onClick={(event) => event.stopPropagation()}
           >
@@ -2446,12 +2466,12 @@ export default function ByeoriPanel({
                 </svg>
               </span>
               <div className="min-w-0 flex-1">
-                <p id="byeori-session-delete-title" className="break-words text-[13px] font-medium text-[#37352f]">
+                <p id={`${panelId}-session-delete-title`} className="break-words text-[13px] font-medium text-[#37352f]">
                   {sessionDeleteRequest.kind === 'single'
                     ? `“${sessionDeleteRequest.title}” 대화를 삭제할까요?`
                     : `선택한 대화 ${sessionDeleteRequest.count}개를 삭제할까요?`}
                 </p>
-                <p id="byeori-session-delete-detail" className="mt-1 text-[11px] leading-relaxed text-[#7d7c78]">
+                <p id={`${panelId}-session-delete-detail`} className="mt-1 text-[11px] leading-relaxed text-[#7d7c78]">
                   {sessionDeleteRequest.kind === 'single' && sessionDeleteRequest.running
                     ? '진행 중이거나 대기 중인 실행도 함께 중단됩니다. '
                     : sessionDeleteRequest.kind === 'selected' && sessionDeleteRequest.runningCount > 0

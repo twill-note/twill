@@ -1,4 +1,6 @@
 import { create } from 'zustand'
+import { useAiStore } from './aiStore'
+import { aiDocumentTab, aiDocumentTabId, sessionIdFromAiTab } from './aiTabs'
 import { api } from './api'
 import type { PluginInfo } from './api'
 import type { SaveStatus, Section, TagCount, TreeNode, ViewMode } from './types'
@@ -22,8 +24,6 @@ export type DocTab = {
   erdDirectory?: string | null
 }
 
-export const AI_DOCUMENT_TAB: DocTab = { id: SYSTEM_AI_TAB, kind: 'ai', target: 'ai', title: 'Twill AI', icon: '✦' }
-
 interface AppState {
   tree: TreeNode[]
   sections: Section[]
@@ -41,8 +41,10 @@ interface AppState {
   activeRightTab: string
   /** Electron에서 벼리 패널이 독립 BrowserWindow로 이동한 상태. */
   byeoriDetached: boolean
-  aiLocation: 'editor' | 'right'
-  moveAi: (location: 'editor' | 'right') => void
+  aiTabId: string | null
+  dockedAiTabId: string | null
+  openAiSession: (sessionId: string) => void
+  moveAi: (location: 'editor' | 'right', tabId?: string) => void
   dbDir: string | null
   /** 완료 요약 등에서 특정 카드 집합만 바로 검토할 때 쓰는 일시적 DB 행 필터. */
   dbRowFilter: string[] | null
@@ -136,13 +138,37 @@ export const useAppStore = create<AppState>((set, get) => ({
   rightDockOpen: false,
   activeRightTab: SYSTEM_TERMINAL_TAB,
   byeoriDetached: false,
-  aiLocation: localStorage.getItem('ai-location') === 'editor' ? 'editor' : 'right',
-  moveAi: (aiLocation) => {
-    localStorage.setItem('ai-location', aiLocation)
+  aiTabId: null,
+  dockedAiTabId: SYSTEM_AI_TAB,
+  openAiSession: (sessionId) => {
+    if (!useAiStore.getState().sessions.some((session) => session.id === sessionId)) return
+    get().moveAi('editor', aiDocumentTabId(sessionId))
+    // The empty AI entry is replaced by the first real conversation.
+    get().closeTab(SYSTEM_AI_TAB)
     const state = get()
-    set({ aiLocation, ...(aiLocation === 'editor'
-      ? { openTabs: upsertTab(state.openTabs, AI_DOCUMENT_TAB), view: 'ai' as const, ...(state.activeRightTab === SYSTEM_AI_TAB ? { rightDockOpen: false } : {}) }
-      : { openTabs: state.openTabs.filter((tab) => tab.id !== SYSTEM_AI_TAB), rightDockOpen: true, activeRightTab: SYSTEM_AI_TAB, ...(state.view === 'ai' ? { view: 'editor' as const } : {}) }) })
+    if (state.dockedAiTabId === SYSTEM_AI_TAB) set({ dockedAiTabId: null, ...(state.activeRightTab === SYSTEM_AI_TAB ? { rightDockOpen: false } : {}) })
+  },
+  moveAi: (location, requestedTabId) => {
+    const state = get()
+    const tabId = requestedTabId ?? state.aiTabId ?? state.dockedAiTabId ?? SYSTEM_AI_TAB
+    const sessionId = sessionIdFromAiTab(tabId)
+    const session = useAiStore.getState().sessions.find((item) => item.id === sessionId)
+    if (sessionId && !session) return
+    useAiStore.setState({ activeSessionId: sessionId })
+    const tab = aiDocumentTab(tabId, session?.title)
+    if (location === 'editor') {
+      const fromDock = state.dockedAiTabId === tabId
+      set({ openTabs: upsertTab(state.openTabs, tab), aiTabId: tabId, view: 'ai',
+        ...(fromDock ? { dockedAiTabId: null, ...(state.activeRightTab === SYSTEM_AI_TAB ? { rightDockOpen: false } : {}) } : {}) })
+    } else {
+      let openTabs = state.openTabs.filter((item) => item.id !== tabId)
+      // Replacing the dock keeps the previous conversation open as an editor tab.
+      const previousId = state.dockedAiTabId && sessionIdFromAiTab(state.dockedAiTabId)
+      const previous = useAiStore.getState().sessions.find((item) => item.id === previousId)
+      if (previous && state.dockedAiTabId !== tabId) openTabs = upsertTab(openTabs, aiDocumentTab(state.dockedAiTabId!, previous.title))
+      set({ openTabs, dockedAiTabId: tabId, rightDockOpen: true, activeRightTab: SYSTEM_AI_TAB,
+        ...(state.aiTabId === tabId ? { aiTabId: null, ...(state.view === 'ai' ? { view: 'editor' } : {}) } : {}) })
+    }
   },
   dbDir: null,
   dbRowFilter: null,
@@ -288,13 +314,20 @@ export const useAppStore = create<AppState>((set, get) => ({
   setActiveRightTab: (activeRightTab) => set({ activeRightTab }),
   setByeoriDetached: (byeoriDetached) => set({ byeoriDetached }),
   openRightTab: (id) => {
-    if (id === SYSTEM_AI_TAB && get().byeoriDetached && window.noteDesktop) {
+    const selectedSessionId = useAiStore.getState().activeSessionId
+    const selectedAiTabId = selectedSessionId ? aiDocumentTabId(selectedSessionId) : SYSTEM_AI_TAB
+    if (id === SYSTEM_AI_TAB && get().byeoriDetached && get().dockedAiTabId === selectedAiTabId && window.noteDesktop) {
       void window.noteDesktop.focusByeoriWindow()
       return
     }
-    if (id === SYSTEM_AI_TAB && get().aiLocation === 'editor') {
-      get().moveAi('editor')
-      return
+    if (id === SYSTEM_AI_TAB) {
+      const sessionId = selectedSessionId
+      const tabId = selectedAiTabId
+      if (get().dockedAiTabId !== tabId) {
+        if (sessionId) get().openAiSession(sessionId)
+        else get().moveAi('editor', tabId)
+        return
+      }
     }
     set({ rightDockOpen: true, activeRightTab: id })
   },
@@ -425,6 +458,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (first) {
       if (first.kind === 'file') return get().openFile(first.target)
       if (first.kind === 'db') return get().openDatabase(first.target)
+      if (first.kind === 'ai') return get().moveAi('editor', first.id)
       return get().setView(first.target as ViewMode)
     }
     set({ view: 'editor', currentPath: null, pluginViewId: null, erdPath: null, erdDirectory: null, erdTabId: null })
@@ -437,13 +471,15 @@ export const useAppStore = create<AppState>((set, get) => ({
     const openTabs = s.openTabs.filter((t) => t.id !== id)
     // 닫는 탭이 현재 활성 탭이면 인접 탭으로 스위치
     const activeId = currentActiveTabId(s)
+    if (id === s.aiTabId) set({ aiTabId: null })
     if (closingTab.id === activeId) {
-      const next = openTabs[Math.max(0, idx - 1)] ?? openTabs[0]
+      const availableTabs = openTabs.filter((tab) => tab.kind !== 'ai' || !tab.target || useAiStore.getState().sessions.some((session) => session.id === tab.target))
+      const next = availableTabs[Math.max(0, idx - 1)] ?? availableTabs[0]
       if (next) {
         set({ openTabs })
         // 뷰 상태를 next 로 전환
         if (next.kind === 'file') set({ currentPath: next.target, view: 'editor' })
-        else if (next.kind === 'ai') set({ view: 'ai' })
+        else if (next.kind === 'ai') get().moveAi('editor', next.id)
         else if (next.kind === 'erd') {
           set({ openTabs })
           get().activateErdTab(next.id)
@@ -512,7 +548,7 @@ function erdTitle(path: string | null): string {
 
 /** 현재 뷰 상태로부터 활성 탭 id 계산. */
 function currentActiveTabId(s: AppState): string | null {
-  if (s.view === 'ai') return SYSTEM_AI_TAB
+  if (s.view === 'ai') return s.aiTabId
   if (s.view === 'editor' && s.currentPath) return `file:${s.currentPath}`
   if (s.view === 'database') return `db:${s.dbDir ?? ''}`
   if (s.view === 'erd') return s.erdTabId
@@ -521,8 +557,8 @@ function currentActiveTabId(s: AppState): string | null {
 }
 
 /** 외부에서 활성 탭 id 를 얻기 위한 헬퍼. */
-export function activeTabId(s: Pick<AppState, 'view' | 'currentPath' | 'dbDir' | 'erdTabId'>): string | null {
-  if (s.view === 'ai') return SYSTEM_AI_TAB
+export function activeTabId(s: Pick<AppState, 'view' | 'currentPath' | 'dbDir' | 'erdTabId' | 'aiTabId'>): string | null {
+  if (s.view === 'ai') return s.aiTabId
   if (s.view === 'editor' && s.currentPath) return `file:${s.currentPath}`
   if (s.view === 'database') return `db:${s.dbDir ?? ''}`
   if (s.view === 'erd') return s.erdTabId

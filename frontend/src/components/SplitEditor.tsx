@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { activeTabId, AI_DOCUMENT_TAB, SYSTEM_AI_TAB, type DocTab, useAppStore } from '../store'
+import { activeTabId, type DocTab, useAppStore } from '../store'
+import { aiDocumentTab, isAiTab, sessionIdFromAiTab } from '../aiTabs'
+import { useAiStore } from '../aiStore'
 import { AiPanelHost } from './AiPlacement'
 import { dialog } from '../dialog'
 import Editor from './Editor'
@@ -166,6 +168,7 @@ export default function SplitEditor() {
   const currentPath = useAppStore((s) => s.currentPath)
   const dbDir = useAppStore((s) => s.dbDir)
   const erdTabId = useAppStore((s) => s.erdTabId)
+  const aiTabId = useAppStore((s) => s.aiTabId)
   const openFile = useAppStore((s) => s.openFile)
   const activateErdTab = useAppStore((s) => s.activateErdTab)
   const closeTab = useAppStore((s) => s.closeTab)
@@ -175,12 +178,12 @@ export default function SplitEditor() {
   const documentTabs = useMemo(() => openTabs.filter((tab) => tab.kind === 'file' || tab.kind === 'erd' || tab.kind === 'ai'), [openTabs])
   const tabsById = useMemo(() => new Map(documentTabs.map((tab) => [tab.id, tab])), [documentTabs])
   const openDocumentTabIds = useMemo(() => new Set(documentTabs.map((tab) => tab.id)), [documentTabs])
-  const selectedTabId = activeTabId({ view, currentPath, dbDir, erdTabId })
+  const selectedTabId = activeTabId({ view, currentPath, dbDir, erdTabId, aiTabId })
 
   const openDocument = useCallback((tab: DocTab) => {
     if (tab.kind === 'file') openFile(tab.target)
     else if (tab.kind === 'erd') activateErdTab(tab.id)
-    else if (tab.kind === 'ai') useAppStore.getState().moveAi('editor')
+    else if (tab.kind === 'ai') useAppStore.getState().moveAi('editor', tab.id)
   }, [activateErdTab, openFile])
 
   // 파일 트리에서 노트 또는 ERD를 열면, 마지막으로 포커스한 패널에 그 탭을 배치한다.
@@ -212,15 +215,23 @@ export default function SplitEditor() {
       const root = pruneClosedTabs(previous.root, openDocumentTabIds, () => {
         changed = true
       })
-      const compacted = removeEmptyPanels(root) ?? createPanel()
+      let compacted = removeEmptyPanels(root) ?? createPanel()
       if (compacted !== root) changed = true
+      // A displaced dock conversation also needs a tab, without stealing focus.
+      const placed = new Set(leafPanels(compacted).flatMap((panel) => panel.tabIds))
+      const missing = documentTabs.filter((tab) => tab.kind === 'ai' && !placed.has(tab.id)).map((tab) => tab.id)
+      if (missing.length) {
+        const target = findPanel(compacted, previous.activePanelId) ?? leafPanels(compacted)[0]
+        compacted = updatePanel(compacted, target.id, (panel) => ({ ...panel, tabIds: [...panel.tabIds, ...missing], activeTabId: panel.activeTabId ?? missing[0] }))
+        changed = true
+      }
       if (!changed) return previous
       const activePanelId = findPanel(compacted, previous.activePanelId)
         ? previous.activePanelId
         : leafPanels(compacted)[0]?.id ?? previous.activePanelId
       return { root: compacted, activePanelId }
     })
-  }, [openDocumentTabIds])
+  }, [openDocumentTabIds, documentTabs])
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(layout))
@@ -233,7 +244,9 @@ export default function SplitEditor() {
   /** 상단 탭을 패널에 놓는다. 가운데는 이동/재정렬, 가장자리는 새 분할 패널을 만든다. */
   const dropTab = useCallback(
     (tabId: string, sourcePanelId: string, targetPanelId: string, zone: DropZone, beforeTabId: string | null = null) => {
-      const tab = tabsById.get(tabId) ?? (tabId === SYSTEM_AI_TAB ? AI_DOCUMENT_TAB : undefined)
+      const session = useAiStore.getState().sessions.find((item) => item.id === sessionIdFromAiTab(tabId))
+      if (sessionIdFromAiTab(tabId) && !session) return
+      const tab = tabsById.get(tabId) ?? (isAiTab(tabId) ? aiDocumentTab(tabId, session?.title) : undefined)
       const target = findPanel(layout.root, targetPanelId)
       if (!tab || !target || (isSplitZone(zone) && leafPanels(layout.root).length >= 4)) return
 
@@ -694,7 +707,7 @@ function EditorPane({
         const sourcePanelId = event.dataTransfer.getData('text/doc-tab-source')
         const zone = resolveDropZone(event)
         setDropZone(null)
-        if ((!tabsById.has(tabId) && tabId !== SYSTEM_AI_TAB) || !sourcePanelId) return
+        if ((!tabsById.has(tabId) && !isAiTab(tabId)) || !sourcePanelId) return
         event.preventDefault()
         event.stopPropagation()
         onDropTab(tabId, sourcePanelId, panel.id, zone)
@@ -728,7 +741,7 @@ function EditorPane({
               const sourcePanelId = event.dataTransfer.getData('text/doc-tab-source')
               setDropZone(null)
               setTabDropTarget(null)
-              if ((!tabsById.has(tabId) && tabId !== SYSTEM_AI_TAB) || !sourcePanelId) return
+              if ((!tabsById.has(tabId) && !isAiTab(tabId)) || !sourcePanelId) return
               event.preventDefault()
               event.stopPropagation()
               // 탭 사이의 빈 공간으로 놓으면 이 패널의 마지막 탭 뒤에 둔다.
@@ -770,7 +783,7 @@ function EditorPane({
                     const { beforeTabId } = getDropBeforeTabId(event, tab)
                     setDropZone(null)
                     setTabDropTarget(null)
-                    if ((!tabsById.has(tabId) && tabId !== SYSTEM_AI_TAB) || !sourcePanelId) return
+                    if ((!tabsById.has(tabId) && !isAiTab(tabId)) || !sourcePanelId) return
                     event.preventDefault()
                     event.stopPropagation()
                     onDropTab(tabId, sourcePanelId, panel.id, 'center', beforeTabId)
@@ -788,7 +801,7 @@ function EditorPane({
                     active ? 'bg-white text-[#37352f]' : 'text-[#7d7c78] hover:bg-[#ececea]'
                   } ${tabDropSide === 'before' ? 'border-l-2 border-l-[#4a9eff]' : ''} ${tabDropSide === 'after' ? 'border-r-2 border-r-[#4a9eff]' : ''}`}
                 >
-                  <button className="flex max-w-[200px] items-center gap-1 truncate" onClick={() => onActivateTab(panel.id, tab)} title={tab.target}>
+                  <button className={`flex items-center gap-1 truncate ${tab.kind === 'ai' ? 'max-w-[160px]' : 'max-w-[200px]'}`} onClick={() => onActivateTab(panel.id, tab)} title={tab.kind === 'ai' ? tab.title : tab.target}>
                     {pinnedNotes.includes(tab.target) && <span className="text-[9px]">📌</span>}
                     <span className="text-[13px]">{tab.icon}</span>
                     <span className="truncate">{tab.title}</span>
@@ -905,9 +918,11 @@ function EditorPane({
         )}
       </div>
       <div className="min-h-0 min-w-0 flex-1" onMouseDown={() => onFocusPanel(panel.id)}>
-        {tabs.some((tab) => tab.kind === 'ai') && (
-          <div className={activeTab?.kind === 'ai' ? 'h-full' : 'hidden'}><AiPanelHost onFocus={() => onFocusPanel(panel.id)} /></div>
-        )}
+        {tabs.filter((tab) => tab.kind === 'ai').map((tab) => (
+          <div key={tab.id} className={activeTab?.id === tab.id ? 'h-full' : 'hidden'}>
+            <AiPanelHost tabId={tab.id} onFocus={() => onActivateTab(panel.id, tab)} />
+          </div>
+        ))}
         {activeTab ? (
           activeTab.kind === 'ai' ? null : activeTab.kind === 'erd' ? <ErdWorkspace tab={activeTab} /> : <Editor path={activeTab.target} />
         ) : (

@@ -15,11 +15,12 @@
     "desktop:dev": "electron electron/main.mjs --url=http://127.0.0.1:5173 --no-backend",
     "desktop:smoke": "electron electron/main.mjs --smoke-test",
     "test:ai-workspace": "electron test/aiWorkspace.electron.cjs",
+    "test:ai-conversations": "electron test/aiConversations.electron.cjs",
     "dist:win": "electron-builder --win nsis",
     "dist:mac": "node scripts/build-mac-icon.mjs && electron-builder --mac dmg",
     "desktop:check": "node --check electron/main.mjs && node --check electron/preload.cjs && node --check electron/runtime.mjs && node --check electron/lifecycle.mjs && node --check electron/local-storage.mjs && node --check scripts/npm-command.mjs && node --check scripts/ensure-desktop-build.mjs && node --check scripts/build-mac-icon.mjs",
     "lint": "oxlint",
-    "test": "node --experimental-strip-types --test test/wikiLinks.test.ts test/blockPersistence.test.ts test/taskQueue.test.ts test/restartGuards.test.ts test/aiMemory.test.ts test/aiProjectGroups.test.ts test/buildInfo.test.ts test/editorPreferences.test.ts test/themeConfig.test.ts test/taskExecutionScope.test.ts test/desktopRuntime.test.mjs test/desktopLifecycle.test.mjs",
+    "test": "node --experimental-strip-types --test test/wikiLinks.test.ts test/blockPersistence.test.ts test/taskQueue.test.ts test/restartGuards.test.ts test/aiMemory.test.ts test/aiProjectGroups.test.ts test/aiTabs.test.ts test/buildInfo.test.ts test/editorPreferences.test.ts test/themeConfig.test.ts test/taskExecutionScope.test.ts test/desktopRuntime.test.mjs test/desktopLifecycle.test.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

@@ -108,7 +108,6 @@ export default function TaskCardPopup({ row, config, onClose, onCellChange, onRo
     if (openingWork) return
     setError(null)
     setOpeningWork(true)
-    openRightTab(SYSTEM_AI_TAB)
     try {
       // 분리 창이나 다른 렌더러에서 열린 세션도 놓치지 않도록 서버 목록을 먼저 동기화한다.
       await loadSessions()
@@ -125,6 +124,7 @@ export default function TaskCardPopup({ row, config, onClose, onCellChange, onRo
       )
       if (existing && existingAction !== 'start-changed-project') {
         selectSession(existing.id)
+        openRightTab(SYSTEM_AI_TAB)
         onClose()
         return
       }
@@ -141,6 +141,7 @@ export default function TaskCardPopup({ row, config, onClose, onCellChange, onRo
       }
       if (origin?.busy || origin?.queued) {
         selectSession(origin.id)
+        openRightTab(SYSTEM_AI_TAB)
         onClose()
         return
       }
@@ -166,6 +167,7 @@ export default function TaskCardPopup({ row, config, onClose, onCellChange, onRo
         if (!startError) setError('세션을 만들 수 없습니다. 백엔드 연결을 확인하세요.')
         return
       }
+      useAppStore.getState().openAiSession(sessionId)
       onRowUpdated()
       onClose()
     } finally {

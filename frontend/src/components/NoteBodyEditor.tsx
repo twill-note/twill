@@ -65,24 +65,24 @@ export default function NoteBodyEditor({
   const saveChainRef = useRef<Promise<void>>(Promise.resolve())
   const save = useCallback(() => {
     const operation = saveChainRef.current.then(async () => {
-    if (!loadedRef.current) return
-    if (timerRef.current) {
-      clearTimeout(timerRef.current)
-      timerRef.current = null
-    }
-    setStatus('saving')
-    try {
-      const blocks = editor.document
-      const body = await preserveBlocks(await editor.blocksToMarkdownLossy(toMarkdownBlocks(blocks)), blocks)
-      // 최신 frontmatter/mtime 을 읽어 본문만 교체 (병행 수정된 메타 필드 보존)
-      const latest = await api.getContent(content.path)
-      await api.saveContent(content.path, latest.frontmatter, body, latest.mtime)
-      setStatus('saved')
-      return true
-    } catch {
-      setStatus('error')
-      return false
-    }
+      if (!loadedRef.current) return
+      if (timerRef.current) {
+        clearTimeout(timerRef.current)
+        timerRef.current = null
+      }
+      setStatus('saving')
+      try {
+        const blocks = editor.document
+        const body = await preserveBlocks(await editor.blocksToMarkdownLossy(toMarkdownBlocks(blocks)), blocks)
+        // 최신 frontmatter/mtime 을 읽어 본문만 교체 (병행 수정된 메타 필드 보존)
+        const latest = await api.getContent(content.path)
+        await api.saveContent(content.path, latest.frontmatter, body, latest.mtime)
+        setStatus('saved')
+        return true
+      } catch {
+        setStatus('error')
+        return false
+      }
     })
     saveChainRef.current = operation.then(() => {}, () => {})
     return operation

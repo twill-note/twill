@@ -787,31 +787,31 @@ function NoteEditor({
   const save = useCallback(
     (force = false) => {
       const operation = saveChainRef.current.then(async () => {
-      if (!loadedRef.current) return
-      if (timerRef.current) {
-        clearTimeout(timerRef.current)
-        timerRef.current = null
-      }
-      setSaveStatus('saving')
-      try {
-        const blocks = editor.document
-      const markdown = await editor.blocksToMarkdownLossy(toMarkdownBlocks(blocks))
-      const body = isExternal ? markdown : await preserveBlocks(markdown, blocks)
-        const res = isExternal
-          ? await api.saveContentExternal(content.path, fmRef.current, body, mtimeRef.current, force)
-          : await api.saveContent(content.path, fmRef.current, body, mtimeRef.current, force)
-        mtimeRef.current = res.mtime
-        setSaveStatus('saved')
-        if (!isExternal) {
-          refreshTags()
-          loadLinks()
+        if (!loadedRef.current) return
+        if (timerRef.current) {
+          clearTimeout(timerRef.current)
+          timerRef.current = null
         }
-        return true
-      } catch (e) {
-        if (e instanceof ApiError && e.status === 409) setSaveStatus('conflict')
-        else setSaveStatus('error')
-        return false
-      }
+        setSaveStatus('saving')
+        try {
+          const blocks = editor.document
+          const markdown = await editor.blocksToMarkdownLossy(toMarkdownBlocks(blocks))
+          const body = isExternal ? markdown : await preserveBlocks(markdown, blocks)
+          const res = isExternal
+            ? await api.saveContentExternal(content.path, fmRef.current, body, mtimeRef.current, force)
+            : await api.saveContent(content.path, fmRef.current, body, mtimeRef.current, force)
+          mtimeRef.current = res.mtime
+          setSaveStatus('saved')
+          if (!isExternal) {
+            refreshTags()
+            loadLinks()
+          }
+          return true
+        } catch (e) {
+          if (e instanceof ApiError && e.status === 409) setSaveStatus('conflict')
+          else setSaveStatus('error')
+          return false
+        }
       })
       saveChainRef.current = operation.then(() => {}, () => {})
       return operation

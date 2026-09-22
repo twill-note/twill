@@ -1441,6 +1441,8 @@ if (!hasSingleInstanceLock) {
         if (!window || window.isDestroyed() || new URL(event.senderFrame.url).origin !== new URL(appUrl).origin) {
           throw new Error('앱 창에서만 PDF를 내보낼 수 있습니다.')
         }
+        // Control characters are not valid in a native filename.
+        // eslint-disable-next-line no-control-regex
         const name = (typeof title === 'string' ? title : '문서').replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').slice(0, 120) || '문서'
         const result = await dialog.showSaveDialog(window, { title: 'PDF로 내보내기', defaultPath: `${name}.pdf`, filters: [{ name: 'PDF', extensions: ['pdf'] }] })
         if (result.canceled || !result.filePath) return { canceled: true }
@@ -1478,15 +1480,15 @@ if (!hasSingleInstanceLock) {
             for (const win of windows) win.webContents.send('desktop:prepare-restart', requestId)
             if (!pending.size) finish()
           })
-        // The API refuses while AI work or an update is active, including work
-        // started from a detached window.
-        const response = await fetch(new URL('/api/ai/restart-engine', appUrl), { method: 'POST' })
-        if (!response.ok) {
-          const body = await response.json()
-          throw new Error(body.detail || 'AI 엔진을 다시 시작할 수 없습니다.')
-        }
-        restartRequested = true
-        app.quit()
+          // The API refuses while AI work or an update is active, including work
+          // started from a detached window.
+          const response = await fetch(new URL('/api/ai/restart-engine', appUrl), { method: 'POST' })
+          if (!response.ok) {
+            const body = await response.json()
+            throw new Error(body.detail || 'AI 엔진을 다시 시작할 수 없습니다.')
+          }
+          restartRequested = true
+          app.quit()
         } finally { restartPreparing = false }
       })
       ipcMain.handle('desktop:open-quick-memo', async () => openQuickMemo())

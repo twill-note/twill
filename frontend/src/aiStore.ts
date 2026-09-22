@@ -5,8 +5,8 @@
  * 세션마다 독립 WebSocket(/api/ai/run)으로 오케스트레이터 이벤트를 스트리밍한다.
  *
  * 동시 실행 정책 (태스크 세션):
- *  · 전역 동시 실행 상한 MAX_CONCURRENT_RUNS (기본 3) — 초과분은 대기열에서 자동 시작
- *  · 같은 스코프(cwd)를 향한 실행은 직렬화 — 파일/git 충돌 방지
+ *  · 개별 작업은 프로젝트와 실행 개수에 관계없이 즉시 시작
+ *  · 사용자가 확정한 전체 실행 배치의 선행 순서만 유지
  *  · 챗 세션은 대화형이라 대기열을 거치지 않고 즉시 시작
  */
 import { create } from 'zustand'
@@ -14,6 +14,7 @@ import { api, type AiSessionMeta, type AiSessionLastRun, type AiTaskSource, type
 import { SYSTEM_AI_TAB, useAppStore } from './store'
 import { setNoteProp } from './dbmodel'
 import { resolveTaskExecutionScope } from './taskExecutionScope'
+import { canStartTask } from './taskQueue'
 import type { NoteRow } from './types'
 
 /** 전체 실행 순서 계획 세션 → 대상 카드들 (확정 시 이 순서 정보로 runTask). 런타임 전용. */
@@ -224,7 +225,7 @@ export type AiSession = {
 
   // ── 런타임 (스트리밍) 상태 ──
   busy: boolean
-  /** 동시 실행 상한/스코프 충돌로 대기 중 (태스크 세션만). */
+  /** 사용자가 확정한 배치의 선행 작업을 대기 중 (태스크 세션만). */
   queued: boolean
   pendingReq: RunRequestParams | null
   runId: string | null
@@ -264,8 +265,6 @@ export type AiSession = {
   /** 중단 요청을 보낸 뒤 서버 확인을 기다리는 중인지. */
   cancelRequested: boolean
 }
-
-export const MAX_CONCURRENT_RUNS = 3
 
 /** 세션 완료 알림 토스트 (메인 화면 우하단). */
 export type AiToast = {
@@ -572,37 +571,17 @@ export const useAiStore = create<AiStoreState>((set, get) => {
     }
   }
 
-  const scopeKey = (s: { scopeId: string | null }) => s.scopeId || '@workspace'
-
-  /** 지금 이 태스크 세션을 시작해도 되는가 — 전역 상한 + 같은 스코프/배치 직렬화. */
-  const canStartTask = (session: AiSession): boolean => {
-    const running = get().sessions.filter((s) => s.busy)
-    if (running.length >= MAX_CONCURRENT_RUNS) return false
-    if (running.some((s) => s.kind === 'task' && scopeKey(s) === scopeKey(session))) return false
-    const batchOrder = session.batchOrder
-    if (!session.batchId || batchOrder == null) return true
-
-    // 전체 실행은 사용자가 확정한 순서를 보존한다. 새로고침 복원에서 카드가 한꺼번에
-    // queued가 되더라도, 앞선 카드가 verify/done이 되기 전에는 다음 카드를 열지 않는다.
-    return !get().sessions.some((other) => {
-      if (other.id === session.id || other.kind !== 'task' || other.batchId !== session.batchId) return false
-      if (other.batchOrder == null || other.batchOrder >= batchOrder) return false
-      return other.cardStatus !== 'verify' && other.cardStatus !== 'completed' && other.cardStatus !== 'done'
-    })
-  }
-
-  /** 실행 슬롯이 비면 대기열에서 시작 가능한 세션 하나만 시작한다.
-   *  여러 복원 폴링이 겹쳐도 같은 배치의 카드가 동시에 열리지 않도록 한 번에 하나씩 처리한다. */
+  /** 복원된 대기열에서 시작 가능한 세션을 즉시 시작한다.
+   *  openRun이 즉시 busy 상태를 설정하므로 중복 시작하지 않는다. */
   const pumpQueue = () => {
     // sessions 배열은 최신 세션이 앞에 오므로(prepend), 대기열은 "먼저 등록된 것부터"
     // 실행되도록 역순으로 순회한다 (전체 실행의 우선순위 순서 보장).
     for (const s of [...get().sessions].reverse()) {
       if (!s.queued || !s.pendingReq) continue
-      if (!canStartTask(s)) continue
+      if (!canStartTask(s, get().sessions)) continue
       const req = s.pendingReq
       patch(s.id, { queued: false, pendingReq: null })
       openRun(s.id, req)
-      return
     }
   }
 
@@ -1650,10 +1629,10 @@ export const useAiStore = create<AiStoreState>((set, get) => {
         max_time_sec: maxTimeSec,
         prompt,
       }
-      if (canStartTask(session)) {
+      if (canStartTask(session, get().sessions)) {
         openRun(meta.id, req)
       } else {
-        patch(meta.id, { queued: true, pendingReq: req, currentStatus: '대기 중 (실행 슬롯/스코프 대기)' })
+        patch(meta.id, { queued: true, pendingReq: req, currentStatus: '대기 중 (배치 선행 작업)' })
         persistTaskRuntime(meta.id, { mode: 'queued', request: req, runId: null, savedAt: Date.now() })
       }
       return meta.id

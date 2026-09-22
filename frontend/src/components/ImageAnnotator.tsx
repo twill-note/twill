@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { api } from '../api'
 import { dialog } from '../dialog'
-import { APP_UI_FONT_FAMILY } from '../fontFamilies'
+import { APP_UI_FONT_FAMILY, ensureKoreanFontLoaded } from '../fontFamilies'
 import { useBackdropDismiss } from '../useBackdropDismiss'
 
 // ─────────────────────────────────────────────────────────
@@ -44,6 +45,12 @@ export default function ImageAnnotator({ imageUrl, onSave, onClose }: Props) {
   const [textInput, setTextInput] = useState<{ x: number; y: number; value: string } | null>(null)
   const [saving, setSaving] = useState(false)
   const [zoom, setZoom] = useState<number>(1)  // 1 = 원본 픽셀 = 원본 해상도
+
+  const overlayRef = useRef<HTMLDivElement>(null)
+  const textInputRef = useRef(textInput)
+  textInputRef.current = textInput
+  const savingRef = useRef(false)
+  useEffect(() => { overlayRef.current?.focus() }, [])
 
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -99,15 +106,16 @@ export default function ImageAnnotator({ imageUrl, onSave, onClose }: Props) {
   }, [img, nw, nh, dpr, zoom, items, draft])
 
   // 마우스 좌표 → 이미지 원본 좌표
-  const getPos = (e: React.MouseEvent<HTMLCanvasElement>): { x: number; y: number } => {
+  const getPos = (e: React.PointerEvent<HTMLCanvasElement>): { x: number; y: number } => {
     const c = canvasRef.current!
     const r = c.getBoundingClientRect()
     // CSS 좌표를 이미지 원본 좌표로 역스케일
     return { x: (e.clientX - r.left) / zoom, y: (e.clientY - r.top) / zoom }
   }
 
-  const startDrag = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (textInput) return
+  const startDrag = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (textInput || !img || savingRef.current || e.button !== 0) return
+    e.currentTarget.setPointerCapture(e.pointerId)
     const { x, y } = getPos(e)
     if (tool === 'rect') setDraft({ kind: 'rect', x, y, w: 0, h: 0, color, stroke })
     else if (tool === 'arrow') setDraft({ kind: 'arrow', x1: x, y1: y, x2: x, y2: y, color, stroke })
@@ -115,7 +123,7 @@ export default function ImageAnnotator({ imageUrl, onSave, onClose }: Props) {
     else if (tool === 'text') setTextInput({ x, y, value: '' })
   }
 
-  const dragMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const dragMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!draft) return
     const { x, y } = getPos(e)
     if (draft.kind === 'rect') setDraft({ ...draft, w: x - draft.x, h: y - draft.y })
@@ -135,13 +143,15 @@ export default function ImageAnnotator({ imageUrl, onSave, onClose }: Props) {
   }
 
   const commitText = () => {
-    if (!textInput || !textInput.value.trim()) {
+    const pending = textInputRef.current
+    textInputRef.current = null
+    if (!pending || !pending.value.trim()) {
       setTextInput(null)
       return
     }
     setItems((prev) => [
       ...prev,
-      { kind: 'text', x: textInput.x, y: textInput.y, text: textInput.value, color, size: textSize },
+      { kind: 'text', x: pending.x, y: pending.y, text: pending.value, color, size: textSize },
     ])
     setTextInput(null)
   }
@@ -155,9 +165,15 @@ export default function ImageAnnotator({ imageUrl, onSave, onClose }: Props) {
 
   // 저장 — 원본 해상도로 정확히 인코딩
   const save = async () => {
-    if (!img || saving) return
+    if (!img || savingRef.current) return
+    savingRef.current = true
     setSaving(true)
+    const pending = textInputRef.current
+    const output: Annotation[] = pending?.value.trim()
+      ? [...items, { kind: 'text', x: pending.x, y: pending.y, text: pending.value, color, size: textSize }]
+      : items
     try {
+      await ensureKoreanFontLoaded()
       const off = document.createElement('canvas')
       off.width = nw
       off.height = nh
@@ -166,7 +182,7 @@ export default function ImageAnnotator({ imageUrl, onSave, onClose }: Props) {
       octx.imageSmoothingEnabled = true
       octx.imageSmoothingQuality = 'high'
       octx.drawImage(img, 0, 0, nw, nh)
-      for (const a of items) drawAnn(octx, a)
+      for (const a of output) drawAnn(octx, a)
       // PNG 무손실 저장 (JPEG 이었으면 원본 확장자도 유지하고 싶지만 우리 서버가 PNG 로 받음)
       const blob = await new Promise<Blob | null>((res) => off.toBlob((b) => res(b), 'image/png'))
       if (!blob) throw new Error('이미지 인코딩 실패')
@@ -176,6 +192,7 @@ export default function ImageAnnotator({ imageUrl, onSave, onClose }: Props) {
     } catch (e) {
       dialog.alert((e as Error).message)
     } finally {
+      savingRef.current = false
       setSaving(false)
     }
   }
@@ -197,24 +214,6 @@ export default function ImageAnnotator({ imageUrl, onSave, onClose }: Props) {
     return () => el.removeEventListener('wheel', onWheel)
   }, [])
 
-  // 키보드 단축: Esc 닫기, Cmd/Ctrl+Z 되돌리기, Cmd/Ctrl+S 저장
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-      if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
-        e.preventDefault()
-        undo()
-      }
-      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
-        e.preventDefault()
-        save()
-      }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items, img])
-
   const cursorClass = useMemo(() => {
     if (textInput) return 'cursor-text'
     if (tool === 'text') return 'cursor-text'
@@ -223,8 +222,16 @@ export default function ImageAnnotator({ imageUrl, onSave, onClose }: Props) {
 
   const dirty = items.length > 0
 
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60" onClick={dismissFromBackdrop}>
+  return createPortal(
+    <div ref={overlayRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="이미지 편집"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 outline-none" onClick={dismissFromBackdrop}
+      onKeyDown={(e) => {
+        e.stopPropagation()
+        if (e.nativeEvent.isComposing) return
+        if (e.key === 'Escape') { e.preventDefault(); if (textInputRef.current) { textInputRef.current = null; setTextInput(null) } else onClose() }
+        if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') { e.preventDefault(); void save() }
+        if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z' && !(e.target instanceof HTMLInputElement)) { e.preventDefault(); undo() }
+      }}>
       <div
         className="flex h-[92vh] w-[1200px] max-w-[96vw] flex-col overflow-hidden rounded-xl border border-[#e3e2e0] bg-white shadow-2xl"
         onClick={(e) => e.stopPropagation()}
@@ -232,7 +239,7 @@ export default function ImageAnnotator({ imageUrl, onSave, onClose }: Props) {
         {/* 헤더 */}
         <div className="flex items-center gap-3 border-b border-[#efefed] px-5 py-3">
           <span className="text-[20px]">✏️</span>
-          <div className="flex-1">
+          <div className="min-w-0 flex-1">
             <h3 className="text-[15px] font-semibold text-[#37352f]">이미지 편집</h3>
             <p className="mt-0.5 text-[11px] text-[#9b9a97]">
               {img
@@ -275,7 +282,7 @@ export default function ImageAnnotator({ imageUrl, onSave, onClose }: Props) {
                         ? 'border-blue-400 bg-blue-50 text-[#37352f]'
                         : 'border-[#e3e2e0] text-[#5f5e5b] hover:bg-[#f1f1ef]'
                     }`}
-                    onClick={() => setTool(t.id)}
+                    onClick={() => { commitText(); setTool(t.id) }}
                     title={t.desc}
                   >
                     <span className="text-[18px]">{t.icon}</span>
@@ -312,7 +319,7 @@ export default function ImageAnnotator({ imageUrl, onSave, onClose }: Props) {
                     max={128}
                     value={textSize}
                     onChange={(e) => setTextSize(Number(e.target.value))}
-                    className="flex-1"
+                    className="min-w-0 flex-1"
                   />
                   <span className="w-10 text-right text-[11px] text-[#5f5e5b]">{textSize}px</span>
                 </div>
@@ -327,7 +334,7 @@ export default function ImageAnnotator({ imageUrl, onSave, onClose }: Props) {
                     max={32}
                     value={stroke}
                     onChange={(e) => setStroke(Number(e.target.value))}
-                    className="flex-1"
+                    className="min-w-0 flex-1"
                   />
                   <span className="w-8 text-right text-[11px] text-[#5f5e5b]">{stroke}</span>
                 </div>
@@ -413,11 +420,11 @@ export default function ImageAnnotator({ imageUrl, onSave, onClose }: Props) {
               >
                 <canvas
                   ref={canvasRef}
-                  className={`block ${cursorClass}`}
-                  onMouseDown={startDrag}
-                  onMouseMove={dragMove}
-                  onMouseUp={endDrag}
-                  onMouseLeave={endDrag}
+                  className={`block touch-none ${cursorClass}`}
+                  onPointerDown={startDrag}
+                  onPointerMove={dragMove}
+                  onPointerUp={endDrag}
+                  onPointerCancel={() => setDraft(null)}
                 />
                 {textInput && (
                   <input
@@ -433,14 +440,20 @@ export default function ImageAnnotator({ imageUrl, onSave, onClose }: Props) {
                       minWidth: 60,
                     }}
                     value={textInput.value}
-                    onChange={(e) => setTextInput({ ...textInput, value: e.target.value })}
+                    onChange={(e) => {
+                      const next = { ...textInput, value: e.currentTarget.value }
+                      textInputRef.current = next
+                      setTextInput(next)
+                    }}
                     onBlur={commitText}
                     onKeyDown={(e) => {
+                      if (e.nativeEvent.isComposing) return
                       if (e.key === 'Enter') {
+                        e.stopPropagation()
                         e.preventDefault()
                         commitText()
                       }
-                      if (e.key === 'Escape') setTextInput(null)
+                      if (e.key === 'Escape') { e.stopPropagation(); textInputRef.current = null; setTextInput(null) }
                     }}
                   />
                 )}
@@ -461,7 +474,7 @@ export default function ImageAnnotator({ imageUrl, onSave, onClose }: Props) {
           <span>원본 해상도 무손실 저장</span>
         </div>
       </div>
-    </div>
+    </div>, document.body
   )
 }
 
@@ -495,7 +508,7 @@ function drawAnn(ctx: CanvasRenderingContext2D, a: Annotation) {
     ctx.closePath()
     ctx.fill()
   } else if (a.kind === 'pen') {
-    if (a.points.length < 2) return
+    if (a.points.length < 2) { ctx.restore(); return }
     ctx.strokeStyle = a.color
     ctx.lineWidth = a.stroke
     ctx.lineCap = 'round'

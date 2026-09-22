@@ -29,6 +29,12 @@ async function getMermaid(theme: 'default' | 'dark') {
   return mermaid
 }
 
+export async function renderMermaidForExport(source: string, id: string): Promise<string> {
+  const mermaid = await getMermaid('default')
+  await ensureKoreanFontLoaded()
+  return (await mermaid.render(id, source)).svg
+}
+
 /** Mermaid 소스를 SVG로 렌더링하는 공용 미리보기. 노트 블록과 채팅이 같은 보안·렌더링
  * 설정을 사용하도록 한 곳에 둔다. */
 export function MermaidPreview({ source, className = '' }: { source: string; className?: string }) {
@@ -74,6 +80,7 @@ export function MermaidPreview({ source, className = '' }: { source: string; cla
   if (svg) {
     return (
       <div
+        data-mermaid-source={source}
         className={`mermaid-preview flex justify-center overflow-auto px-3 py-3 ${className}`}
         // Mermaid는 strict 보안 수준으로 초기화되며, 외부 HTML은 렌더링하지 않는다.
         // eslint-disable-next-line react/no-danger
@@ -81,8 +88,8 @@ export function MermaidPreview({ source, className = '' }: { source: string; cla
       />
     )
   }
-  if (err) return <pre className="whitespace-pre-wrap px-3 py-2 text-[11px] text-red-600">에러: {err}</pre>
-  return <p className="px-3 py-4 text-center text-[12px] text-[#9b9a97]">다이어그램을 준비하는 중…</p>
+  if (err) return <pre data-mermaid-source={source} className="whitespace-pre-wrap px-3 py-2 text-[11px] text-red-600">에러: {err}</pre>
+  return <p data-mermaid-source={source} className="px-3 py-4 text-center text-[12px] text-[#9b9a97]">다이어그램을 준비하는 중…</p>
 }
 
 /** 문서 블록과 채팅 카드에서 공유하는 Mermaid 확대 버튼. */

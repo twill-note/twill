@@ -1436,6 +1436,18 @@ if (!hasSingleInstanceLock) {
         if (!window || window.isDestroyed() || typeof color !== 'string' || !/^#[0-9a-f]{6}$/i.test(color)) return
         window.setBackgroundColor(color)
       })
+      ipcMain.handle('desktop:export-pdf', async (event, title) => {
+        const window = BrowserWindow.fromWebContents(event.sender)
+        if (!window || window.isDestroyed() || new URL(event.senderFrame.url).origin !== new URL(appUrl).origin) {
+          throw new Error('앱 창에서만 PDF를 내보낼 수 있습니다.')
+        }
+        const name = (typeof title === 'string' ? title : '문서').replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').slice(0, 120) || '문서'
+        const result = await dialog.showSaveDialog(window, { title: 'PDF로 내보내기', defaultPath: `${name}.pdf`, filters: [{ name: 'PDF', extensions: ['pdf'] }] })
+        if (result.canceled || !result.filePath) return { canceled: true }
+        const pdf = await event.sender.printToPDF({ printBackground: true, preferCSSPageSize: true, pageSize: 'A4', margins: { top: 0, bottom: 0, left: 0, right: 0 } })
+        await fs.promises.writeFile(result.filePath, pdf)
+        return { canceled: false, path: result.filePath }
+      })
       ipcMain.handle('desktop:restart', async (event) => {
         const window = BrowserWindow.fromWebContents(event.sender)
         if (!window || window.isDestroyed() || new URL(event.senderFrame.url).origin !== new URL(appUrl).origin) {

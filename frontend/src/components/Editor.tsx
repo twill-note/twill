@@ -1,4 +1,5 @@
 import { registerRestartGuard } from '../restartGuards'
+import { exportDocumentPdf } from '../exportPdf'
 import { markdownWithoutSnapshot, preserveBlocks, restoreBlocks } from '../blockPersistence'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import '@blocknote/core/fonts/inter.css'
@@ -719,6 +720,7 @@ function NoteEditor({
   }
 
   // 브라우저 맞춤법 검사(오탈자 빨간 줄) 켜기/끄기 — 컨테이너 속성으로 상속시킴
+  const [exportingPdf, setExportingPdf] = useState(false)
   const [spellcheck, setSpellcheck] = useState(() => readSpellcheckEnabled(localStorage.getItem('spellcheck')))
   const toggleSpellcheck = () => {
     setSpellcheck((prev) => {
@@ -1035,6 +1037,16 @@ function NoteEditor({
         </button>
         <span className="flex-1 truncate text-[12px] text-[#9b9a97]">{content.path}</span>
         <SaveIndicator status={saveStatus} />
+        <button type="button" disabled={exportingPdf} title="PDF로 내보내기"
+          className="shrink-0 rounded px-1.5 py-0.5 text-[12px] text-[#9b9a97] hover:bg-[#f1f1ef] disabled:opacity-50"
+          onClick={async () => {
+            const element = editorWrapRef.current?.querySelector<HTMLElement>('.bn-editor')
+            if (!element) return
+            setExportingPdf(true)
+            try { await exportDocumentPdf(element, fm.title || content.path.split('/').pop() || '문서') }
+            catch (error) { await dialog.alert('PDF 내보내기 실패', { detail: (error as Error).message }) }
+            finally { setExportingPdf(false) }
+          }}>{exportingPdf ? 'PDF 생성 중…' : 'PDF ↓'}</button>
         <button
           type="button"
           className="rounded px-1.5 py-0.5 text-[13px] text-[#9b9a97] hover:bg-[#f1f1ef] hover:text-[#37352f] disabled:cursor-not-allowed disabled:text-[#d3d1cb]"

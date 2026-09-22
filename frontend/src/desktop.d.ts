@@ -18,6 +18,7 @@ declare global {
       versions: Readonly<{ chrome: string; electron: string }>
       restart: () => Promise<void>
       onPrepareRestart: (callback: () => Promise<void>) => () => void
+      exportPdf: (title: string) => Promise<{ canceled: boolean; path?: string }>
       openQuickMemo: () => Promise<void>
       openByeoriWindow: (point?: { x: number; y: number }) => Promise<boolean>
       focusByeoriWindow: () => Promise<boolean>

@@ -6,7 +6,7 @@ import { locales as multiColumnLocales } from '@blocknote/xl-multi-column'
 import { api } from '../api'
 import { isDarkTheme, useThemeStore } from '../theme'
 import type { FileContent } from '../types'
-import { fromMarkdownBlocks, schema, toMarkdownBlocks } from './Editor'
+import { fromMarkdownBlocks, ImageAnnotateButton, schema, toMarkdownBlocks } from './Editor'
 
 /**
  * 노트 "본문만" 편집하는 경량 BlockNote 에디터 — 태스크 카드 팝업의 설명 영역 등에 임베드.
@@ -32,6 +32,7 @@ export default function NoteBodyEditor({
   const [status, setStatus] = useState<NoteBodySaveStatus>('idle')
   const appTheme = useThemeStore((s) => s.theme)
   const loadedRef = useRef(false)
+  const wrapperRef = useRef<HTMLDivElement>(null)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const editor = useCreateBlockNote({
@@ -95,8 +96,9 @@ export default function NoteBodyEditor({
   )
 
   return (
-    <div className="note-body-editor" spellCheck={spellCheck}>
+    <div ref={wrapperRef} className="note-body-editor relative" spellCheck={spellCheck}>
       <BlockNoteView editor={editor} theme={isDarkTheme(appTheme) ? 'dark' : 'light'} onChange={scheduleSave} />
+      <ImageAnnotateButton wrapperRef={wrapperRef} editor={editor} />
     </div>
   )
 }

@@ -1367,7 +1367,7 @@ function CodeCopyButton({ wrapperRef }: { wrapperRef: React.RefObject<HTMLDivEle
 
 /** 이미지 블록에 호버 시 우상단에 "주석" 버튼 노출 → 캔버스 편집기 오픈 */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function ImageAnnotateButton({ wrapperRef, editor }: { wrapperRef: React.RefObject<HTMLDivElement | null>; editor: any }) {
+export function ImageAnnotateButton({ wrapperRef, editor }: { wrapperRef: React.RefObject<HTMLDivElement | null>; editor: any }) {
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
   const [target, setTarget] = useState<{ blockId: string; url: string } | null>(null)
   const [modal, setModal] = useState<{ url: string; blockId: string } | null>(null)

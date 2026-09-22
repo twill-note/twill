@@ -126,6 +126,24 @@ class TaskSessionSourceTests(unittest.TestCase):
         self.assertEqual("ERD 디자이너 버그 수정 (이름 변경)", deleted["source_task_status"]["title"])
         self.assertEqual(original["card_id"], deleted["source_task"]["card_id"])
 
+    def test_chat_title_updates_card_and_other_conversations(self):
+        first = ai_router.create_session(ai_router.CreateSessionReq(kind="chat", source_task_path=self.path))
+        second = ai_router.create_session(ai_router.CreateSessionReq(kind="task", task_path=self.path))
+        with patch("app.indexer.index_file"):
+            sessions.update_session(first["id"], title="새 AI 제목", title_mode="generated")
+        self.assertEqual("새 AI 제목", frontmatter.load(self.card)["title"])
+        self.assertEqual("새 AI 제목", sessions.get_session(second["id"])["title"])
+        self.assertEqual("ERD 디자이너 버그 수정", sessions.get_session(first["id"])["source_task"]["title"])
+
+    def test_card_title_updates_chat_without_changing_execution_context(self):
+        created = ai_router.create_session(ai_router.CreateSessionReq(kind="chat", source_task_path=self.path))
+        post = frontmatter.load(self.card)
+        post["title"] = "카드에서 변경"
+        self.card.write_text(frontmatter.dumps(post), encoding="utf-8")
+        restored = self._session(created["id"])
+        self.assertEqual("카드에서 변경", restored["title"])
+        self.assertEqual(created["scope_id"], restored["scope_id"])
+
     def test_legacy_or_general_session_has_no_source_banner_metadata(self):
         legacy = sessions.create_session(kind="chat", title="기존 일반 대화")
 

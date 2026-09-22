@@ -498,6 +498,10 @@ def _with_task_source_runtime(
             # 카드가 유효한 프로젝트를 잃은 것도 기존 세션과 안전하게 이어갈 수 없는 상태다.
             runtime["scope_mismatch"] = True
             runtime["scope_error"] = str(exc)
+    if runtime.get("state") == "available" and session.get("title") != runtime["title"]:
+        session["title"] = runtime["title"]
+        result["title"] = runtime["title"]
+        changed = True
     result["source_task_status"] = runtime
     return result, changed
 
@@ -625,6 +629,21 @@ def update_session(session_id: str, **fields: Any) -> dict | None:
                 if fields.get(legacy_key, object()) is None:
                     s.pop(legacy_key, None)
                     fields.pop(legacy_key, None)
+            if "title" in fields and isinstance(s.get("source_task"), dict):
+                source = s["source_task"]
+                found = _find_source_card(source["card_id"], [source.get("last_path", ""), source["path"]])
+                if found:
+                    path, post = found
+                    post["title"] = fields["title"]
+                    path.write_text(frontmatter.dumps(post) + "\n", encoding="utf-8")
+                    from .. import indexer
+                    indexer.index_file(path.relative_to(config.notes_dir().resolve()).as_posix())
+                    # All conversations for this card share its current title; the origin snapshot stays immutable.
+                    for linked in data["sessions"]:
+                        if (linked.get("source_task") or {}).get("card_id") == source["card_id"]:
+                            linked["title"] = fields["title"]
+                            linked["title_mode"] = fields.get("title_mode", "manual")
+                            linked["source_task"]["last_title"] = fields["title"]
             s.update(fields)
             s["updated_at"] = time.time()
             _save(data)

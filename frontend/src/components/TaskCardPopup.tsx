@@ -269,10 +269,10 @@ export default function TaskCardPopup({ row, config, onClose, onCellChange, onRo
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-3">
           <div className="mb-1.5 flex items-center justify-between gap-2">
             <span className="text-[10px] uppercase tracking-wide text-[#9b9a97]">설명</span>
-            <div className="flex items-center gap-2">
+            <div className="flex shrink-0 items-center gap-3">
               {bodySaveStatus !== 'idle' && (
                 <span
-                  className={`text-[10px] ${
+                  className={`whitespace-nowrap text-[10px] ${
                     bodySaveStatus === 'error'
                       ? 'text-red-500'
                       : bodySaveStatus === 'saved'

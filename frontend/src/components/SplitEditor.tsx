@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { activeTabId, type DocTab, useAppStore } from '../store'
+import { activeTabId, AI_DOCUMENT_TAB, SYSTEM_AI_TAB, type DocTab, useAppStore } from '../store'
+import { AiPanelHost } from './AiPlacement'
 import { dialog } from '../dialog'
 import Editor from './Editor'
 import ErdWorkspace from '../plugins/erd-designer/Workspace'
@@ -171,7 +172,7 @@ export default function SplitEditor() {
   const [layout, setLayout] = useState<SplitLayout>(loadLayout)
 
   // DB·캘린더 같은 전체 화면 뷰와 달리 ERD는 노트와 동일하게 분할 패널 안의 문서 탭이다.
-  const documentTabs = useMemo(() => openTabs.filter((tab) => tab.kind === 'file' || tab.kind === 'erd'), [openTabs])
+  const documentTabs = useMemo(() => openTabs.filter((tab) => tab.kind === 'file' || tab.kind === 'erd' || tab.kind === 'ai'), [openTabs])
   const tabsById = useMemo(() => new Map(documentTabs.map((tab) => [tab.id, tab])), [documentTabs])
   const openDocumentTabIds = useMemo(() => new Set(documentTabs.map((tab) => tab.id)), [documentTabs])
   const selectedTabId = activeTabId({ view, currentPath, dbDir, erdTabId })
@@ -179,6 +180,7 @@ export default function SplitEditor() {
   const openDocument = useCallback((tab: DocTab) => {
     if (tab.kind === 'file') openFile(tab.target)
     else if (tab.kind === 'erd') activateErdTab(tab.id)
+    else if (tab.kind === 'ai') useAppStore.getState().moveAi('editor')
   }, [activateErdTab, openFile])
 
   // 파일 트리에서 노트 또는 ERD를 열면, 마지막으로 포커스한 패널에 그 탭을 배치한다.
@@ -231,7 +233,7 @@ export default function SplitEditor() {
   /** 상단 탭을 패널에 놓는다. 가운데는 이동/재정렬, 가장자리는 새 분할 패널을 만든다. */
   const dropTab = useCallback(
     (tabId: string, sourcePanelId: string, targetPanelId: string, zone: DropZone, beforeTabId: string | null = null) => {
-      const tab = tabsById.get(tabId)
+      const tab = tabsById.get(tabId) ?? (tabId === SYSTEM_AI_TAB ? AI_DOCUMENT_TAB : undefined)
       const target = findPanel(layout.root, targetPanelId)
       if (!tab || !target || (isSplitZone(zone) && leafPanels(layout.root).length >= 4)) return
 
@@ -692,8 +694,9 @@ function EditorPane({
         const sourcePanelId = event.dataTransfer.getData('text/doc-tab-source')
         const zone = resolveDropZone(event)
         setDropZone(null)
-        if (!tabsById.has(tabId) || !sourcePanelId) return
+        if ((!tabsById.has(tabId) && tabId !== SYSTEM_AI_TAB) || !sourcePanelId) return
         event.preventDefault()
+        event.stopPropagation()
         onDropTab(tabId, sourcePanelId, panel.id, zone)
       }}
     >
@@ -725,7 +728,7 @@ function EditorPane({
               const sourcePanelId = event.dataTransfer.getData('text/doc-tab-source')
               setDropZone(null)
               setTabDropTarget(null)
-              if (!tabsById.has(tabId) || !sourcePanelId) return
+              if ((!tabsById.has(tabId) && tabId !== SYSTEM_AI_TAB) || !sourcePanelId) return
               event.preventDefault()
               event.stopPropagation()
               // 탭 사이의 빈 공간으로 놓으면 이 패널의 마지막 탭 뒤에 둔다.
@@ -744,6 +747,7 @@ function EditorPane({
                   onDragStart={(event) => {
                     event.dataTransfer.setData('text/doc-tab', tab.id)
                     event.dataTransfer.setData('text/doc-tab-source', panel.id)
+                    if (tab.kind === 'ai') event.dataTransfer.setData('application/x-twill-ai', '1')
                     event.dataTransfer.effectAllowed = 'move'
                   }}
                   onDragOver={(event) => {
@@ -766,7 +770,7 @@ function EditorPane({
                     const { beforeTabId } = getDropBeforeTabId(event, tab)
                     setDropZone(null)
                     setTabDropTarget(null)
-                    if (!tabsById.has(tabId) || !sourcePanelId) return
+                    if ((!tabsById.has(tabId) && tabId !== SYSTEM_AI_TAB) || !sourcePanelId) return
                     event.preventDefault()
                     event.stopPropagation()
                     onDropTab(tabId, sourcePanelId, panel.id, 'center', beforeTabId)
@@ -901,8 +905,11 @@ function EditorPane({
         )}
       </div>
       <div className="min-h-0 min-w-0 flex-1" onMouseDown={() => onFocusPanel(panel.id)}>
+        {tabs.some((tab) => tab.kind === 'ai') && (
+          <div className={activeTab?.kind === 'ai' ? 'h-full' : 'hidden'}><AiPanelHost onFocus={() => onFocusPanel(panel.id)} /></div>
+        )}
         {activeTab ? (
-          activeTab.kind === 'erd' ? <ErdWorkspace tab={activeTab} /> : <Editor path={activeTab.target} />
+          activeTab.kind === 'ai' ? null : activeTab.kind === 'erd' ? <ErdWorkspace tab={activeTab} /> : <Editor path={activeTab.target} />
         ) : (
           <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center text-[#9b9a97]">
             <span className="text-2xl">▧</span>
@@ -931,7 +938,7 @@ function EditorPane({
               top: Math.min(tabMenu.y, window.innerHeight - 160),
             }}
           >
-            <button
+            {tabMenu.tab.kind !== 'ai' && <button
               className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[12px] text-[#37352f] hover:bg-[#f1f1ef]"
               onClick={() => {
                 togglePinnedNote(tabMenu.tab.target)
@@ -940,7 +947,7 @@ function EditorPane({
             >
               <span>📌</span>
               {pinnedNotes.includes(tabMenu.tab.target) ? '상단바 고정 해제' : '상단바에 고정'}
-            </button>
+            </button>}
             <button
               className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[12px] text-[#5f5e5b] hover:bg-[#f1f1ef]"
               onClick={() => {

@@ -4,7 +4,11 @@ import { useAiStore } from '../aiStore'
 import { usePluginRegistry } from '../plugins/registry'
 import { SYSTEM_AI_TAB, SYSTEM_TERMINAL_TAB, useAppStore } from '../store'
 import { isRepeatedClick } from '../useBackdropDismiss'
-function AiDockHost() { return <div id="ai-dock-host" className="h-full" /> }
+import { AiPanelHost } from './AiPlacement'
+function AiDockHost() {
+  const location = useAppStore((s) => s.aiLocation)
+  return location === 'right' ? <AiPanelHost /> : null
+}
 import TerminalPanel from './TerminalPanel'
 
 const MIN_WIDTH = 320
@@ -68,6 +72,7 @@ export default function RightDock() {
   const aiQueuedCount = useAiStore((state) => state.sessions.filter((session) => session.queued).length)
   const [width, setWidth] = useState(480)
   const [detachError, setDetachError] = useState<string | null>(null)
+  const [aiDropOver, setAiDropOver] = useState(false)
   // 닫았다 다시 열어도 터미널 세션 등 이미 사용한 도구의 컴포넌트는 유지한다.
   const [activated, setActivated] = useState<Set<string>>(() => new Set([SYSTEM_AI_TAB, SYSTEM_TERMINAL_TAB]))
 
@@ -113,7 +118,14 @@ export default function RightDock() {
     }
   }, [setByeoriDetached, setRightDockOpen])
 
-  const finishByeoriDrag = (event: React.DragEvent<HTMLButtonElement>) => {
+  const startByeoriDrag = (event: React.DragEvent) => {
+    event.dataTransfer.effectAllowed = 'move'
+    event.dataTransfer.setData('text/doc-tab', SYSTEM_AI_TAB)
+    event.dataTransfer.setData('text/doc-tab-source', 'right-dock')
+    event.dataTransfer.setData('application/x-twill-ai', '1')
+  }
+
+  const finishByeoriDrag = (event: React.DragEvent) => {
     const outside = event.clientX <= 0 || event.clientY <= 0 ||
       event.clientX >= window.innerWidth || event.clientY >= window.innerHeight
     if (!outside) return
@@ -136,10 +148,22 @@ export default function RightDock() {
   }
 
   return (
-    <div className="flex h-full shrink-0"
-      onDragOver={(event) => { if (event.dataTransfer.types.includes('application/x-note-right-tab')) event.preventDefault() }}
-      onDrop={(event) => { if (event.dataTransfer.getData('application/x-note-right-tab') === SYSTEM_AI_TAB) { event.preventDefault(); useAppStore.getState().moveAi('right') } }}
+    <div className={`relative flex h-full shrink-0 ${aiDropOver ? 'ring-2 ring-inset ring-[#4a9eff]' : ''}`}
+      onDragOver={(event) => {
+        if (!event.dataTransfer.types.includes('application/x-twill-ai')) return
+        event.preventDefault()
+        event.dataTransfer.dropEffect = 'move'
+        setAiDropOver(true)
+      }}
+      onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setAiDropOver(false) }}
+      onDrop={(event) => {
+        setAiDropOver(false)
+        if (event.dataTransfer.getData('text/doc-tab') !== SYSTEM_AI_TAB) return
+        event.preventDefault()
+        useAppStore.getState().moveAi('right')
+      }}
     >
+      {aiDropOver && <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center bg-[#4a9eff]/10"><span className="rounded bg-white px-2 py-1 text-[11px] text-[#2f6fd0] shadow">여기에 AI 배치</span></div>}
       <aside
         id="right-tool-panel"
         className={`relative h-full shrink-0 flex-col border-l border-[#e9e9e7] bg-white ${rightDockOpen ? 'flex' : 'hidden'}`}
@@ -152,7 +176,11 @@ export default function RightDock() {
           title="패널 너비 조절"
         />
         <div className="flex h-9 shrink-0 items-center border-b border-[#e9e9e7] bg-[#f7f7f5] px-2.5">
-          <div className="flex min-w-0 flex-1 items-center gap-2 text-[12px] font-medium text-[#37352f]">
+          <div className={`flex min-w-0 flex-1 items-center gap-2 text-[12px] font-medium text-[#37352f] ${activeTool.id === SYSTEM_AI_TAB ? 'cursor-grab' : ''}`}
+            draggable={activeTool.id === SYSTEM_AI_TAB && !byeoriDetached}
+            onDragStart={startByeoriDrag}
+            onDragEnd={finishByeoriDrag}
+            title={activeTool.id === SYSTEM_AI_TAB ? '드래그하여 문서와 함께 배치' : undefined}>
             <ToolIcon tab={activeTool} compact />
             <span className="truncate">{activeTool.title}</span>
             {activeTool.id === SYSTEM_AI_TAB && aiBusyCount > 0 && (
@@ -247,8 +275,7 @@ export default function RightDock() {
                   event.preventDefault()
                   return
                 }
-                event.dataTransfer.effectAllowed = 'move'
-                event.dataTransfer.setData('application/x-note-right-tab', tab.id)
+                startByeoriDrag(event)
               }}
               onDragEnd={(event) => {
                 if (tab.id === SYSTEM_AI_TAB && !byeoriDetached) finishByeoriDrag(event)

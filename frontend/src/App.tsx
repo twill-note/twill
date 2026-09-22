@@ -16,12 +16,12 @@ import TabBar from './components/TabBar'
 import TodoView from './components/TodoView'
 import { initPlugins } from './plugins/manager'
 import { dbApi } from './dbschema'
-import { actionForEvent, displayCombo, type ShortcutAction, useShortcutStore } from './shortcuts'
+import { actionForEvent, type ShortcutAction } from './shortcuts'
 import { useAiStore } from './aiStore'
 import { SYSTEM_AI_TAB, SYSTEM_TERMINAL_TAB, useAppStore } from './store'
 
 export default function App() {
-  const { view, currentPath, refreshTree, setPaletteOpen, openToday, openRightTab, refreshPlugins } = useAppStore()
+  const { view, refreshTree, setPaletteOpen, openToday, openRightTab, refreshPlugins } = useAppStore()
 
   useEffect(() => {
     refreshTree().catch(() => {
@@ -201,13 +201,12 @@ export default function App() {
       <CodexUpdateNotice />
       <div className="flex min-h-0 flex-1">
         <Sidebar />
-        <main className="flex min-w-0 flex-1 flex-col"
-          onDragOver={(event) => { if (event.dataTransfer.types.includes('application/x-note-right-tab')) event.preventDefault() }}
-          onDrop={(event) => { if (event.dataTransfer.getData('application/x-note-right-tab') === SYSTEM_AI_TAB) { event.preventDefault(); useAppStore.getState().moveAi('editor') } }}
-        >
+        <main className="flex min-w-0 flex-1 flex-col">
           <TabBar />
-          <div id="ai-editor-host" className={view === 'ai' ? 'min-h-0 flex-1' : 'hidden'} />
-          <div className={view === 'ai' ? 'hidden' : 'min-h-0 flex-1 overflow-auto'}>
+          <div className={view === 'editor' || view === 'erd' || view === 'ai' ? 'min-h-0 flex-1' : 'hidden'}>
+            <SplitEditor />
+          </div>
+          <div className={view === 'editor' || view === 'erd' || view === 'ai' ? 'hidden' : 'min-h-0 flex-1 overflow-auto'}>
             {view === 'plugin' ? (
               <MissingPluginView />
             ) : view === 'calendar' ? (
@@ -218,11 +217,7 @@ export default function App() {
               <SkillBookView />
             ) : view === 'database' ? (
               <DatabaseView />
-            ) : currentPath || view === 'erd' ? (
-              <SplitEditor />
-            ) : (
-              <EmptyState />
-            )}
+            ) : null}
           </div>
         </main>
         <RightDock />
@@ -232,19 +227,6 @@ export default function App() {
       <DialogHost />
       <AiToasts />
       <DesktopTooltip />
-    </div>
-  )
-}
-
-function EmptyState() {
-  const searchShortcut = useShortcutStore((state) => state.bindings.search)
-  return (
-    <div className="flex h-full flex-col items-center justify-center gap-2 text-[#9b9a97]">
-      <span className="text-4xl">📝</span>
-      <p className="text-[14px]">왼쪽에서 노트를 선택하거나, 우클릭으로 새 노트를 만드세요</p>
-      <p className="text-[12px]">
-        <kbd className="rounded bg-[#f1f1ef] px-1.5 py-0.5">{displayCombo(searchShortcut)}</kbd> 로 검색할 수 있습니다
-      </p>
     </div>
   )
 }

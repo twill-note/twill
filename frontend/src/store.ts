@@ -11,7 +11,7 @@ export const SYSTEM_AI_TAB = 'system:ai'
 export type DocTab = {
   /** 유니크 id — kind:target 형태 (file:foo.md, db:tasks, view:calendar) */
   id: string
-  kind: 'file' | 'erd' | 'db' | 'view'
+  kind: 'file' | 'erd' | 'db' | 'view' | 'ai'
   /** 파일 경로, DB 폴더 경로, 또는 뷰 이름 */
   target: string
   title: string
@@ -21,6 +21,8 @@ export type DocTab = {
   /** 새 ERD의 초기 저장 제안 폴더. */
   erdDirectory?: string | null
 }
+
+export const AI_DOCUMENT_TAB: DocTab = { id: SYSTEM_AI_TAB, kind: 'ai', target: 'ai', title: 'Twill AI', icon: '✦' }
 
 interface AppState {
   tree: TreeNode[]
@@ -139,8 +141,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     localStorage.setItem('ai-location', aiLocation)
     const state = get()
     set({ aiLocation, ...(aiLocation === 'editor'
-      ? { view: 'ai' as const, ...(state.activeRightTab === SYSTEM_AI_TAB ? { rightDockOpen: false } : {}) }
-      : { rightDockOpen: true, activeRightTab: SYSTEM_AI_TAB, ...(state.view === 'ai' ? { view: 'editor' as const } : {}) }) })
+      ? { openTabs: upsertTab(state.openTabs, AI_DOCUMENT_TAB), view: 'ai' as const, ...(state.activeRightTab === SYSTEM_AI_TAB ? { rightDockOpen: false } : {}) }
+      : { openTabs: state.openTabs.filter((tab) => tab.id !== SYSTEM_AI_TAB), rightDockOpen: true, activeRightTab: SYSTEM_AI_TAB, ...(state.view === 'ai' ? { view: 'editor' as const } : {}) }) })
   },
   dbDir: null,
   dbRowFilter: null,
@@ -291,7 +293,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       return
     }
     if (id === SYSTEM_AI_TAB && get().aiLocation === 'editor') {
-      set({ view: 'ai' })
+      get().moveAi('editor')
       return
     }
     set({ rightDockOpen: true, activeRightTab: id })
@@ -405,6 +407,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const back = boardReturnState
     boardReturnState = null
     if (back && !isToggleViewState(back.view, back.dbDir)) {
+      if (back.view === 'ai') return get().moveAi('editor')
       if (back.view === 'editor' && back.currentPath) return get().openFile(back.currentPath)
       if (back.view === 'database' && back.dbDir != null) return get().openDatabase(back.dbDir)
       if (back.view === 'calendar' || back.view === 'todos' || back.view === 'skillbook') return get().setView(back.view)
@@ -440,6 +443,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         set({ openTabs })
         // 뷰 상태를 next 로 전환
         if (next.kind === 'file') set({ currentPath: next.target, view: 'editor' })
+        else if (next.kind === 'ai') set({ view: 'ai' })
         else if (next.kind === 'erd') {
           set({ openTabs })
           get().activateErdTab(next.id)
@@ -508,6 +512,7 @@ function erdTitle(path: string | null): string {
 
 /** 현재 뷰 상태로부터 활성 탭 id 계산. */
 function currentActiveTabId(s: AppState): string | null {
+  if (s.view === 'ai') return SYSTEM_AI_TAB
   if (s.view === 'editor' && s.currentPath) return `file:${s.currentPath}`
   if (s.view === 'database') return `db:${s.dbDir ?? ''}`
   if (s.view === 'erd') return s.erdTabId
@@ -517,6 +522,7 @@ function currentActiveTabId(s: AppState): string | null {
 
 /** 외부에서 활성 탭 id 를 얻기 위한 헬퍼. */
 export function activeTabId(s: Pick<AppState, 'view' | 'currentPath' | 'dbDir' | 'erdTabId'>): string | null {
+  if (s.view === 'ai') return SYSTEM_AI_TAB
   if (s.view === 'editor' && s.currentPath) return `file:${s.currentPath}`
   if (s.view === 'database') return `db:${s.dbDir ?? ''}`
   if (s.view === 'erd') return s.erdTabId

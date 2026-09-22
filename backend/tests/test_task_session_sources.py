@@ -144,6 +144,19 @@ class TaskSessionSourceTests(unittest.TestCase):
         self.assertEqual("카드에서 변경", restored["title"])
         self.assertEqual(created["scope_id"], restored["scope_id"])
 
+    def test_single_created_card_shares_the_chat_title_in_both_directions(self):
+        chat = sessions.create_session(kind="chat", scope_id="erd-project")
+        new_card = self.tasks / "new.md"
+        previous = _task_card_paths("tasks")
+        new_card.write_text(frontmatter.dumps(frontmatter.Post("본문", title="AI가 만든 이름", scope="erd-project")), encoding="utf-8")
+        with patch("app.ai.orchestrator.indexer.index_file"):
+            _link_new_task_cards_to_session("tasks", previous, chat["id"])
+            linked = sessions.get_session(chat["id"])
+            self.assertEqual("AI가 만든 이름", linked["title"])
+            self.assertEqual("tasks/new.md", linked["source_task"]["path"])
+            sessions.update_session(chat["id"], title="대화에서 수정", title_mode="manual")
+        self.assertEqual("대화에서 수정", frontmatter.load(new_card)["title"])
+
     def test_legacy_or_general_session_has_no_source_banner_metadata(self):
         legacy = sessions.create_session(kind="chat", title="기존 일반 대화")
 

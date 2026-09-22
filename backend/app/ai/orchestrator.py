@@ -522,7 +522,8 @@ def _link_new_task_cards_to_session(
     """
     root = config.notes_dir().resolve()
     linked: list[str] = []
-    for rel in sorted(_task_card_paths(board_dir) - previous_paths):
+    new_paths = sorted(_task_card_paths(board_dir) - previous_paths)
+    for rel in new_paths:
         path = root / rel
         try:
             post = frontmatter.load(path)
@@ -537,6 +538,13 @@ def _link_new_task_cards_to_session(
             linked.append(rel)
         except Exception:  # noqa: BLE001
             log.info("new task session link skipped: %s", rel)
+    # A one-card conversation has one shared name. Multi-card planning chats retain
+    # independent card titles instead of renaming every card to the same name.
+    session = ai_sessions.get_session(session_id)
+    if len(new_paths) == 1 and session and not session.get("source_task"):
+        source = ai_sessions.capture_task_source(new_paths[0])
+        if source.get("scope_id") == session.get("scope_id"):
+            ai_sessions.update_session(session_id, source_task=source, title=source["title"], title_mode="generated")
     return linked
 
 
@@ -2401,9 +2409,10 @@ class Orchestrator:
                     persisted_assistant_messages.add(message_id)
             if final_text and not persisted_assistant_messages:
                 ai_sessions.append_message(session["id"], "assistant", final_text)
+            latest_session = ai_sessions.get_session(session["id"]) or session
             if (
                 session.get("kind") == "chat"
-                and session.get("title_mode", "suggested") == "suggested"
+                and latest_session.get("title_mode", "suggested") == "suggested"
                 and raw_prompt
             ):
                 title = raw_prompt[:40] + ("…" if len(raw_prompt) > 40 else "")

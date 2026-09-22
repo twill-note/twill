@@ -473,6 +473,7 @@ def _with_task_source_runtime(
 ) -> tuple[dict, bool]:
     """세션 API 응답에 카드 출처의 최신 위치 또는 삭제 상태를 덧붙인다."""
     result = dict(session)
+    previous_title = (session.get("source_task") or {}).get("last_title")
     runtime, saved_source, changed = _task_source_runtime(session.get("source_task"))
     if runtime is None:
         return result, False
@@ -501,6 +502,9 @@ def _with_task_source_runtime(
     if runtime.get("state") == "available" and session.get("title") != runtime["title"]:
         session["title"] = runtime["title"]
         result["title"] = runtime["title"]
+        if previous_title and previous_title != runtime["title"]:
+            session["title_mode"] = "manual"
+            result["title_mode"] = "manual"
         changed = True
     result["source_task_status"] = runtime
     return result, changed

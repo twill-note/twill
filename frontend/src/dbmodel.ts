@@ -33,6 +33,10 @@ export function cellValue(row: NoteRow, key: string): string | number {
 /** 노트의 frontmatter 임의 속성 하나를 변경해 저장. 빈 문자열·빈 배열·null 은 속성 자체를 제거. */
 export async function setNoteProp(path: string, key: string, value: unknown): Promise<void> {
   const c = await api.getContent(path)
+  if (['title', 'date', 'tags', 'icon', 'cover'].includes(key)) {
+    await api.saveContent(c.path, { ...c.frontmatter, [key]: value }, c.body, c.mtime)
+    return
+  }
   const extra = { ...(c.frontmatter.extra ?? {}) }
   const isEmpty =
     value == null ||

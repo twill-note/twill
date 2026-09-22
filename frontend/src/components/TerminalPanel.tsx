@@ -3,7 +3,7 @@ import { WebLinksAddon } from '@xterm/addon-web-links'
 import { Terminal } from '@xterm/xterm'
 import '@xterm/xterm/css/xterm.css'
 import { useEffect, useRef, useState } from 'react'
-import { APP_MONO_FONT_FAMILY } from '../fontFamilies'
+import { APP_MONO_FONT_FAMILY, ensureKoreanFontLoaded } from '../fontFamilies'
 import { useAppStore } from '../store'
 
 /**
@@ -47,6 +47,10 @@ export default function TerminalPanel() {
     term.loadAddon(new WebLinksAddon())
     term.open(hostRef.current)
     fit.fit()
+    let disposed = false
+    void Promise.all([ensureKoreanFontLoaded(), document.fonts.load('13px "JetBrains Mono"')]).then(() => {
+      if (!disposed) { fit.fit(); term.refresh(0, term.rows - 1) }
+    }).catch(() => {})
     termRef.current = term
     fitRef.current = fit
 
@@ -78,6 +82,7 @@ export default function TerminalPanel() {
     observer.observe(hostRef.current)
 
     return () => {
+      disposed = true
       observer.disconnect()
       ws.onclose = null
       ws.close()

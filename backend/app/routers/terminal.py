@@ -5,6 +5,7 @@ import json
 import os
 import signal
 import subprocess
+import sys
 
 if os.name != "nt":
     import fcntl
@@ -19,6 +20,24 @@ from .. import config
 router = APIRouter(prefix="/api/terminal", tags=["terminal"])
 
 
+def terminal_environment() -> dict[str, str]:
+    env = dict(os.environ, TERM="xterm-256color", COLORTERM="truecolor", PYTHONIOENCODING="utf-8", PYTHONUTF8="1")
+    # Finder-launched apps often inherit no locale (or LC_ALL=C).
+    locale = env.get("LC_ALL") or env.get("LC_CTYPE") or env.get("LANG", "")
+    if "utf8" not in locale.lower().replace("-", ""):
+        utf8_locale = "en_US.UTF-8" if sys.platform == "darwin" else "C.UTF-8"
+        env.update(LANG=utf8_locale, LC_CTYPE=utf8_locale, LC_ALL=utf8_locale)
+    return env
+
+
+WINDOWS_UTF8_INIT = (
+    "chcp.com 65001 > $null; "
+    "$utf8 = New-Object System.Text.UTF8Encoding $false; "
+    "[Console]::InputEncoding = $utf8; "
+    "[Console]::OutputEncoding = $utf8; $OutputEncoding = $utf8"
+)
+
+
 async def _terminal_ws_windows(ws: WebSocket) -> None:
     """Bridge PowerShell over pipes when a Unix PTY is unavailable."""
     creationflags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
@@ -26,6 +45,10 @@ async def _terminal_ws_windows(ws: WebSocket) -> None:
         "powershell.exe",
         "-NoLogo",
         "-NoProfile",
+        "-NoExit",
+        "-Command",
+        WINDOWS_UTF8_INIT,
+        env=terminal_environment(),
         cwd=config.notes_dir(),
         stdin=asyncio.subprocess.PIPE,
         stdout=asyncio.subprocess.PIPE,
@@ -66,7 +89,7 @@ def _spawn_shell() -> tuple[int, int]:
     if pid == 0:
         try:
             os.chdir(config.notes_dir())
-            env = dict(os.environ, TERM="xterm-256color", COLORTERM="truecolor")
+            env = terminal_environment()
             os.execvpe(shell, [shell], env)
         finally:
             os._exit(1)

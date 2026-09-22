@@ -10,8 +10,8 @@ const PRINT_CSS = `
   #twill-print-document h1 { font-size: 24pt; margin: 0 0 8mm; }
   #twill-print-document .bn-editor { padding: 0 !important; background: white !important; color: #222 !important; font-family: "Noto Sans KR", sans-serif !important; }
   #twill-print-document [data-node-type="blockContainer"] { overflow: visible !important; }
-  #twill-print-document [data-content-type="columnList"] { display: flex !important; gap: 5mm; }
-  #twill-print-document [data-content-type="column"] { min-width: 0 !important; }
+  #twill-print-document [data-node-type="columnList"] { display: flex !important; gap: 5mm; }
+  #twill-print-document [data-node-type="column"] { min-width: 0 !important; }
   #twill-print-document img, #twill-print-document svg { max-width: 100% !important; height: auto; }
   #twill-print-document img, #twill-print-document .mermaid-preview { break-inside: avoid; }
   #twill-print-document .mermaid-preview { overflow: visible !important; background: white !important; }
@@ -34,7 +34,16 @@ export async function exportDocumentPdf(editor: HTMLElement, title: string): Pro
   const heading = document.createElement('h1')
   heading.textContent = title || '제목 없음'
   const copy = editor.cloneNode(true) as HTMLElement
-  copy.querySelectorAll('button, textarea, input, [role="toolbar"], [data-image-annotate], .bn-side-menu').forEach((node) => node.remove())
+  // Include the live Mermaid draft even if the editor has not switched to preview yet.
+  const drafts = editor.querySelectorAll<HTMLTextAreaElement>('[data-content-type="mermaid"] textarea')
+  const copiedDrafts = copy.querySelectorAll<HTMLTextAreaElement>('[data-content-type="mermaid"] textarea')
+  drafts.forEach((draft, index) => {
+    const preview = document.createElement('div')
+    preview.className = 'mermaid-preview'
+    preview.dataset.mermaidSource = draft.value
+    copiedDrafts[index]?.replaceWith(preview)
+  })
+  copy.querySelectorAll('button, textarea, input:not([type="checkbox"]), [role="toolbar"], [data-image-annotate], .bn-side-menu').forEach((node) => node.remove())
   copy.querySelectorAll('[contenteditable]').forEach((node) => node.removeAttribute('contenteditable'))
   output.append(heading, copy)
   const style = document.createElement('style')

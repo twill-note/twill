@@ -17,6 +17,7 @@ declare global {
       platform: string
       versions: Readonly<{ chrome: string; electron: string }>
       restart: () => Promise<void>
+      onPrepareRestart: (callback: () => Promise<void>) => () => void
       openQuickMemo: () => Promise<void>
       openByeoriWindow: (point?: { x: number; y: number }) => Promise<boolean>
       focusByeoriWindow: () => Promise<boolean>

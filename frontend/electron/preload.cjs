@@ -83,6 +83,14 @@ contextBridge.exposeInMainWorld('noteDesktop', Object.freeze({
     electron: process.versions.electron,
   }),
   restart: () => ipcRenderer.invoke('desktop:restart'),
+  onPrepareRestart: (callback) => {
+    const listener = async (_event, requestId) => {
+      try { await callback(); ipcRenderer.send('desktop:restart-ready', requestId, null) }
+      catch (error) { ipcRenderer.send('desktop:restart-ready', requestId, String(error?.message || error)) }
+    }
+    ipcRenderer.on('desktop:prepare-restart', listener)
+    return () => ipcRenderer.removeListener('desktop:prepare-restart', listener)
+  },
   openQuickMemo: () => ipcRenderer.invoke('desktop:open-quick-memo'),
   openByeoriWindow: (point) => ipcRenderer.invoke('desktop:open-byeori-window', point),
   focusByeoriWindow: () => ipcRenderer.invoke('desktop:focus-byeori-window'),

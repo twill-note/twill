@@ -1,3 +1,4 @@
+import { registerRestartGuard } from './restartGuards'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, type QuickMemoSaveResult } from './api'
 
@@ -82,6 +83,10 @@ export default function QuickMemoApp() {
     window.clearTimeout(successTimer.current)
     successTimer.current = window.setTimeout(() => setNotice({ kind: 'idle' }), 3_000)
   }
+
+  useEffect(() => registerRestartGuard(() => {
+    if (content.trim()) throw new Error('빠른 메모를 저장한 뒤 앱을 완전히 종료하고 다시 실행해 주세요.')
+  }), [content])
 
   const save = useCallback(async () => {
     if (!canSave) return

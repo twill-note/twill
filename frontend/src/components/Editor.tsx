@@ -1,3 +1,4 @@
+import { registerRestartGuard } from '../restartGuards'
 import { markdownWithoutSnapshot, preserveBlocks, restoreBlocks } from '../blockPersistence'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import '@blocknote/core/fonts/inter.css'
@@ -780,8 +781,10 @@ function NoteEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  const saveChainRef = useRef<Promise<void>>(Promise.resolve())
   const save = useCallback(
-    async (force = false) => {
+    (force = false) => {
+      const operation = saveChainRef.current.then(async () => {
       if (!loadedRef.current) return
       if (timerRef.current) {
         clearTimeout(timerRef.current)
@@ -800,13 +803,23 @@ function NoteEditor({
           refreshTags()
           loadLinks()
         }
+        return true
       } catch (e) {
         if (e instanceof ApiError && e.status === 409) setSaveStatus('conflict')
         else setSaveStatus('error')
+        return false
       }
+      })
+      saveChainRef.current = operation.then(() => {}, () => {})
+      return operation
     },
     [editor, content.path, isExternal, setSaveStatus, refreshTags, loadLinks],
   )
+
+  useEffect(() => registerRestartGuard(async () => {
+    if (!loadedRef.current) return
+    if (await save() === false) throw new Error('문서를 저장하지 못했습니다. 저장 오류를 해결한 뒤 앱을 완전히 종료하고 다시 실행해 주세요.')
+  }), [save])
 
   const scheduleSave = useCallback(() => {
     if (!loadedRef.current) return

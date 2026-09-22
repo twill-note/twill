@@ -1,3 +1,4 @@
+import { registerRestartGuard } from '../../restartGuards'
 import type { ErdDiagram } from './types'
 
 export type ErdTabSession = {
@@ -11,6 +12,9 @@ export type ErdTabSession = {
 /** 패널 사이 탭 이동 중에도 저장 전 편집 상태를 보관하는 탭별 세션. */
 const diagramSessions = new Map<string, ErdTabSession>()
 const dirtyTabs = new Map<string, boolean>()
+registerRestartGuard(() => {
+  if ([...dirtyTabs.values()].some(Boolean)) throw new Error('저장하지 않은 ERD가 있습니다. 저장한 뒤 앱을 완전히 종료하고 다시 실행해 주세요.')
+})
 const closeRequests = new Map<string, () => void>()
 
 export function getErdTabSession(tabId: string): ErdTabSession | undefined {

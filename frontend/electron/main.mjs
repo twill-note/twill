@@ -90,6 +90,7 @@ let backendReady = false
 let quitting = false
 let shutdownComplete = false
 let restartRequested = false
+let restartPreparing = false
 let mainWindow = null
 let quickMemoWindow = null
 let byeoriWindow = null
@@ -1441,6 +1442,30 @@ if (!hasSingleInstanceLock) {
           throw new Error('앱 창에서만 다시 시작할 수 있습니다.')
         }
         if (restartRequested) return
+        if (restartPreparing) throw new Error('앱 재시작을 준비하고 있습니다.')
+        restartPreparing = true
+        try {
+          await new Promise((resolve, reject) => {
+            const requestId = `${Date.now()}-${Math.random()}`
+            const windows = BrowserWindow.getAllWindows().filter((win) => !win.isDestroyed())
+            const pending = new Set(windows.map((win) => win.webContents.id))
+            const finish = (error) => {
+              clearTimeout(timer)
+              ipcMain.removeListener('desktop:restart-ready', onReady)
+              if (error) reject(error)
+              else resolve()
+            }
+            const onReady = (reply, id, error) => {
+              if (id !== requestId || !pending.has(reply.sender.id)) return
+              pending.delete(reply.sender.id)
+              if (error) finish(new Error(String(error)))
+              else if (!pending.size) finish()
+            }
+            const timer = setTimeout(() => finish(new Error('문서 저장 확인 시간이 초과되었습니다. 편집 내용을 저장한 뒤 다시 실행해 주세요.')), 15000)
+            ipcMain.on('desktop:restart-ready', onReady)
+            for (const win of windows) win.webContents.send('desktop:prepare-restart', requestId)
+            if (!pending.size) finish()
+          })
         // The API refuses while AI work or an update is active, including work
         // started from a detached window.
         const response = await fetch(new URL('/api/ai/restart-engine', appUrl), { method: 'POST' })
@@ -1450,6 +1475,7 @@ if (!hasSingleInstanceLock) {
         }
         restartRequested = true
         app.quit()
+        } finally { restartPreparing = false }
       })
       ipcMain.handle('desktop:open-quick-memo', async () => openQuickMemo())
       ipcMain.handle('desktop:open-byeori-window', openByeoriWindow)

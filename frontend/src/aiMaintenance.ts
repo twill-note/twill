@@ -33,10 +33,14 @@ export function subscribeAiEngineChanged(callback: () => void) {
 }
 
 export async function offerAppRestart() {
-  if (!window.noteDesktop) return
-  const confirmed = await dialog.confirm('로그인이 완료되었습니다. Twill을 다시 시작할까요?', {
-    detail: '새 계정으로 AI 엔진을 초기화했습니다. 모든 창의 편집 내용을 저장한 뒤 다시 시작해 주세요.',
-    confirmLabel: '앱 다시 시작',
-  })
-  if (confirmed) await window.noteDesktop.restart()
+  const instruction = '주간 사용 한도를 새 계정 기준으로 갱신하려면 Twill을 완전히 종료한 뒤 다시 실행해 주세요.'
+  if (!window.noteDesktop?.restart) {
+    await dialog.alert('로그인이 완료되었습니다. 앱 재시작이 필요합니다.', { detail: instruction + '\n브라우저 개발 모드에서는 백엔드도 다시 시작해 주세요.' })
+    return
+  }
+  try {
+    await window.noteDesktop.restart()
+  } catch (error) {
+    await dialog.alert('로그인은 완료되었지만 자동 재시작하지 못했습니다.', { detail: `${(error as Error).message}\n\n${instruction}` })
+  }
 }

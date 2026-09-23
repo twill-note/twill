@@ -3,15 +3,18 @@ import fs from 'node:fs'
 import os from 'node:os'
 import test from 'node:test'
 import path from 'node:path'
+import net from 'node:net'
 
 import {
   backendPortCandidates,
   backendPythonCandidates,
+  canListenOnPort,
   desktopAppProfile,
   desktopCommandPath,
   desktopWindowChromeOptions,
   frontendRevisionFromHtml,
   isExpectedFrontendHtml,
+  isPortConflict,
   isSafeExternalUrl,
   normalizeLocalAppUrl,
   parseDesktopOptions,
@@ -52,7 +55,7 @@ test('기본 데스크톱 모드는 로컬 백엔드를 직접 관리한다', ()
   const options = parseDesktopOptions([], {})
   assert.equal(options.manageBackend, true)
   assert.equal(options.backendHost, '127.0.0.1')
-  assert.equal(options.backendPort, 8000)
+  assert.equal(options.backendPort, 52023)
 })
 
 test('개발 Electron은 설치 앱과 별도 프로필을 사용한다', () => {
@@ -116,8 +119,31 @@ test('백엔드 포트 환경변수를 반영한다', () => {
 })
 
 test('기본 포트가 점유되면 이어지는 로컬 포트를 후보로 사용한다', () => {
-  assert.deepEqual(backendPortCandidates(8000, 4), [8000, 8001, 8002, 8003])
+  assert.deepEqual(backendPortCandidates(52023, 4), [52023, 52024, 52025, 52026])
+  assert.equal(backendPortCandidates(undefined).length, 20)
+  assert.equal(backendPortCandidates(undefined)[0], 52023)
+  assert.equal(parseDesktopOptions([], { NOTE_APP_BACKEND_PORT: 'invalid' }).backendPort, 52023)
   assert.deepEqual(backendPortCandidates(65534, 4), [65534, 65535])
+})
+
+test('HTTP 응답이 없는 TCP 서버도 점유를 감지하고 해제 후에는 사용할 수 있다', async () => {
+  const server = net.createServer()
+  await new Promise((resolve, reject) => {
+    server.once('error', reject)
+    server.listen(0, '127.0.0.1', resolve)
+  })
+  const { port } = server.address()
+  try { assert.equal(await canListenOnPort('127.0.0.1', port), false) }
+  finally { await new Promise((resolve) => server.close(resolve)) }
+  assert.equal(await canListenOnPort('127.0.0.1', port), true)
+})
+
+test('시작 중 포트 충돌은 Mac·Windows·Linux 오류를 인식하고 다른 시작 오류와 구분한다', () => {
+  for (const error of ['[Errno 48] error while attempting to bind', '[Errno 98] address already in use', '[WinError 10048] socket', 'EADDRINUSE']) {
+    assert.equal(isPortConflict(error), true)
+  }
+  assert.equal(isPortConflict('ModuleNotFoundError: missing dependency'), false)
+  assert.equal(isPortConflict('[Errno 13] Permission denied'), false)
 })
 
 test('Electron 설정 스냅샷은 문자열 localStorage 값만 안전하게 보존한다', () => {

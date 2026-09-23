@@ -10,11 +10,13 @@ import { app, BrowserWindow, dialog, ipcMain, Menu, screen, session, shell } fro
 import {
   backendPortCandidates,
   backendPythonCandidates,
+  canListenOnPort,
   desktopAppProfile,
   desktopCommandPath,
   desktopWindowChromeOptions,
   frontendRevisionFromHtml,
   isExpectedFrontendHtml,
+  isPortConflict,
   isSafeExternalUrl,
   parseDesktopOptions,
   popoutWindowBounds,
@@ -154,15 +156,6 @@ async function probe(url) {
   }
 }
 
-async function endpointResponds(url) {
-  try {
-    await fetch(url, { signal: AbortSignal.timeout(1_000) })
-    return true
-  } catch {
-    return false
-  }
-}
-
 async function probeNoteFrontend(baseUrl, expectedHtml = null) {
   try {
     const response = await fetch(`${baseUrl}/`, { signal: AbortSignal.timeout(1_000) })
@@ -200,24 +193,34 @@ async function startOrReuseBackend() {
   }
   const expectedFrontendHtml = fs.readFileSync(frontendIndex, 'utf8')
   frontendRevision = frontendRevisionFromHtml(expectedFrontendHtml)
-  let selected = null
   for (const port of backendPortCandidates(options.backendPort)) {
     const candidate = `http://${options.backendHost}:${port}`
-    if (await probe(`${candidate}/api/workspace`)) {
-      if (!process.argv.includes('--fresh-backend') && await probeNoteFrontend(candidate, expectedFrontendHtml)) {
+    if (!await canListenOnPort(options.backendHost, port)) {
+      if (!process.argv.includes('--fresh-backend') && await probe(`${candidate}/api/workspace`) && await probeNoteFrontend(candidate, expectedFrontendHtml)) {
         console.log(`[desktop] 실행 중인 백엔드를 재사용합니다: ${candidate}`)
         return candidate
       }
-      console.warn(`[desktop] 현재 빌드와 다른 화면을 제공하는 기존 백엔드를 건너뜁니다: ${candidate}`)
+      console.warn(`[desktop] 사용 중이거나 사용할 수 없는 포트를 건너뜁니다: ${candidate}`)
       continue
     }
-    if (await endpointResponds(candidate)) continue
-    selected = { baseUrl: candidate, port }
-    break
+    try {
+      await startBackendAtPort(candidate, port)
+      console.log(`[desktop] 로컬 백엔드를 시작했습니다: ${candidate}`)
+      return candidate
+    } catch (error) {
+      // Another process may acquire the port after the bind probe was released.
+      if (backendProcess?.exitCode !== null && isPortConflict(backendLog)) {
+        console.warn(`[desktop] 시작 중 포트 충돌이 발생하여 다음 포트로 재시도합니다: ${candidate}`)
+        continue
+      }
+      throw error
+    }
   }
-  if (!selected) throw new Error('사용 가능한 로컬 백엔드 포트를 찾지 못했습니다.')
-  const { baseUrl, port } = selected
+  throw new Error('사용 가능한 로컬 백엔드 포트를 찾지 못했습니다.')
+}
 
+async function startBackendAtPort(baseUrl, port) {
+  backendLog = ''
   const command = app.isPackaged ? packagedBackend : resolvePython()
   const commandArgs = app.isPackaged
     ? ['--host', options.backendHost, '--port', String(port)]

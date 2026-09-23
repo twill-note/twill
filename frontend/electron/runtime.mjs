@@ -1,7 +1,9 @@
 import { createHash } from 'node:crypto'
+import net from 'node:net'
 import path from 'node:path'
 
 const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '::1', '[::1]'])
+export const DEFAULT_DESKTOP_PORT = 52023
 
 export function desktopAppProfile(isPackaged, appDataPath) {
   if (isPackaged) return { name: 'Twill', userDataPath: null }
@@ -90,15 +92,31 @@ export function parseDesktopOptions(argv, env = process.env) {
     uiUrl,
     manageBackend: explicitlyStartBackend || (!uiUrl && !explicitlySkipBackend),
     backendHost: env.NOTE_APP_HOST || '127.0.0.1',
-    backendPort: parsePort(env.NOTE_APP_BACKEND_PORT, 8000),
+    backendPort: parsePort(env.NOTE_APP_BACKEND_PORT, DEFAULT_DESKTOP_PORT),
   }
 }
 
 export function backendPortCandidates(preferred, count = 20) {
-  const first = Number.isInteger(preferred) && preferred > 0 && preferred <= 65535 ? preferred : 8000
+  const first = Number.isInteger(preferred) && preferred > 0 && preferred <= 65535 ? preferred : DEFAULT_DESKTOP_PORT
   const limit = Math.max(1, Math.min(Number.isInteger(count) ? count : 20, 100))
   return Array.from({ length: limit }, (_, index) => first + index)
     .filter((port) => port <= 65535)
+}
+
+/** Probe the actual TCP bind, including non-HTTP listeners and Windows exclusions. */
+export function canListenOnPort(host, port) {
+  return new Promise((resolve, reject) => {
+    const server = net.createServer()
+    server.once('error', (error) => {
+      if (error.code === 'EADDRINUSE' || error.code === 'EACCES') resolve(false)
+      else reject(error)
+    })
+    server.listen({ host, port, exclusive: true }, () => server.close(() => resolve(true)))
+  })
+}
+
+export function isPortConflict(log) {
+  return /EADDRINUSE|address already in use|only one usage of each socket address|\[(?:Errno|WinError)\s+(?:48|98|10048)\]/i.test(log)
 }
 
 export function isSafeExternalUrl(raw) {

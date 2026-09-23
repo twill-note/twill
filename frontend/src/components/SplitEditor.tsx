@@ -196,7 +196,17 @@ export default function SplitEditor() {
       const existingPanel = focusedPanel?.tabIds.includes(selectedTabId)
         ? focusedPanel
         : leafPanels(previous.root).find((panel) => panel.tabIds.includes(selectedTabId))
-      const panel = existingPanel ?? findPanel(previous.root, previous.activePanelId) ?? leafPanels(previous.root)[0]
+      const isDocument = !isAiTab(selectedTabId)
+      const panels = leafPanels(previous.root)
+      const documentPanel = isDocument && focusedPanel?.tabIds.some(isAiTab)
+        ? panels.find((panel) => panel.tabIds.some((id) => !isAiTab(id)) || panel.tabIds.length === 0)
+        : focusedPanel
+      // Opening a document from an AI pane must not replace that conversation.
+      if (!existingPanel && isDocument && !documentPanel) {
+        const panel: PanelNode = { ...createPanel(), tabIds: [selectedTabId], activeTabId: selectedTabId }
+        return { root: { kind: 'split', id: createId('split'), direction: 'horizontal', ratio: 50, first: panel, second: previous.root }, activePanelId: panel.id }
+      }
+      const panel = existingPanel ?? documentPanel ?? panels[0]
       if (!panel) return previous
       if (panel.activeTabId === selectedTabId && previous.activePanelId === panel.id) return previous
       const tabIds = panel.tabIds.includes(selectedTabId) ? panel.tabIds : [...panel.tabIds, selectedTabId]

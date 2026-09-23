@@ -56,13 +56,14 @@ export default function AiPlacement() {
   const detached = useAppStore((s) => s.byeoriDetached)
   const tabs = useAppStore((s) => s.openTabs)
   const dockedId = useAppStore((s) => s.dockedAiTabId)
+  const dockedTabs = useAppStore((s) => s.dockedAiTabs)
   const sessions = useAiStore((s) => s.sessions)
   const loaded = useAiStore((s) => s.sessionsLoaded)
   useEffect(() => {
     const open = new Set(tabs.filter((tab) => tab.kind === 'ai').map((tab) => tab.id))
-    if (dockedId) open.add(dockedId)
+    for (const tab of dockedTabs) open.add(tab.id)
     for (const id of containers.keys()) if (!open.has(id)) containers.delete(id)
-  }, [tabs, dockedId])
+  }, [tabs, dockedTabs])
   useEffect(() => {
     if (!loaded) return
     const byId = new Map(sessions.map((session) => [session.id, session]))
@@ -76,11 +77,18 @@ export default function AiPlacement() {
       return session && session.title !== tab.title ? { ...tab, title: session.title } : tab
     })
     if (next.some((tab, index) => tab !== current.openTabs[index])) useAppStore.setState({ openTabs: next })
-    const dockedSession = current.dockedAiTabId && sessionIdFromAiTab(current.dockedAiTabId)
-    if (dockedSession && !byId.has(dockedSession)) useAppStore.setState({ dockedAiTabId: 'system:ai' })
+    for (const tab of current.dockedAiTabs) {
+      if (tab.target && !byId.has(tab.target)) current.closeDockedAiTab(tab.id)
+    }
+    const docked = useAppStore.getState().dockedAiTabs
+    const nextDocked = docked.map((tab) => {
+      const session = byId.get(tab.target)
+      return session && session.title !== tab.title ? { ...tab, title: session.title } : tab
+    })
+    if (nextDocked.some((tab, index) => tab !== docked[index])) useAppStore.setState({ dockedAiTabs: nextDocked })
   }, [sessions, loaded])
   const ids = new Set(tabs.filter((tab) => tab.kind === 'ai').map((tab) => tab.id))
-  if (dockedId) ids.add(dockedId)
+  for (const tab of dockedTabs) ids.add(tab.id)
   return [...ids].map((id) => detached && id === dockedId ? null : <SessionPortal key={id} tabId={id} />)
 }
 

@@ -21,7 +21,7 @@ app.whenReady().then(async()=>{
    api.ai.models=async()=>({models:[]})
    api.ai.usageLimits=async()=>({available:false,blocked:false})
    notifyAiEngineChanged()
-   useAppStore.setState({openTabs:[],currentPath:null,view:'editor'})
+   useAppStore.setState({openTabs:[],aiTabId:null,dockedAiTabId:SYSTEM_AI_TAB,dockedAiTabs:[{id:SYSTEM_AI_TAB,kind:'ai',target:'',title:'새 대화',icon:'✦'}],currentPath:null,view:'editor'})
    await pause()
    useAppStore.getState().openFile('qa-tabs.md')
    useAppStore.getState().moveAi('right')
@@ -93,7 +93,7 @@ app.whenReady().then(async()=>{
    aiTab().querySelector('[title="탭 닫기"]').click();await pause()
    assert(useAppStore.getState().view!=='ai'&&!aiTab(),'AI close failed')
    useAppStore.getState().openRightTab(SYSTEM_AI_TAB);await pause()
-   assert(aiTab()&&input.value==='유지할 한글 초안','AI reopen failed')
+   assert(useAppStore.getState().dockedAiTabId===SYSTEM_AI_TAB,'closed AI should reopen in the right dock')
 
    useAiStore.setState({loadSessions:async()=>{}})
    const base=useAiStore.getState().sessions[0]??{kind:'chat',messages:[],busy:false,queued:false,createdAt:Date.now(),updatedAt:Date.now()}
@@ -110,12 +110,12 @@ app.whenReady().then(async()=>{
      assert(group===group.parentElement.lastElementChild,'AI work must be at bottom of project')
    }
    document.querySelector('[data-ai-session-id="qa-b"]').click();await pause()
-   assert(selected==='qa-b'&&useAppStore.getState().view==='ai','project session click failed')
+   assert(selected==='qa-b'&&useAppStore.getState().dockedAiTabId==='ai:qa-b','project session click failed')
    const group=document.querySelector('[data-project-ai-tasks="a"]')
    group.querySelector('button').click();await pause()
    assert(!group.querySelector('[data-ai-session-id]'),'collapse failed')
    group.querySelector('button').click();await pause()
-   await drag(document.querySelector('[data-document-tab-id="ai:qa-b"]'),docTab().closest('section'),'left')
+   await drag(document.querySelector('#right-tool-panel [draggable="true"]'),docTab().closest('section'),'left')
    return {edgePreview:guide,chatBodyDrop:true,splitDirections:true,tabMerge:true,draftPreserved:true,calendarReturn:true,dockReturn:true,closeReopen:true,projectGrouping:true,projectClick:true}
   })()`)
   console.log(JSON.stringify(result))

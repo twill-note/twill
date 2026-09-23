@@ -8,7 +8,29 @@ import { AiPanelHost } from './AiPlacement'
 import { isAiTab, sessionIdFromAiTab } from '../aiTabs'
 function AiDockHost() {
   const tabId = useAppStore((s) => s.dockedAiTabId)
-  return tabId ? <AiPanelHost tabId={tabId} onFocus={() => useAiStore.setState({ activeSessionId: sessionIdFromAiTab(tabId) })} /> : null
+  const tabs = useAppStore((s) => s.dockedAiTabs)
+  return <div className="flex h-full min-h-0 flex-col">
+    <div className="flex h-9 shrink-0 overflow-x-auto border-b border-[#e9e9e7] bg-[#f7f7f5]" role="tablist" aria-label="AI 대화 탭">
+      {tabs.map((tab) => <div key={tab.id} data-ai-dock-tab-id={tab.id} draggable
+        className={`group flex shrink-0 items-center gap-1 border-r border-[#e9e9e7] px-2 text-[12px] ${tab.id === tabId ? 'bg-white text-[#37352f]' : 'text-[#7d7c78]'}`}
+        onDragStart={(event) => {
+          event.dataTransfer.setData('text/doc-tab', tab.id)
+          event.dataTransfer.setData('text/doc-tab-source', 'right-dock')
+          event.dataTransfer.setData('application/x-twill-ai', '1')
+          event.dataTransfer.effectAllowed = 'move'
+        }}>
+        <button role="tab" aria-selected={tab.id === tabId} title={tab.title} className="max-w-40 truncate py-2"
+          onClick={() => useAppStore.getState().moveAi('right', tab.id)}>✦ {tab.title}</button>
+        <button title="탭 닫기" aria-label={`${tab.title} 탭 닫기`} className="rounded px-1 text-[#9b9a97] hover:bg-[#e9e9e7]"
+          onClick={() => useAppStore.getState().closeDockedAiTab(tab.id)}>×</button>
+      </div>)}
+    </div>
+    <div className="min-h-0 flex-1">
+      {tabs.map((tab) => <div key={tab.id} className={tab.id === tabId ? 'h-full' : 'hidden'}>
+        <AiPanelHost tabId={tab.id} onFocus={() => useAiStore.setState({ activeSessionId: sessionIdFromAiTab(tab.id) })} />
+      </div>)}
+    </div>
+  </div>
 }
 import TerminalPanel from './TerminalPanel'
 
@@ -171,7 +193,7 @@ export default function RightDock() {
       <aside
         id="right-tool-panel"
         className={`relative h-full shrink-0 flex-col border-l border-[#e9e9e7] bg-white ${rightDockOpen ? 'flex' : 'hidden'}`}
-        style={{ width }}
+        style={{ width, maxWidth: '70vw' }}
         aria-label={`${activeTool.title} 패널`}
       >
         <div

@@ -43,6 +43,8 @@ interface AppState {
   byeoriDetached: boolean
   aiTabId: string | null
   dockedAiTabId: string | null
+  dockedAiTabs: DocTab[]
+  closeDockedAiTab: (tabId: string) => void
   openAiSession: (sessionId: string) => void
   moveAi: (location: 'editor' | 'right', tabId?: string) => void
   dbDir: string | null
@@ -140,13 +142,19 @@ export const useAppStore = create<AppState>((set, get) => ({
   byeoriDetached: false,
   aiTabId: null,
   dockedAiTabId: SYSTEM_AI_TAB,
+  dockedAiTabs: [aiDocumentTab(SYSTEM_AI_TAB)],
+  closeDockedAiTab: (tabId) => {
+    const state = get()
+    const tabs = state.dockedAiTabs.filter((tab) => tab.id !== tabId)
+    set({ dockedAiTabs: tabs, dockedAiTabId: state.dockedAiTabId === tabId ? tabs.at(-1)?.id ?? null : state.dockedAiTabId,
+      ...(tabs.length === 0 && state.activeRightTab === SYSTEM_AI_TAB ? { rightDockOpen: false } : {}) })
+  },
   openAiSession: (sessionId) => {
     if (!useAiStore.getState().sessions.some((session) => session.id === sessionId)) return
-    get().moveAi('editor', aiDocumentTabId(sessionId))
+    const tabId = aiDocumentTabId(sessionId)
+    get().moveAi(get().openTabs.some((tab) => tab.id === tabId) ? 'editor' : 'right', tabId)
     // The empty AI entry is replaced by the first real conversation.
     get().closeTab(SYSTEM_AI_TAB)
-    const state = get()
-    if (state.dockedAiTabId === SYSTEM_AI_TAB) set({ dockedAiTabId: null, ...(state.activeRightTab === SYSTEM_AI_TAB ? { rightDockOpen: false } : {}) })
   },
   moveAi: (location, requestedTabId) => {
     const state = get()
@@ -158,15 +166,14 @@ export const useAppStore = create<AppState>((set, get) => ({
     const tab = aiDocumentTab(tabId, session?.title)
     if (location === 'editor') {
       const fromDock = state.dockedAiTabId === tabId
+      const dockedAiTabs = state.dockedAiTabs.filter((item) => item.id !== tabId)
       set({ openTabs: upsertTab(state.openTabs, tab), aiTabId: tabId, view: 'ai',
-        ...(fromDock ? { dockedAiTabId: null, ...(state.activeRightTab === SYSTEM_AI_TAB ? { rightDockOpen: false } : {}) } : {}) })
+        dockedAiTabs,
+        ...(fromDock ? { dockedAiTabId: dockedAiTabs.at(-1)?.id ?? null, ...(dockedAiTabs.length === 0 && state.activeRightTab === SYSTEM_AI_TAB ? { rightDockOpen: false } : {}) } : {}) })
     } else {
-      let openTabs = state.openTabs.filter((item) => item.id !== tabId)
-      // Replacing the dock keeps the previous conversation open as an editor tab.
-      const previousId = state.dockedAiTabId && sessionIdFromAiTab(state.dockedAiTabId)
-      const previous = useAiStore.getState().sessions.find((item) => item.id === previousId)
-      if (previous && state.dockedAiTabId !== tabId) openTabs = upsertTab(openTabs, aiDocumentTab(state.dockedAiTabId!, previous.title))
-      set({ openTabs, dockedAiTabId: tabId, rightDockOpen: true, activeRightTab: SYSTEM_AI_TAB,
+      const openTabs = state.openTabs.filter((item) => item.id !== tabId)
+      const dockedAiTabs = upsertTab(state.dockedAiTabs.filter((item) => !sessionId || item.id !== SYSTEM_AI_TAB), tab)
+      set({ openTabs, dockedAiTabs, dockedAiTabId: tabId, rightDockOpen: true, activeRightTab: SYSTEM_AI_TAB,
         ...(state.aiTabId === tabId ? { aiTabId: null, ...(state.view === 'ai' ? { view: 'editor' } : {}) } : {}) })
     }
   },
@@ -321,11 +328,12 @@ export const useAppStore = create<AppState>((set, get) => ({
       return
     }
     if (id === SYSTEM_AI_TAB) {
-      const sessionId = selectedSessionId
       const tabId = selectedAiTabId
       if (get().dockedAiTabId !== tabId) {
-        if (sessionId) get().openAiSession(sessionId)
-        else get().moveAi('editor', tabId)
+        // Restored sessions have no editor placement yet. Open them in the dock;
+        // only focus the editor when this conversation already has a document tab.
+        const alreadyInEditor = get().openTabs.some((tab) => tab.id === tabId)
+        get().moveAi(alreadyInEditor ? 'editor' : 'right', tabId)
         return
       }
     }
@@ -565,3 +573,4 @@ export function activeTabId(s: Pick<AppState, 'view' | 'currentPath' | 'dbDir' |
   if (s.view === 'calendar' || s.view === 'todos' || s.view === 'skillbook') return `view:${s.view}`
   return null
 }
+

@@ -8,37 +8,9 @@ import Editor from './Editor'
 import ErdWorkspace from '../plugins/erd-designer/Workspace'
 import { discardErdTabSession, hasUnsavedErdTab, requestCloseErdTab } from '../plugins/erd-designer/session'
 
-/**
- * 노트와 ERD 문서를 함께 배치하는 분할 트리. 이 컴포넌트는 각 패널의 탭과 렌더링을 담당한다.
- */
-type PanelNode = {
-  kind: 'panel'
-  id: string
-  tabIds: string[]
-  activeTabId: string | null
-}
-
-type SplitNode = {
-  kind: 'split'
-  id: string
-  /** horizontal = 좌우, vertical = 상하 */
-  direction: 'horizontal' | 'vertical'
-  /** 첫 번째 자식의 비율(%) */
-  ratio: number
-  first: PaneNode
-  second: PaneNode
-}
-
-type PaneNode = PanelNode | SplitNode
-
-type SplitLayout = {
-  root: PaneNode
-  activePanelId: string
-}
+import { type PanelNode, type SplitNode, type PaneNode, type SplitLayout } from '../workspaceSession'
 
 type DropZone = 'center' | 'left' | 'right' | 'top' | 'bottom'
-
-const STORAGE_KEY = 'split-editor-layout-v1'
 const MIN_PANE_RATIO = 20
 const MAX_PANE_RATIO = 80
 
@@ -55,32 +27,6 @@ function createInitialLayout(): SplitLayout {
   return { root, activePanelId: root.id }
 }
 
-function isPaneNode(value: unknown): value is PaneNode {
-  if (!value || typeof value !== 'object') return false
-  const node = value as Partial<PaneNode>
-  if (node.kind === 'panel') return typeof node.id === 'string' && Array.isArray(node.tabIds)
-  if (node.kind === 'split') {
-    const split = node as Partial<SplitNode>
-    return (
-      typeof split.id === 'string' &&
-      (split.direction === 'horizontal' || split.direction === 'vertical') &&
-      typeof split.ratio === 'number' &&
-      isPaneNode(split.first) &&
-      isPaneNode(split.second)
-    )
-  }
-  return false
-}
-
-function loadLayout(): SplitLayout {
-  try {
-    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '') as Partial<SplitLayout>
-    if (isPaneNode(saved.root) && typeof saved.activePanelId === 'string') return saved as SplitLayout
-  } catch {
-    // 오래된 형식이나 손상된 값은 빈 패널 하나로 안전하게 되돌린다.
-  }
-  return createInitialLayout()
-}
 
 function findPanel(node: PaneNode, id: string): PanelNode | null {
   if (node.kind === 'panel') return node.id === id ? node : null
@@ -172,7 +118,12 @@ export default function SplitEditor() {
   const openFile = useAppStore((s) => s.openFile)
   const activateErdTab = useAppStore((s) => s.activateErdTab)
   const closeTab = useAppStore((s) => s.closeTab)
-  const [layout, setLayout] = useState<SplitLayout>(loadLayout)
+  const savedLayout = useAppStore((s) => s.splitLayout)
+  const [initialLayout] = useState(createInitialLayout)
+  const layout = savedLayout ?? initialLayout
+  const setLayout = useCallback((update: (previous: SplitLayout) => SplitLayout) => {
+    useAppStore.setState((state) => ({ splitLayout: update(state.splitLayout ?? initialLayout) }))
+  }, [initialLayout])
 
   // DB·캘린더 같은 전체 화면 뷰와 달리 ERD는 노트와 동일하게 분할 패널 안의 문서 탭이다.
   const documentTabs = useMemo(() => openTabs.filter((tab) => tab.kind === 'file' || tab.kind === 'erd' || tab.kind === 'ai'), [openTabs])
@@ -216,7 +167,7 @@ export default function SplitEditor() {
         root: updatePanel(previous.root, panel.id, (current) => ({ ...current, tabIds, activeTabId: selectedTabId })),
       }
     })
-  }, [selectedTabId, openDocumentTabIds])
+  }, [selectedTabId, openDocumentTabIds, setLayout])
 
   // 닫힌 전역 탭은 저장된 패널 레이아웃에서도 자연스럽게 제거한다.
   useEffect(() => {
@@ -229,7 +180,7 @@ export default function SplitEditor() {
       if (compacted !== root) changed = true
       // A displaced dock conversation also needs a tab, without stealing focus.
       const placed = new Set(leafPanels(compacted).flatMap((panel) => panel.tabIds))
-      const missing = documentTabs.filter((tab) => tab.kind === 'ai' && !placed.has(tab.id)).map((tab) => tab.id)
+      const missing = documentTabs.filter((tab) => !placed.has(tab.id)).map((tab) => tab.id)
       if (missing.length) {
         const target = findPanel(compacted, previous.activePanelId) ?? leafPanels(compacted)[0]
         compacted = updatePanel(compacted, target.id, (panel) => ({ ...panel, tabIds: [...panel.tabIds, ...missing], activeTabId: panel.activeTabId ?? missing[0] }))
@@ -241,15 +192,11 @@ export default function SplitEditor() {
         : leafPanels(compacted)[0]?.id ?? previous.activePanelId
       return { root: compacted, activePanelId }
     })
-  }, [openDocumentTabIds, documentTabs])
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(layout))
-  }, [layout])
+  }, [openDocumentTabIds, documentTabs, setLayout])
 
   const focusPanel = useCallback((panelId: string) => {
     setLayout((previous) => (previous.activePanelId === panelId ? previous : { ...previous, activePanelId: panelId }))
-  }, [])
+  }, [setLayout])
 
   /** 상단 탭을 패널에 놓는다. 가운데는 이동/재정렬, 가장자리는 새 분할 패널을 만든다. */
   const dropTab = useCallback(
@@ -299,7 +246,7 @@ export default function SplitEditor() {
       })
       openDocument(tab)
     },
-    [layout.root, openDocument, tabsById],
+    [layout.root, openDocument, tabsById, setLayout],
   )
 
   const resizeSplit = useCallback((splitId: string, ratio: number) => {
@@ -308,7 +255,7 @@ export default function SplitEditor() {
       ...previous,
       root: updateSplit(previous.root, splitId, (split) => (Math.abs(split.ratio - nextRatio) < 0.1 ? split : { ...split, ratio: nextRatio })),
     }))
-  }, [])
+  }, [setLayout])
 
   const activateTab = useCallback(
     (panelId: string, tab: DocTab) => {
@@ -319,7 +266,7 @@ export default function SplitEditor() {
       }))
       openDocument(tab)
     },
-    [openDocument],
+    [openDocument, setLayout],
   )
 
   const closeTabInPanel = useCallback(
@@ -354,7 +301,7 @@ export default function SplitEditor() {
         if (fallback) openDocument(fallback)
       }
     },
-    [closeTab, layout, openDocument, tabsById],
+    [closeTab, layout, openDocument, tabsById, setLayout],
   )
 
   const closeTabsInPanel = useCallback(
@@ -421,7 +368,7 @@ export default function SplitEditor() {
         if (fallback) openDocument(fallback)
       }
     },
-    [closeTab, layout.root, openDocument, tabsById],
+    [closeTab, layout.root, openDocument, tabsById, setLayout],
   )
 
   /** 패널 닫기는 탭을 인접 그룹으로 옮긴 뒤 해당 그룹만 제거한다. */
@@ -442,7 +389,7 @@ export default function SplitEditor() {
       if (!root) return previous
       return { root, activePanelId: previous.activePanelId === panelId ? target.id : previous.activePanelId }
     })
-  }, [])
+  }, [setLayout])
 
   return (
     <div className="flex h-full min-h-0 min-w-0 overflow-hidden bg-white" data-split-editor>

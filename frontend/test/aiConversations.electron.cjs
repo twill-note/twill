@@ -19,13 +19,14 @@ app.whenReady().then(async () => {
       const pause = () => new Promise(r => setTimeout(r, 250))
       const assert = (value, label) => { if (!value) throw new Error(label) }
       const waitFor = async (fn, label) => { for (let i=0;i<40;i++) { if (fn()) return fn(); await pause() } throw new Error(label) }
+      await waitFor(()=>app.getState().workspaceReady,'workspace not ready')
       api.ai.status = async () => ({ engine: 'codex', available: true, logged_in: true })
       api.ai.models = async () => ({ models: [] })
       api.ai.usageLimits = async () => ({ available: false, blocked: false })
       const sends = [], cancellations = []
       ai.setState({ sendChat: (id, text, options) => sends.push({ id, text, options }), cancel: id => cancellations.push(id) })
       notifyAiEngineChanged()
-      app.setState({ openTabs: [],  currentPath: null, view: 'editor', aiTabId: null, dockedAiTabs:[{id:SYSTEM_AI_TAB,kind:'ai',target:'',title:'새 대화',icon:'✦'}], dockedAiTabId: SYSTEM_AI_TAB })
+      app.setState({ openTabs: [], splitLayout:null, currentPath: null, view: 'editor', aiTabId: null, dockedAiTabs:[{id:SYSTEM_AI_TAB,kind:'ai',target:'',title:'새 대화',icon:'✦'}], dockedAiTabId: SYSTEM_AI_TAB })
       const a = await ai.getState().newChatSession({ title: '첫 번째 AI 대화 — 긴 제목도 탭에서는 짧게 표시' })
       const b = await ai.getState().newChatSession({ title: '두 번째 AI 대화' })
       const c = await ai.getState().newChatSession({ title: '선택 문맥 수신 대화' })

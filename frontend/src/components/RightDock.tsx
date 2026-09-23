@@ -95,7 +95,7 @@ export default function RightDock() {
   const aiBusyCount = useAiStore((state) => state.sessions.filter((session) => session.busy).length)
   const aiQueuedCount = useAiStore((state) => state.sessions.filter((session) => session.queued).length)
   const dockedTitle = useAiStore((state) => state.sessions.find((session) => session.id === sessionIdFromAiTab(dockedAiTabId ?? ''))?.title)
-  const [width, setWidth] = useState(480)
+  const width = useAppStore((state) => state.rightDockWidth)
   const [detachError, setDetachError] = useState<string | null>(null)
   const [aiDropOver, setAiDropOver] = useState(false)
   // 닫았다 다시 열어도 터미널 세션 등 이미 사용한 도구의 컴포넌트는 유지한다.
@@ -119,7 +119,7 @@ export default function RightDock() {
     const onMove = (pointerEvent: PointerEvent) => {
       const max = Math.floor(window.innerWidth * 0.7)
       const requested = window.innerWidth - RAIL_WIDTH - pointerEvent.clientX
-      setWidth(Math.min(max, Math.max(MIN_WIDTH, requested)))
+      useAppStore.setState({ rightDockWidth: Math.min(max, Math.max(MIN_WIDTH, requested)) })
     }
     const onUp = () => {
       window.removeEventListener('pointermove', onMove)

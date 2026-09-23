@@ -1388,7 +1388,8 @@ export const useAiStore = create<AiStoreState>((set, get) => {
         writePersistedTaskRuntime(nextRuntime)
         window.setTimeout(pumpQueue, 0)
       } catch {
-        set({ sessionsLoaded: true })
+        // A failed list request is not evidence that restored conversations were deleted.
+        set({ sessionsLoaded: false })
       }
     },
 

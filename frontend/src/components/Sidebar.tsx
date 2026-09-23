@@ -18,7 +18,7 @@ export default function Sidebar() {
   const [reindexing, setReindexing] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [width, setWidth] = useState(MIN_WIDTH)
+  const width = useAppStore((state) => state.sidebarWidth)
   const [tagsCollapsed, setTagsCollapsed] = useState(() => localStorage.getItem('sidebar.tags-collapsed') === '1')
   const searchShortcut = useShortcutStore((state) => state.bindings.search)
 
@@ -49,7 +49,7 @@ export default function Sidebar() {
     e.preventDefault()
     const onMove = (ev: PointerEvent) => {
       const max = Math.floor(window.innerWidth * 0.7)
-      setWidth(Math.min(max, Math.max(MIN_WIDTH, ev.clientX)))
+      useAppStore.setState({ sidebarWidth: Math.min(max, Math.max(MIN_WIDTH, ev.clientX)) })
     }
     const onUp = () => {
       window.removeEventListener('pointermove', onMove)

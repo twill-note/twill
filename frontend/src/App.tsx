@@ -21,7 +21,7 @@ import { useAiStore } from './aiStore'
 import { SYSTEM_AI_TAB, SYSTEM_TERMINAL_TAB, useAppStore } from './store'
 
 export default function App() {
-  const { view, refreshTree, setPaletteOpen, openToday, openRightTab, refreshPlugins } = useAppStore()
+  const { view, root, workspaceReady, refreshTree, setPaletteOpen, openToday, openRightTab, refreshPlugins } = useAppStore()
 
   useEffect(() => {
     refreshTree().catch(() => {
@@ -116,8 +116,6 @@ export default function App() {
 
   // 브라우저 뒤로/앞으로 가기 → 이전/다음 노트로 이동 (사이트 이탈 방지)
   useEffect(() => {
-    const initial = decodeURIComponent(window.location.hash.slice(1))
-    if (initial) useAppStore.getState().restoreFromHistory(initial)
     const onPop = (e: PopStateEvent) => {
       const fromState = (e.state as { notePath?: string } | null)?.notePath
       const fromHash = window.location.hash ? decodeURIComponent(window.location.hash.slice(1)) : null
@@ -204,7 +202,7 @@ export default function App() {
         <main className="flex min-w-0 flex-1 flex-col">
           <TabBar />
           <div className={view === 'editor' || view === 'erd' || view === 'ai' ? 'min-h-0 flex-1' : 'hidden'}>
-            <SplitEditor />
+            {workspaceReady && <SplitEditor key={root} />}
           </div>
           <div className={view === 'editor' || view === 'erd' || view === 'ai' ? 'hidden' : 'min-h-0 flex-1 overflow-auto'}>
             {view === 'plugin' ? (
@@ -220,9 +218,9 @@ export default function App() {
             ) : null}
           </div>
         </main>
-        <RightDock />
+        {workspaceReady && <RightDock />}
       </div>
-      <AiPlacement />
+      {workspaceReady && <AiPlacement key={root} />}
       <CommandPalette />
       <DialogHost />
       <AiToasts />

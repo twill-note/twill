@@ -4,6 +4,7 @@ import { aiDocumentTab, aiDocumentTabId, sessionIdFromAiTab } from './aiTabs'
 import { api } from './api'
 import type { PluginInfo } from './api'
 import type { SaveStatus, Section, TagCount, TreeNode, ViewMode } from './types'
+import { parseWorkspaceSession, serializeWorkspaceSession, workspaceSessionKey, type SplitLayout } from './workspaceSession'
 
 export const SYSTEM_TERMINAL_TAB = 'system:terminal'
 /** 벼리(AI) 시스템 탭 — 구 '실행'(system:runs) 탭과 플러그인 챗 탭을 통합. */
@@ -34,6 +35,10 @@ interface AppState {
   paletteOpen: boolean
   tagFilter: string | null
   root: string | null
+  workspaceReady: boolean
+  splitLayout: SplitLayout | null
+  rightDockWidth: number
+  sidebarWidth: number
   recent: string[]
   /** 우측 도크 개폐 여부 (구 terminalOpen 을 대체). */
   rightDockOpen: boolean
@@ -136,6 +141,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   paletteOpen: false,
   tagFilter: null,
   root: null,
+  workspaceReady: false,
+  splitLayout: null,
+  rightDockWidth: 480,
+  sidebarWidth: 256,
   recent: [],
   rightDockOpen: false,
   activeRightTab: SYSTEM_TERMINAL_TAB,
@@ -189,7 +198,23 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   loadWorkspace: async () => {
     const info = await api.workspace()
-    set({ root: info.root, recent: info.recent, pinnedNotes: loadPinnedNotes(info.root) })
+    const firstWorkspace = get().root === null
+    if (get().root === info.root && get().workspaceReady) {
+      set({ recent: info.recent })
+      return
+    }
+    const detached = new URLSearchParams(window.location.search).get('window') === 'byeori'
+    let restored = null
+    try { if (!detached) restored = parseWorkspaceSession(localStorage.getItem(workspaceSessionKey(info.root))) } catch { /* storage unavailable */ }
+    set({ workspaceReady: false })
+    // Hydrate conversations before mounting restored AI tabs so they are not mistaken for deletions.
+    await useAiStore.getState().loadSessions()
+    set({ root: info.root, recent: info.recent, pinnedNotes: loadPinnedNotes(info.root),
+      openTabs: [], dockedAiTabs: [aiDocumentTab(SYSTEM_AI_TAB)], dockedAiTabId: SYSTEM_AI_TAB, aiTabId: null,
+      splitLayout: null, rightDockOpen: false, activeRightTab: SYSTEM_AI_TAB, rightDockWidth: 480, sidebarWidth: 256,
+      view: 'editor', currentPath: null, erdTabId: null, erdPath: null, erdDirectory: null, dbDir: null, pluginViewId: null,
+      ...restored, workspaceReady: true })
+    if (firstWorkspace && !restored && window.location.hash) get().restoreFromHistory(decodeURIComponent(window.location.hash.slice(1)))
   },
   pinnedNotes: [],
   togglePinnedNote: (path) => {
@@ -203,7 +228,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
   openWorkspace: async (path) => {
     await api.openWorkspace(path)
-    set({ currentPath: null, tagFilter: null, saveStatus: 'idle', view: 'editor', pluginViewId: null, erdPath: null, erdDirectory: null, erdTabId: null, erdNewRequest: 0 })
+    set({ workspaceReady: false, tagFilter: null, saveStatus: 'idle', erdNewRequest: 0 })
     await Promise.all([get().loadWorkspace(), get().refreshTree(), get().refreshTags(), get().refreshSections()])
   },
   openToday: async () => {
@@ -574,3 +599,11 @@ export function activeTabId(s: Pick<AppState, 'view' | 'currentPath' | 'dbDir' |
   return null
 }
 
+// Electron also snapshots localStorage across backend ports; keep each workspace's
+// session current synchronously, including close/reorder/resize actions before quit.
+useAppStore.subscribe((state, previous) => {
+  if (!state.root || !state.workspaceReady || new URLSearchParams(window.location.search).get('window') === 'byeori') return
+  const snapshot = serializeWorkspaceSession(state)
+  if (state.root === previous.root && snapshot === serializeWorkspaceSession(previous)) return
+  try { localStorage.setItem(workspaceSessionKey(state.root), snapshot) } catch (error) { console.warn('Workspace layout could not be saved', error) }
+})

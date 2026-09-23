@@ -39,6 +39,7 @@ interface AppState {
   splitLayout: SplitLayout | null
   rightDockWidth: number
   sidebarWidth: number
+  sidebarCollapsed: boolean
   recent: string[]
   /** 우측 도크 개폐 여부 (구 terminalOpen 을 대체). */
   rightDockOpen: boolean
@@ -145,6 +146,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   splitLayout: null,
   rightDockWidth: 480,
   sidebarWidth: 256,
+  sidebarCollapsed: false,
   recent: [],
   rightDockOpen: false,
   activeRightTab: SYSTEM_TERMINAL_TAB,
@@ -211,7 +213,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     await useAiStore.getState().loadSessions()
     set({ root: info.root, recent: info.recent, pinnedNotes: loadPinnedNotes(info.root),
       openTabs: [], dockedAiTabs: [aiDocumentTab(SYSTEM_AI_TAB)], dockedAiTabId: SYSTEM_AI_TAB, aiTabId: null,
-      splitLayout: null, rightDockOpen: false, activeRightTab: SYSTEM_AI_TAB, rightDockWidth: 480, sidebarWidth: 256,
+      splitLayout: null, rightDockOpen: false, activeRightTab: SYSTEM_AI_TAB, rightDockWidth: 480, sidebarWidth: 256, sidebarCollapsed: false,
       view: 'editor', currentPath: null, erdTabId: null, erdPath: null, erdDirectory: null, dbDir: null, pluginViewId: null,
       ...restored, workspaceReady: true })
     if (firstWorkspace && !restored && window.location.hash) get().restoreFromHistory(decodeURIComponent(window.location.hash.slice(1)))

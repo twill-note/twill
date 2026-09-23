@@ -14,6 +14,7 @@ import { isRepeatedClick } from '../useBackdropDismiss'
  * · 파일(노트) 탭은 SplitEditor 의 편집기 그룹마다 표시 — 여기서는 그리지 않는다.
  */
 export default function TabBar() {
+  const sidebarCollapsed = useAppStore((s) => s.sidebarCollapsed)
   const openTabs = useAppStore((s) => s.openTabs)
   const view = useAppStore((s) => s.view)
   const currentPath = useAppStore((s) => s.currentPath)
@@ -50,6 +51,21 @@ export default function TabBar() {
 
   return (
     <div className="flex h-9 shrink-0 items-center border-b border-[#e9e9e7] bg-[#f7f7f5]">
+      <button
+        type="button"
+        aria-label={sidebarCollapsed ? '왼쪽 패널 펼치기' : '왼쪽 패널 접기'}
+        title={sidebarCollapsed ? '왼쪽 패널 펼치기' : '왼쪽 패널 접기'}
+        aria-expanded={!sidebarCollapsed}
+        aria-controls="workspace-sidebar"
+        className="flex h-full w-9 shrink-0 items-center justify-center border-r border-[#e9e9e7] text-[#7d7c78] hover:bg-[#ececea] hover:text-[#37352f] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[#4a9eff]"
+        onClick={() => useAppStore.setState((state) => ({ sidebarCollapsed: !state.sidebarCollapsed }))}
+      >
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+          <rect x="3" y="4" width="18" height="16" rx="2" />
+          <path d="M9 4v16" />
+          <path d={sidebarCollapsed ? 'm13 9 3 3-3 3' : 'm16 9-3 3 3 3'} strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
       {/* 좌측 고정: 태스크 보드 · 프로젝트 관리 · 오늘의 노트 */}
       <button
         className={`flex h-full shrink-0 items-center border-r border-[#e9e9e7] px-2.5 text-[14px] ${

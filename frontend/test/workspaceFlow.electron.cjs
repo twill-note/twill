@@ -37,7 +37,7 @@ app.whenReady().then(async()=>{
     target.dispatchEvent(new DragEvent('drop',{bubbles:true,cancelable:true,dataTransfer:dt,clientX:x,clientY:y}));await pause()
    }
    if(window.__qaPhase==='save'){
-    app.setState({openTabs:[],splitLayout:null,dockedAiTabs:[],dockedAiTabId:null,view:'editor',currentPath:null,aiTabId:null})
+    app.setState({openTabs:[],splitLayout:null,dockedAiTabs:[],dockedAiTabId:null,view:'editor',currentPath:null,aiTabId:null,sidebarCollapsed:false})
     const a=await ai.getState().newChatSession({title:'복원 확인 대화 A'})
     const b=await ai.getState().newChatSession({title:'복원 확인 대화 B'})
     ai.setState({activeSessionId:a});app.getState().openRightTab(SYSTEM_AI_TAB)
@@ -74,15 +74,32 @@ app.whenReady().then(async()=>{
     ai.setState({loadSessions:reload})
     app.setState(s=>({rightDockWidth:520,sidebarWidth:280,splitLayout:{...s.splitLayout,root:{...s.splitLayout.root,ratio:62}}}))
     app.getState().openFile('qa-session-restore.md');await pause()
+    const sidebar=document.querySelector('#workspace-sidebar')
+    const originalTree=sidebar.querySelector('[data-ai-session-id="'+a+'"]')
+    const layoutBefore=JSON.stringify(app.getState().splitLayout)
+    const mainWidth=document.querySelector('main').getBoundingClientRect().width
+    const toggle=document.querySelector('[aria-controls="workspace-sidebar"]')
+    toggle.focus();toggle.click();await pause()
+    assert(toggle.getAttribute('aria-expanded')==='false'&&document.activeElement===toggle,'toggle accessibility or focus lost')
+    assert(sidebar.getBoundingClientRect().width===0,'sidebar did not collapse')
+    assert(document.querySelector('main').getBoundingClientRect().width>=mainWidth+279,'document area did not expand')
+    assert(JSON.stringify(app.getState().splitLayout)===layoutBefore&&app.getState().currentPath==='qa-session-restore.md','collapse changed open documents or splits')
+    toggle.click();await pause()
+    assert(sidebar.getBoundingClientRect().width===280,'expanded sidebar lost its previous width')
+    assert(sidebar.querySelector('[data-ai-session-id="'+a+'"]')===originalTree,'collapse remounted project tree')
+    toggle.click();await pause()
     const expected=serializeWorkspaceSession(app.getState())
     assert(localStorage.getItem(workspaceSessionKey(app.getState().root))===expected,'latest layout not saved')
-    return {phase:'save',ids:[a,b,c.id],expected,defaultDock:true,newChatDock:true,documentLinksLeft:true,manualSplit:true}
+    return {phase:'save',ids:[a,b,c.id],expected,defaultDock:true,newChatDock:true,documentLinksLeft:true,manualSplit:true,sidebarToggle:true,treePreserved:true}
    }
    const {ids,expected}=window.__qaPrior
    assert(serializeWorkspaceSession(app.getState())===serializeWorkspaceSession(parseWorkspaceSession(expected)),'relaunch did not restore exact layout, tabs and selected documents')
    assert(tab('ai:'+ids[0])&&dock(ids[1])&&dock(ids[2]),'AI placements not restored')
    assert(tab('file:qa-tabs.md')&&tab('file:qa-session-restore.md'),'documents not restored')
    assert(app.getState().rightDockWidth===520&&app.getState().sidebarWidth===280,'pane widths lost')
+   assert(app.getState().sidebarCollapsed&&document.querySelector('#workspace-sidebar').getBoundingClientRect().width===0,'collapsed state not restored')
+   document.querySelector('[aria-controls="workspace-sidebar"]').click();await pause()
+   assert(document.querySelector('#workspace-sidebar').getBoundingClientRect().width===280,'restored sidebar cannot reopen at previous width')
    // Delete through the real sidebar menu; cancel keeps the conversation intact.
    await wait(()=>document.querySelector('[data-ai-session-id="'+ids[1]+'"]'),'sidebar conversation')
    const showDelete=async()=>{
@@ -99,7 +116,7 @@ app.whenReady().then(async()=>{
    assert(!dock(ids[1])&&!document.querySelector('[data-ai-session-id="'+ids[1]+'"]'),'deleted conversation still open')
    assert(tab('file:qa-tabs.md')&&tab('ai:'+ids[0]),'deletion removed unrelated tabs')
    for(const id of ids.filter(id=>id!==ids[1]))await ai.getState().closeSession(id)
-   return {phase:'restore',exactLayout:true,documents:true,aiTabs:true,widths:true,sidebarDelete:true,cancelDelete:true}
+   return {phase:'restore',exactLayout:true,documents:true,aiTabs:true,widths:true,sidebarDelete:true,cancelDelete:true,sidebarCollapsedRestored:true}
   })()`)
   console.log(JSON.stringify(result))
   if(phase==='save')fs.writeFileSync('/tmp/twill-workspace-flow.json',JSON.stringify(result))

@@ -22,6 +22,7 @@ export type WorkspaceSession = {
   activeRightTab: string
   rightDockWidth: number
   sidebarWidth: number
+  sidebarCollapsed: boolean
   splitLayout: SplitLayout | null
 }
 
@@ -92,11 +93,12 @@ export function parseWorkspaceSession(raw: string | null): WorkspaceSession | nu
       activeRightTab: typeof data.activeRightTab === 'string' ? data.activeRightTab : 'system:ai',
       rightDockWidth: Number.isFinite(data.rightDockWidth) ? Math.max(320, data.rightDockWidth) : 480,
       sidebarWidth: Number.isFinite(data.sidebarWidth) ? Math.max(200, data.sidebarWidth) : 256,
+      sidebarCollapsed: data.sidebarCollapsed === true,
     }
   } catch { return null }
 }
 
 export function serializeWorkspaceSession(state: WorkspaceSession): string {
-  const { openTabs, dockedAiTabs, dockedAiTabId, aiTabId, currentPath, view, dbDir, erdTabId, erdPath, erdDirectory, pluginViewId, rightDockOpen, activeRightTab, rightDockWidth, sidebarWidth, splitLayout } = state
-  return JSON.stringify({ version: 1, openTabs: openTabs.filter(validTab), dockedAiTabs, dockedAiTabId, aiTabId, currentPath, view, dbDir, erdTabId, erdPath, erdDirectory, pluginViewId, rightDockOpen, activeRightTab, rightDockWidth, sidebarWidth, splitLayout })
+  const { openTabs, dockedAiTabs, dockedAiTabId, aiTabId, currentPath, view, dbDir, erdTabId, erdPath, erdDirectory, pluginViewId, rightDockOpen, activeRightTab, rightDockWidth, sidebarWidth, sidebarCollapsed, splitLayout } = state
+  return JSON.stringify({ version: 1, openTabs: openTabs.filter(validTab), dockedAiTabs, dockedAiTabId, aiTabId, currentPath, view, dbDir, erdTabId, erdPath, erdDirectory, pluginViewId, rightDockOpen, activeRightTab, rightDockWidth, sidebarWidth, sidebarCollapsed, splitLayout })
 }

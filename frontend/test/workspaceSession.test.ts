@@ -7,7 +7,7 @@ const aiTab = { id:'ai:one', kind:'ai' as const, target:'one', title:'첫 대화
 const state: WorkspaceSession = {
   openTabs:[documentTab,aiTab], dockedAiTabs:[{...aiTab,id:'ai:two',target:'two'}], dockedAiTabId:'ai:two',
   aiTabId:'ai:one', currentPath:'한글.md', view:'ai', dbDir:null, erdTabId:null, erdPath:null, erdDirectory:null, pluginViewId:null,
-  rightDockOpen:true,activeRightTab:'system:ai',rightDockWidth:510,sidebarWidth:280,
+  rightDockOpen:true,activeRightTab:'system:ai',rightDockWidth:510,sidebarWidth:280,sidebarCollapsed:true,
   splitLayout:{activePanelId:'right',root:{kind:'split',id:'split',direction:'horizontal',ratio:38,
     first:{kind:'panel',id:'left',tabIds:[documentTab.id],activeTabId:documentTab.id},
     second:{kind:'panel',id:'right',tabIds:[aiTab.id],activeTabId:aiTab.id}}},
@@ -32,11 +32,13 @@ test('corrupt, foreign-version and duplicated layout entries do not break startu
   assert.equal(parseWorkspaceSession('{bad'),null)
   assert.equal(parseWorkspaceSession('{"version":99}'),null)
   const raw=JSON.parse(serializeWorkspaceSession(state))
+  delete raw.sidebarCollapsed
   raw.splitLayout.root.ratio=900
   raw.splitLayout.root.second.tabIds=[documentTab.id,aiTab.id]
   raw.openTabs.push({...documentTab})
   const restored=parseWorkspaceSession(JSON.stringify(raw))!
   assert.equal(restored.openTabs.length,2)
+  assert.equal(restored.sidebarCollapsed,false)
   assert.equal(restored.splitLayout?.root.kind==='split'&&restored.splitLayout.root.ratio,80)
   assert.deepEqual(restored.splitLayout?.root.kind==='split'&&restored.splitLayout.root.second.kind==='panel'&&restored.splitLayout.root.second.tabIds,[aiTab.id])
 })

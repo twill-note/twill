@@ -19,6 +19,7 @@ export default function Sidebar() {
   const [pickerOpen, setPickerOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const width = useAppStore((state) => state.sidebarWidth)
+  const collapsed = useAppStore((state) => state.sidebarCollapsed)
   const [tagsCollapsed, setTagsCollapsed] = useState(() => localStorage.getItem('sidebar.tags-collapsed') === '1')
   const searchShortcut = useShortcutStore((state) => state.bindings.search)
 
@@ -69,7 +70,9 @@ export default function Sidebar() {
 
   return (
     <aside
-      className="relative flex h-full shrink-0 flex-col border-r border-[#e9e9e7] bg-[#f7f7f5]"
+      id="workspace-sidebar"
+      aria-label="문서 탐색 패널"
+      className={`relative h-full shrink-0 flex-col border-r border-[#e9e9e7] bg-[#f7f7f5] ${collapsed ? 'hidden' : 'flex'}`}
       style={{ width }}
     >
       <div

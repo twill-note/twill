@@ -43,6 +43,9 @@ export default function DialogHost() {
       }}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={current.message}
         className="w-[400px] max-w-[90vw] overflow-hidden rounded-xl border border-[#e3e2e0] bg-white shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >

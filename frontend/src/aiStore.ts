@@ -1420,7 +1420,7 @@ export const useAiStore = create<AiStoreState>((set, get) => {
 
     closeSession: async (id) => {
       const s = get().sessions.find((x) => x.id === id)
-      if (s?.busy) get().cancel(id)
+      if (s?.busy || s?.queued) get().cancel(id)
       const ws = sockets.get(id)
       if (ws) {
         try {
@@ -1430,11 +1430,7 @@ export const useAiStore = create<AiStoreState>((set, get) => {
         }
         sockets.delete(id)
       }
-      try {
-        await api.ai.deleteSession(id)
-      } catch {
-        /* 서버에 없어도 로컬에서 제거 */
-      }
+      await api.ai.deleteSession(id)
       set((state) => {
         const sessions = state.sessions.filter((x) => x.id !== id)
         const active =

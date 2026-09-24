@@ -79,6 +79,12 @@
   --ui-scrollbar-thumb-active: #7a284e;
 }
 
+[data-theme='graphiteteal'] {
+  --ui-scrollbar-thumb: #30363a;
+  --ui-scrollbar-thumb-hover: #3a474b;
+  --ui-scrollbar-thumb-active: #80cbc4;
+}
+
 html,
 body,
 #root {

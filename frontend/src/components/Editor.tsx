@@ -468,17 +468,20 @@ const dbViewBlockSpec = createReactBlockSpec(
   },
 )
 
-// 기본 파서는 첫 로드 테마(github-dark)를 사용해 밝은 배경에서 대비가 무너짐 →
-// 밝은 배경용 고대비 테마(VSCode Light+)를 로드하고 파서에 명시적으로 고정
+// 대부분 테마는 밝은 코드 블록을 사용하고, Graphite Teal은 어두운 편집 배경에
+// 맞춰 Dark+ 문법 색상을 사용한다.
 const codeHighlightOptions = {
   ...codeBlockOptions,
   createHighlighter: async () => {
     const highlighter = await codeBlockOptions.createHighlighter!()
-    const lightPlus = (await import('@shikijs/themes/light-plus')).default
-    await highlighter.loadTheme(lightPlus)
+    const useGraphiteDark = document.documentElement.dataset.theme === 'graphiteteal'
+    const syntaxTheme = useGraphiteDark
+      ? (await import('@shikijs/themes/dark-plus')).default
+      : (await import('@shikijs/themes/light-plus')).default
+    await highlighter.loadTheme(syntaxTheme)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ;(globalThis as any)[Symbol.for('blocknote.shikiParser')] = createParser(highlighter, {
-      theme: 'light-plus',
+      theme: useGraphiteDark ? 'dark-plus' : 'light-plus',
     })
     return highlighter
   },

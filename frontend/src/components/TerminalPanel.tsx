@@ -5,6 +5,7 @@ import '@xterm/xterm/css/xterm.css'
 import { useEffect, useRef, useState } from 'react'
 import { APP_MONO_FONT_FAMILY, ensureKoreanFontLoaded } from '../fontFamilies'
 import { useAppStore } from '../store'
+import { useThemeStore } from '../theme'
 
 /**
  * 우측 도크에 마운트되는 터미널 탭 본문.
@@ -14,6 +15,7 @@ import { useAppStore } from '../store'
 export default function TerminalPanel() {
   const rightDockOpen = useAppStore((s) => s.rightDockOpen)
   const activeRightTab = useAppStore((s) => s.activeRightTab)
+  const appTheme = useThemeStore((s) => s.theme)
   const isVisible = rightDockOpen && activeRightTab === 'system:terminal'
   const [connected, setConnected] = useState(false)
   const [session, setSession] = useState(0)
@@ -32,12 +34,7 @@ export default function TerminalPanel() {
       fontSize: 13,
       lineHeight: 1.25,
       scrollback: 5000,
-      theme: {
-        background: '#1e1e1e',
-        foreground: '#d4d4d4',
-        cursor: '#d4d4d4',
-        selectionBackground: '#264f78',
-      },
+      theme: terminalTheme(useThemeStore.getState().theme),
     })
     term.attachCustomKeyEventHandler(
       (ev) => !(ev.ctrlKey && (ev.key === '`' || ev.code === 'Backquote')),
@@ -93,6 +90,10 @@ export default function TerminalPanel() {
   }, [session])
 
   useEffect(() => {
+    if (termRef.current) termRef.current.options.theme = terminalTheme(appTheme)
+  }, [appTheme])
+
+  useEffect(() => {
     if (isVisible && termRef.current) {
       requestAnimationFrame(() => {
         fitRef.current?.fit()
@@ -104,14 +105,14 @@ export default function TerminalPanel() {
   const restart = () => setSession((s) => s + 1)
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-[#1e1e1e]">
-      <div className="flex h-8 shrink-0 items-center justify-between border-b border-[#333] px-3">
-        <span className="flex items-center gap-2 text-[12px] font-medium text-[#cccccc]">
+    <div className="twill-terminal flex h-full min-h-0 flex-col bg-[#1e1e1e]">
+      <div className="twill-terminal-toolbar flex h-8 shrink-0 items-center justify-between border-b border-[#333] px-3">
+        <span className="twill-terminal-title flex items-center gap-2 text-[12px] font-medium text-[#cccccc]">
           <span className={`inline-block h-2 w-2 rounded-full ${connected ? 'bg-[#4ec9b0]' : 'bg-[#6e6e6e]'}`} />
           터미널
         </span>
         <button
-          className="rounded px-1.5 py-0.5 text-[13px] text-[#9d9d9d] hover:bg-[#333] hover:text-white"
+          className="twill-terminal-restart rounded px-1.5 py-0.5 text-[13px] text-[#9d9d9d] hover:bg-[#333] hover:text-white"
           title="세션 다시 시작"
           onClick={restart}
         >
@@ -121,4 +122,21 @@ export default function TerminalPanel() {
       <div ref={hostRef} className="min-h-0 flex-1 pl-2 pt-1" />
     </div>
   )
+}
+
+function terminalTheme(theme: string) {
+  if (theme === 'graphiteteal') {
+    return {
+      background: '#151719', foreground: '#ccdDe3', cursor: '#80cbc4',
+      selectionBackground: '#303b3e', black: '#151719', red: '#f78c6c',
+      green: '#c3e88d', yellow: '#ffc857', blue: '#82aaff', magenta: '#c792ea',
+      cyan: '#89ddff', white: '#ccdDe3', brightBlack: '#61686b', brightRed: '#ff9cac',
+      brightGreen: '#d7f5aa', brightYellow: '#ffda85', brightBlue: '#a8c3ff',
+      brightMagenta: '#dfb4f4', brightCyan: '#a8e8ff', brightWhite: '#e8f1f4',
+    }
+  }
+  return {
+    background: '#1e1e1e', foreground: '#d4d4d4', cursor: '#d4d4d4',
+    selectionBackground: '#264f78',
+  }
 }

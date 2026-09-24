@@ -307,6 +307,74 @@ THEMES: dict[str, dict] = {
     },
 
     # 플럼 아틀리에 — 웜 화이트 + 딥 플럼/앤티크 골드 (편집실 라이트)
+    # Twill Code — 차콜 그라파이트 + 차분한 틸 코드 팔레트
+    "graphiteteal": {
+        "dark": True,
+        "body": {"background": "#151719", "color": "#ccdDe3"},
+        "bg_white": "#1b1f21",
+        "text_white": "#101214",
+        "bg": {
+            "#f7f7f5": "#1b1f21", "#fbfbfa": "#171a1c", "#f1f1ef": "#252a2d",
+            "#efefed": "#222629", "#ececea": "#2a3033", "#e0e0de": "#343b3e",
+            "#e9e9e7": "#252a2d", "#e8e7e4": "#2a3033", "#f7f6f3": "#1b1f21",
+            "#fafafa": "#171a1c", "#565452": "#5da69f", "#37352f": "#80cbc4",
+            "#2b2925": "#61aaa3", "#4a9eff": "#80cbc4", "#faf7ff": "#202427",
+            "#c8b6ff": "#465653", "#6f5aa8": "#80cbc4", "#ede9fe": "#293532",
+            "#f3efff": "#293532", "#f1ebff": "#293532", "#fdf2f2": "#3a292a",
+            "#fdf0f0": "#3a292a", "#fff9eb": "#383226", "#fff7e6": "#383226",
+            "#fef3c7": "#383226", "#fffce8": "#383226", "#fef9e7": "#383226",
+            "#f5f8ff": "#222b30", "#e7f0ff": "#222b30", "#f0fdf4": "#20342d",
+            "#e5dbff": "#293532", "#eee9ff": "#293532", "#f7f4ff": "#202427",
+            "#fbf9ff": "#202427", "#e7edf9": "#222b30", "#f0f7ff": "#222b30",
+            "#fdf8ea": "#383226", "#e7f5ef": "#20342d", "#5d4a91": "#9bd8d1",
+            "#5c4a92": "#9bd8d1", "#e3e2e0": "#343b3e", "#eee0d6": "#383226",
+            "#faebdd": "#383226", "#fbf3db": "#383226", "#dbeddb": "#20342d",
+            "#dbeaf4": "#222b30", "#eae4f2": "#293532", "#f4dfeb": "#382a34",
+            "#fbe4e4": "#3a292a", "#fffcf5": "#383226", "#f4f8ff": "#222b30",
+            "#fdfcff": "#202427", "#faf0ff": "#202427", "#e8e8e5": "#252a2d",
+            "#dcdbd8": "#343b3e", "#c9c8c4": "#41494c",
+        },
+        "text": {
+            "#37352f": "#ccdDe3", "#2b2925": "#ccdDe3", "#5f5e5b": "#b7c3c8",
+            "#7d7c78": "#9da7ac", "#787774": "#9da7ac", "#9b9a97": "#707a7f",
+            "#b3b2ae": "#616b70", "#c8c7c4": "#505a5f", "#c9c8c4": "#505a5f",
+            "#c7c6c2": "#505a5f", "#d3d1cb": "#505a5f", "#243d73": "#89ddff",
+            "#6f5aa8": "#c792ea", "#5d4a91": "#c792ea", "#8a6ff0": "#c792ea",
+            "#9b91c1": "#9c8aaa", "#8a7bb8": "#b49ac3", "#8f83b4": "#a494b0",
+            "#375a9e": "#82aaff", "#2f6fd0": "#82aaff", "#216fbe": "#82aaff",
+            "#4a5568": "#b4c0c5", "#c92a2a": "#f78c6c", "#a12a2a": "#f78c6c",
+            "#0f7a48": "#c3e88d", "#a67c1b": "#ffc857", "#8a6817": "#ffc857",
+            "#92400e": "#ffc857", "#80621a": "#ffc857", "#795f28": "#ffc857",
+            "#5f4811": "#e9b84e", "#8a5a3b": "#d7a17d", "#b34d15": "#f78c6c",
+            "#217a3f": "#c3e88d", "#1f6fb2": "#89ddff", "#7c56b7": "#c792ea",
+            "#c94b8c": "#f48fb1",
+        },
+        "line": {
+            "#e9e9e7": "#252a2d", "#e3e2e0": "#343b3e", "#efefed": "#222629",
+            "#f1f1ef": "#222629", "#eeeeec": "#222629", "#d3d1cb": "#41494c",
+            "#8a8886": "#707a7f", "#37352f": "#80cbc4", "#4a9eff": "#80cbc4",
+            "#c8b6ff": "#465653", "#d9ccff": "#3a4747", "#e2d8fa": "#3a4747",
+            "#e8dcff": "#3a4747", "#a8c8ff": "#3c5860", "#fbcaca": "#704047",
+            "#f4dfab": "#625735", "#e7f5ef": "#315144", "#f4e9c8": "#625735",
+            "#e7e0cf": "#625735", "#c9dcff": "#3c5860", "#e6d4ff": "#3a4747",
+            "#efe9ff": "#293532", "#e3dcf7": "#3a4747", "#d5e6ff": "#3c5860",
+            "#f0e3c0": "#625735", "#c9d7f8": "#3c5860", "#d9c1ae": "#62513f",
+            "#f2d3ac": "#62513f", "#f0dfa6": "#625735", "#b6dab6": "#315144",
+            "#b7d4e8": "#3c5860", "#d1c1e8": "#3a4747", "#eec1da": "#59384a",
+            "#efbebe": "#704047",
+        },
+        "extra": """
+[data-theme="graphiteteal"] { color-scheme: dark; }
+[data-theme="graphiteteal"] [data-content-type="codeBlock"] { background: #151719 !important; border: 1px solid #30363a; border-radius: 8px; }
+[data-theme="graphiteteal"] .twill-terminal { background: #151719 !important; color: #ccdDe3; }
+[data-theme="graphiteteal"] .twill-terminal-toolbar { border-color: #30363a !important; }
+[data-theme="graphiteteal"] .twill-terminal-title { color: #ccdDe3 !important; }
+[data-theme="graphiteteal"] .twill-terminal-restart { color: #9da7ac !important; }
+[data-theme="graphiteteal"] .twill-terminal-restart:hover { background: #252a2d !important; color: #80cbc4 !important; }
+""",
+    },
+
+    # 플럼 아틀리에 — 웜 화이트 + 딥 플럼/앤티크 골드 (편집실 라이트)
     "plum": {
         "body": {"background": "#fcf8fb", "color": "#382a35"},
         "bg_white": "#fffdfd",

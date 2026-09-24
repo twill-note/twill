@@ -151,6 +151,7 @@ async def _login(ws: WebSocket):
         return
 
     url_sent = False
+    output_lines: list[str] = []
 
     async def pump_stdout() -> None:
         nonlocal url_sent
@@ -159,6 +160,9 @@ async def _login(ws: WebSocket):
             text = line.decode(errors="ignore").rstrip()
             if not text:
                 continue
+            output_lines.append(text)
+            if len(output_lines) > 40:
+                del output_lines[:-40]
             await ws.send_json({"type": "log", "text": text})
             if not url_sent:
                 match = _CODEX_URL_RE.search(text)
@@ -183,7 +187,14 @@ async def _login(ws: WebSocket):
         await proc.wait()
         if proc.returncode == 0:
             return True
-        await ws.send_json({"type": "error", "message": f"login exited with {proc.returncode}"})
+        details = "\n".join(
+            "[로그인 URL 생략]" if _CODEX_URL_RE.search(line) else line
+            for line in output_lines[-8:]
+        )
+        message = f"login exited with {proc.returncode}"
+        if details:
+            message = f"{message}\n{details}"
+        await ws.send_json({"type": "error", "message": message})
     except Exception as e:  # noqa: BLE001
         try:
             await ws.send_json({"type": "error", "message": str(e)})

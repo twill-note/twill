@@ -167,6 +167,23 @@ async function probeNoteFrontend(baseUrl, expectedHtml = null) {
   }
 }
 
+async function probeBackendCodexProfile(baseUrl) {
+  try {
+    const response = await fetch(`${baseUrl}/api/ai/status`, { signal: AbortSignal.timeout(1_000) })
+    if (!response.ok) return false
+    const status = await response.json()
+    if (status?.source !== 'managed' || typeof status.binary !== 'string') return true
+
+    const expectedBinary = path.join(app.getPath('userData'), 'codex-runtime', 'bin', packagedCodexName)
+    const canonicalPath = (value) => {
+      try { return fs.realpathSync(value) } catch { return path.resolve(value) }
+    }
+    return canonicalPath(status.binary) === canonicalPath(expectedBinary)
+  } catch {
+    return false
+  }
+}
+
 async function waitForBackend(baseUrl, timeoutMs = 30_000) {
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
@@ -196,7 +213,12 @@ async function startOrReuseBackend() {
   for (const port of backendPortCandidates(options.backendPort)) {
     const candidate = `http://${options.backendHost}:${port}`
     if (!await canListenOnPort(options.backendHost, port)) {
-      if (!process.argv.includes('--fresh-backend') && await probe(`${candidate}/api/workspace`) && await probeNoteFrontend(candidate, expectedFrontendHtml)) {
+      if (
+        !process.argv.includes('--fresh-backend') &&
+        await probe(`${candidate}/api/workspace`) &&
+        await probeNoteFrontend(candidate, expectedFrontendHtml) &&
+        await probeBackendCodexProfile(candidate)
+      ) {
         console.log(`[desktop] 실행 중인 백엔드를 재사용합니다: ${candidate}`)
         return candidate
       }
@@ -228,13 +250,24 @@ async function startBackendAtPort(baseUrl, port) {
   if (app.isPackaged && !fs.existsSync(command)) {
     throw new Error(`패키지에 백엔드 실행 파일이 없습니다: ${command}`)
   }
+  const backendEnvironment = { ...process.env }
+  // Twill이 Codex 터미널/에이전트에서 시작되면 해당 CLI의 실행 문맥이 함께 상속된다.
+  // 특히 CODEX_CI와 세션 메타데이터는 Twill이 시작하는 로그인 CLI에 전달하지 않는다.
+  for (const key of [
+    'CODEX_CI',
+    'CODEX_SESSION_ID',
+    'CODEX_THREAD_ID',
+    'CODEX_VERSION',
+    'CODEX_MANAGED_BY_NPM',
+    'CODEX_MANAGED_PACKAGE_ROOT',
+  ]) delete backendEnvironment[key]
   backendProcess = spawn(
     command,
     commandArgs,
     {
       cwd: app.isPackaged ? path.dirname(packagedBackend) : backendRoot,
       env: {
-        ...process.env,
+        ...backendEnvironment,
         ...(app.isPackaged && !process.env.NOTES_DIR ? { NOTES_DIR: path.join(app.getPath('documents'), 'Twill') } : {}),
         ...(app.isPackaged && fs.existsSync(packagedCodex) ? { TWILL_BUNDLED_CODEX_BINARY: packagedCodex } : {}),
         TWILL_CODEX_MANAGED_DIR: path.join(app.getPath('userData'), 'codex-runtime'),

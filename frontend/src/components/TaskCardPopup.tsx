@@ -9,6 +9,7 @@ import DbCell from './DbCell'
 import NoteBodyEditor, { type NoteBodySaveStatus } from './NoteBodyEditor'
 import SpellcheckToggleButton from './SpellcheckToggleButton'
 import { useBackdropDismiss } from '../useBackdropDismiss'
+import { tr } from '../i18n'
 
 interface Props {
   row: NoteRow
@@ -204,19 +205,19 @@ export default function TaskCardPopup({ row, config, onClose, onCellChange, onRo
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
-        aria-label={`${row.title || '태스크'} 편집`}
+        aria-label={`${row.title || tr("태스크")} 편집`}
       >
         {/* 헤더 */}
         <div className="flex shrink-0 items-start gap-2 border-b border-[#e9e9e7] px-6 py-3">
           <div className="min-w-0 flex-1">
-            <div className="text-[10px] uppercase tracking-wide text-[#9b9a97]">태스크</div>
+            <div className="text-[10px] uppercase tracking-wide text-[#9b9a97]">{tr("태스크")}</div>
             <div className="mt-0.5 flex items-center gap-2">
               <span className="text-[20px]">{row.icon || '📄'}</span>
               {/* 제목 인라인 편집 — 보드에서 + 로 만든 '무제' 카드를 팝업 안에서 바로 명명 */}
               <input
                 className="min-w-0 flex-1 rounded px-1 py-0.5 text-[16px] font-semibold text-[#37352f] outline-none placeholder:text-[#c8c7c4] hover:bg-[#f7f7f5] focus:bg-[#f7f7f5]"
                 defaultValue={row.title}
-                placeholder="태스크 제목"
+                placeholder={tr("태스크 제목")}
                 title={row.path}
                 onBlur={(e) => void saveTitle(e.currentTarget.value)}
                 onKeyDown={(e) => {
@@ -230,8 +231,8 @@ export default function TaskCardPopup({ row, config, onClose, onCellChange, onRo
               type="button"
               className="rounded p-1.5 text-[#9b9a97] hover:bg-[#efefed] hover:text-[#37352f]"
               onClick={openInMarkdownEditor}
-              title="마크다운 편집기에서 열기"
-              aria-label="마크다운 편집기에서 열기"
+              title={tr("마크다운 편집기에서 열기")}
+              aria-label={tr("마크다운 편집기에서 열기")}
             >
               <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" aria-hidden="true">
                 <path d="M6 2.5H2.5V6M10 13.5h3.5V10M2.5 6l4-4M13.5 10l-4 4" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
@@ -241,8 +242,8 @@ export default function TaskCardPopup({ row, config, onClose, onCellChange, onRo
               type="button"
               className="rounded px-2 py-0.5 text-[13px] text-[#9b9a97] hover:bg-[#efefed]"
               onClick={onClose}
-              title="닫기"
-              aria-label="태스크 편집 닫기"
+              title={tr("닫기")}
+              aria-label={tr("태스크 편집 닫기")}
             >
               ✕
             </button>
@@ -270,7 +271,7 @@ export default function TaskCardPopup({ row, config, onClose, onCellChange, onRo
         {/* 설명 — 본편집기와 동일한 마크다운 미리보기+편집 */}
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-3">
           <div className="mb-1.5 flex items-center justify-between gap-2">
-            <span className="text-[10px] uppercase tracking-wide text-[#9b9a97]">설명</span>
+            <span className="text-[10px] uppercase tracking-wide text-[#9b9a97]">{tr("설명")}</span>
             <div className="flex shrink-0 items-center gap-3">
               {bodySaveStatus !== 'idle' && (
                 <span
@@ -283,10 +284,10 @@ export default function TaskCardPopup({ row, config, onClose, onCellChange, onRo
                   }`}
                 >
                   {bodySaveStatus === 'saving'
-                    ? '저장 중…'
+                    ? tr("저장 중…")
                     : bodySaveStatus === 'saved'
-                      ? '저장됨 ✓'
-                      : '저장 실패'}
+                      ? tr("저장됨 ✓")
+                      : tr("저장 실패")}
                 </span>
               )}
               <SpellcheckToggleButton
@@ -305,7 +306,7 @@ export default function TaskCardPopup({ row, config, onClose, onCellChange, onRo
           ) : error ? (
             <p className="text-[12px] text-[#c92a2a]">{error}</p>
           ) : (
-            <p className="text-[12px] text-[#9b9a97]">로드 중…</p>
+            <p className="text-[12px] text-[#9b9a97]">{tr("로드 중…")}</p>
           )}
         </div>
 
@@ -317,12 +318,12 @@ export default function TaskCardPopup({ row, config, onClose, onCellChange, onRo
 
         {scopeMismatch && (
           <div className="shrink-0 border-t border-[#f4dfab] bg-[#fff9eb] px-6 py-2 text-[12px] text-[#8a6817]" role="alert">
-            <div className="font-medium">프로젝트가 변경되었습니다</div>
+            <div className="font-medium">{tr("프로젝트가 변경되었습니다")}</div>
             <div className="mt-0.5 text-[11px]">
               {TASK_PROJECT_CHANGED_MESSAGE}{' '}
               {taskSession?.busy || taskSession?.queued
-                ? '현재 실행이 끝나거나 보류된 뒤 새 실행을 시작할 수 있습니다.'
-                : '아래에서 변경된 프로젝트로 새 실행을 시작해주세요.'}
+                ? tr("현재 실행이 끝나거나 보류된 뒤 새 실행을 시작할 수 있습니다.")
+                : tr("아래에서 변경된 프로젝트로 새 실행을 시작해주세요.")}
             </div>
           </div>
         )}
@@ -335,7 +336,7 @@ export default function TaskCardPopup({ row, config, onClose, onCellChange, onRo
               : sourceSession
               ? `연결된 대화: ${sourceSession.title}`
               : sourceSessionId
-                ? '연결된 원본 대화를 찾을 수 없어 새 세션에서 실행합니다.'
+                ? tr("연결된 원본 대화를 찾을 수 없어 새 세션에서 실행합니다.")
                 : row.path}
           </div>
           <div className="flex shrink-0 items-center gap-2">
@@ -345,17 +346,17 @@ export default function TaskCardPopup({ row, config, onClose, onCellChange, onRo
               disabled={openingWork}
               title={
                 currentSessionAction === 'start-changed-project'
-                  ? '기존 세션을 재사용하지 않고 카드의 최신 프로젝트 권한으로 새 실행을 시작합니다.'
+                  ? tr("기존 세션을 재사용하지 않고 카드의 최신 프로젝트 권한으로 새 실행을 시작합니다.")
                   : taskSession
-                  ? '이미 연결된 작업 채팅을 엽니다. 새 채팅은 만들지 않습니다.'
-                  : '이 태스크의 작업을 시작하고 우측 작업 채팅에서 진행 상황을 보여줍니다.'
+                  ? tr("이미 연결된 작업 채팅을 엽니다. 새 채팅은 만들지 않습니다.")
+                  : tr("이 태스크의 작업을 시작하고 우측 작업 채팅에서 진행 상황을 보여줍니다.")
               }
             >
               {openingWork
-                ? '여는 중…'
+                ? tr("여는 중…")
                 : currentSessionAction === 'start-changed-project'
-                  ? '변경된 프로젝트로 새 실행'
-                  : '작업 수행'}
+                  ? tr("변경된 프로젝트로 새 실행")
+                  : tr("작업 수행")}
             </button>
           </div>
         </div>

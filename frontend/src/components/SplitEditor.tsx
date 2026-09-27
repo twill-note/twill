@@ -9,6 +9,7 @@ import ErdWorkspace from '../plugins/erd-designer/Workspace'
 import { discardErdTabSession, hasUnsavedErdTab, requestCloseErdTab } from '../plugins/erd-designer/session'
 
 import { type PanelNode, type SplitNode, type PaneNode, type SplitLayout } from '../workspaceSession'
+import { tr } from '../i18n'
 
 type DropZone = 'center' | 'left' | 'right' | 'top' | 'bottom'
 const MIN_PANE_RATIO = 20
@@ -470,7 +471,7 @@ function ResizeDivider({ direction, onResize }: { direction: SplitNode['directio
     <div
       role="separator"
       aria-orientation={horizontal ? 'vertical' : 'horizontal'}
-      aria-label={horizontal ? '좌우 패널 크기 조절' : '상하 패널 크기 조절'}
+      aria-label={horizontal ? tr("좌우 패널 크기 조절") : tr("상하 패널 크기 조절")}
       tabIndex={0}
       className={`group relative z-10 shrink-0 bg-[#e9e9e7] transition-colors hover:bg-[#4a9eff] focus:bg-[#4a9eff] ${
         horizontal ? 'w-1 cursor-col-resize' : 'h-1 cursor-row-resize'
@@ -649,7 +650,7 @@ function EditorPane({
         canClosePanel && isActivePanel ? 'ring-1 ring-inset ring-[#4a9eff]/45' : ''
       }`}
       onMouseDown={() => onFocusPanel(panel.id)}
-      aria-label="편집 패널"
+      aria-label={tr("편집 패널")}
       onDragOver={(event) => {
         if (!event.dataTransfer.types.includes('text/doc-tab')) return
         event.preventDefault()
@@ -771,7 +772,7 @@ function EditorPane({
                       event.stopPropagation()
                       onCloseTab(panel.id, tab.id)
                     }}
-                    title="탭 닫기"
+                    title={tr("탭 닫기")}
                     aria-label={`${tab.title} 탭 닫기`}
                   >
                     ×
@@ -784,7 +785,7 @@ function EditorPane({
           {tabScroll.overflow && (
             <div
               role="scrollbar"
-              aria-label="열린 탭 좌우 스크롤"
+              aria-label={tr("열린 탭 좌우 스크롤")}
               aria-orientation="horizontal"
               aria-valuemin={0}
               aria-valuemax={100}
@@ -847,8 +848,8 @@ function EditorPane({
               className="h-full px-2 text-[14px] text-[#7d7c78] hover:bg-[#ececea] hover:text-[#37352f] disabled:cursor-not-allowed disabled:opacity-35"
               onClick={() => scrollTabs(-1)}
               disabled={!tabScroll.left}
-              title="왼쪽 탭 보기"
-              aria-label="왼쪽 탭 보기"
+              title={tr("왼쪽 탭 보기")}
+              aria-label={tr("왼쪽 탭 보기")}
             >
               ‹
             </button>
@@ -856,8 +857,8 @@ function EditorPane({
               className="h-full border-l border-[#e9e9e7] px-2 text-[14px] text-[#7d7c78] hover:bg-[#ececea] hover:text-[#37352f] disabled:cursor-not-allowed disabled:opacity-35"
               onClick={() => scrollTabs(1)}
               disabled={!tabScroll.right}
-              title="오른쪽 탭 보기"
-              aria-label="오른쪽 탭 보기"
+              title={tr("오른쪽 탭 보기")}
+              aria-label={tr("오른쪽 탭 보기")}
             >
               ›
             </button>
@@ -867,8 +868,8 @@ function EditorPane({
           <button
             className="h-full shrink-0 border-l border-[#e9e9e7] px-2 text-[12px] text-[#9b9a97] hover:bg-[#ececea] hover:text-[#37352f]"
             onClick={() => onClosePanel(panel.id)}
-            title="패널 닫기"
-            aria-label="패널 닫기"
+            title={tr("패널 닫기")}
+            aria-label={tr("패널 닫기")}
           >
             ×
           </button>
@@ -885,8 +886,8 @@ function EditorPane({
         ) : (
           <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center text-[#9b9a97]">
             <span className="text-2xl">▧</span>
-            <p className="text-[13px]">비어 있는 편집 패널입니다</p>
-            <p className="text-[12px]">파일 트리나 상단 탭에서 노트를 열면 이 패널에 표시됩니다.</p>
+            <p className="text-[13px]">{tr("비어 있는 편집 패널입니다")}</p>
+            <p className="text-[12px]">{tr("파일 트리나 상단 탭에서 노트를 열면 이 패널에 표시됩니다.")}</p>
           </div>
         )}
       </div>
@@ -918,7 +919,7 @@ function EditorPane({
               }}
             >
               <span>📌</span>
-              {pinnedNotes.includes(tabMenu.tab.target) ? '상단바 고정 해제' : '상단바에 고정'}
+              {pinnedNotes.includes(tabMenu.tab.target) ? tr("상단바 고정 해제") : tr("상단바에 고정")}
             </button>}
             <button
               className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[12px] text-[#5f5e5b] hover:bg-[#f1f1ef]"
@@ -927,7 +928,7 @@ function EditorPane({
                 setTabMenu(null)
               }}
             >
-              <span>✕</span> 탭 닫기
+              <span>✕</span>  {tr("탭 닫기")}
             </button>
             <button
               className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[12px] text-[#5f5e5b] hover:bg-[#f1f1ef] disabled:cursor-not-allowed disabled:text-[#c8c7c4]"
@@ -938,7 +939,7 @@ function EditorPane({
                 void onCloseTabs(panel.id, tabs.filter((tab) => tab.id !== keepId).map((tab) => tab.id))
               }}
             >
-              <span>⊟</span> 기타 닫기
+              <span>⊟</span>  {tr("기타 닫기")}
             </button>
             <button
               className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[12px] text-[#5f5e5b] hover:bg-[#f1f1ef]"
@@ -947,7 +948,7 @@ function EditorPane({
                 void onCloseTabs(panel.id, tabs.map((tab) => tab.id))
               }}
             >
-              <span>⊠</span> 모두 닫기
+              <span>⊠</span>  {tr("모두 닫기")}
             </button>
           </div>
         </>

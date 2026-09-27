@@ -3,6 +3,7 @@ import type { DragEvent as ReactDragEvent, MouseEvent as ReactMouseEvent } from 
 import type { ReactNode } from 'react'
 import type { ErdColumn, ErdTable } from './types'
 import { commentText } from './comments'
+import { tr } from '../../i18n'
 
 interface LinkingState {
   fromTable: string
@@ -210,7 +211,7 @@ export default function TableBox({
             className="min-w-0 flex-1 rounded bg-transparent px-1 font-mono text-[14px] font-semibold outline-none placeholder:text-current placeholder:opacity-65 hover:bg-black/10 focus:bg-black/15"
             value={table.name}
             placeholder="table_name"
-            title="테이블 이름"
+            title={tr("테이블 이름")}
             disabled={controlsDisabled}
             onMouseDown={stopPropagation}
             onChange={(event) => onTableChange({ name: event.target.value })}
@@ -219,7 +220,7 @@ export default function TableBox({
           <button
             type="button"
             className="grid h-5 w-5 place-items-center rounded text-white/80 hover:bg-black/15 hover:text-white"
-            title="테이블 옵션"
+            title={tr("테이블 옵션")}
             disabled={controlsDisabled}
             onMouseDown={stopPropagation}
             onClick={() => {
@@ -237,8 +238,8 @@ export default function TableBox({
           <input
             className="min-w-0 flex-1 rounded bg-transparent px-1 text-[12px] text-[#5f5e5b] outline-none placeholder:text-[#c8c7c4] hover:bg-[#f1f1ef] focus:bg-[#f7f7f5] focus:ring-1 focus:ring-[#d3d1cb]"
             value={tableComment}
-            placeholder="테이블 설명"
-            title={tableComment || '테이블 COMMENT'}
+            placeholder={tr("테이블 설명")}
+            title={tableComment || tr("테이블 COMMENT")}
             disabled={controlsDisabled}
             // 일부 브라우저 테마에서 transparent 배경 input의 글자색이 상속돼 COMMENT가
             // 자리표시자만 보이는 문제를 막는다.
@@ -257,7 +258,7 @@ export default function TableBox({
 
         <div className="divide-y divide-[#efefed]">
           {table.columns.length === 0 ? (
-            <div className="flex h-9 items-center px-3 text-[11px] italic text-[#9b9a97]">컬럼 없음</div>
+            <div className="flex h-9 items-center px-3 text-[11px] italic text-[#9b9a97]">{tr("컬럼 없음")}</div>
           ) : (
             table.columns.map((column) => {
               const columnComment = commentText(column)
@@ -287,7 +288,7 @@ export default function TableBox({
                       className={`grid h-5 w-3 shrink-0 cursor-grab place-items-center text-[#b4b3b0] active:cursor-grabbing ${
                         draggingColumnId === column.id ? 'opacity-40' : 'hover:text-[#5f5e5b]'
                       }`}
-                      title="드래그하여 컬럼 순서 변경"
+                      title={tr("드래그하여 컬럼 순서 변경")}
                       onDragStart={(event) => beginColumnDrag(event, column.id)}
                       onDragEnd={() => {
                         setDraggingColumnId(null)
@@ -301,7 +302,7 @@ export default function TableBox({
                       <button
                         type="button"
                         className="grid h-5 w-5 place-items-center rounded text-[#d6a33c] hover:bg-[#fff9eb]"
-                        title="Primary key 해제"
+                        title={tr("Primary key 해제")}
                         disabled={controlsDisabled}
                         onClick={(event) => {
                           event.stopPropagation()
@@ -320,7 +321,7 @@ export default function TableBox({
                       <button
                         type="button"
                         className="grid h-5 w-5 place-items-center rounded text-transparent hover:bg-[#f1f1ef] hover:text-[#d6a33c]"
-                        title="Primary key로 지정"
+                        title={tr("Primary key로 지정")}
                         disabled={controlsDisabled}
                         onClick={(event) => {
                           event.stopPropagation()
@@ -356,8 +357,8 @@ export default function TableBox({
                     <input
                       className="min-w-0 flex-1 rounded bg-transparent px-1 text-[12px] text-[#5f5e5b] outline-none placeholder:text-[#c8c7c4] hover:bg-[#f1f1ef] focus:bg-[#f7f7f5] focus:ring-1 focus:ring-[#d3d1cb]"
                       value={columnComment}
-                      placeholder="설명"
-                      title={columnComment || '컬럼 COMMENT'}
+                      placeholder={tr("설명")}
+                      title={columnComment || tr("컬럼 COMMENT")}
                       disabled={controlsDisabled}
                       style={{ color: '#5f5e5b', WebkitTextFillColor: '#5f5e5b', opacity: 1 }}
                       onClick={stopPropagation}
@@ -368,7 +369,7 @@ export default function TableBox({
                       className={`grid h-5 w-5 shrink-0 place-items-center rounded text-[#9b9a97] hover:bg-[#efefed] hover:text-[#5f5e5b] ${
                         openColumnMenu === column.id ? 'bg-[#efefed] text-[#5f5e5b]' : ''
                       }`}
-                      title="컬럼 옵션"
+                      title={tr("컬럼 옵션")}
                       disabled={controlsDisabled}
                       onClick={(event) => {
                         event.stopPropagation()
@@ -410,7 +411,7 @@ export default function TableBox({
           onClick={onColumnAdd}
         >
           <PlusIcon />
-          <span className="ml-1">컬럼 추가</span>
+          <span className="ml-1">{tr("컬럼 추가")}</span>
         </button>
       </div>
 
@@ -419,8 +420,8 @@ export default function TableBox({
           selected ? 'text-[#777672]' : 'text-transparent hover:text-[#9b9a97]'
         }`}
         onMouseDown={startResize}
-        title="드래그하여 테이블 너비 조절"
-        aria-label="테이블 너비 조절"
+        title={tr("드래그하여 테이블 너비 조절")}
+        aria-label={tr("테이블 너비 조절")}
       >
         <span className="h-8 w-px rounded bg-current" />
       </div>
@@ -467,8 +468,9 @@ function TableMenu({
       data-erd-menu
     >
       <div className="mb-1 flex items-center justify-between px-1 text-[8px] font-semibold tracking-[0.08em] text-[#9b9a97]">
-        테이블 옵션
-        <button className="rounded px-1 hover:bg-[#f1f1ef]" onClick={onClose} title="닫기">×</button>
+
+        {tr("테이블 옵션")}
+        <button className="rounded px-1 hover:bg-[#f1f1ef]" onClick={onClose} title={tr("닫기")}>×</button>
       </div>
       <div className="mb-2 flex flex-wrap gap-1 border-b border-[#efeeeb] px-1 pb-2">
         {['#3b82f6', '#10b981', '#8b5cf6', '#f59e0b', '#ef4444', '#ec4899', '#14b8a6', '#6366f1', '#6b7280'].map((color) => (
@@ -477,16 +479,16 @@ function TableMenu({
             type="button"
             className={`h-4 w-4 rounded-full ring-offset-1 ${table.color === color ? 'ring-2 ring-[#37352f]' : 'hover:ring-1 hover:ring-[#9b9a97]'}`}
             style={{ backgroundColor: color }}
-            title="헤더 색상"
+            title={tr("헤더 색상")}
             onClick={() => onChange({ color })}
           />
         ))}
       </div>
       <button className="flex w-full items-center gap-1.5 rounded px-1.5 py-1 hover:bg-[#f1f1ef]" onClick={onDuplicate}>
-        <CopyIcon /> 테이블 복제
+        <CopyIcon />  {tr("테이블 복제")}
       </button>
       <button className="mt-0.5 flex w-full items-center gap-1.5 rounded px-1.5 py-1 text-[#c34e4e] hover:bg-[#fff3f3]" onClick={onRemove}>
-        <TrashIcon /> 테이블 삭제
+        <TrashIcon />  {tr("테이블 삭제")}
       </button>
     </div>
   )
@@ -517,8 +519,9 @@ function ColumnMenu({
       data-erd-menu
     >
       <div className="mb-1.5 flex items-center justify-between text-[8px] font-semibold tracking-[0.08em] text-[#9b9a97]">
-        컬럼 옵션
-        <button className="rounded px-1 hover:bg-[#f1f1ef]" onClick={onClose} title="닫기">×</button>
+
+        {tr("컬럼 옵션")}
+        <button className="rounded px-1 hover:bg-[#f1f1ef]" onClick={onClose} title={tr("닫기")}>×</button>
       </div>
       <div className="grid grid-cols-2 gap-x-2 gap-y-1.5 border-b border-[#efeeeb] pb-2">
         <label className="flex items-center gap-1.5">
@@ -538,15 +541,15 @@ function ColumnMenu({
         DEFAULT
         <input
           className="mt-1 w-full rounded border border-[#e3e2e0] px-1.5 py-1 font-mono text-[10px] text-[#37352f] outline-none focus:border-[#d3d1cb]"
-          placeholder="예: CURRENT_TIMESTAMP"
+          placeholder={tr("예: CURRENT_TIMESTAMP")}
           value={column.defaultVal ?? ''}
           onChange={(event) => onChange({ defaultVal: event.target.value || undefined })}
         />
       </label>
       <div className="mt-2 flex items-center gap-1 border-t border-[#efeeeb] pt-2">
-        <button className="rounded px-1.5 py-1 hover:bg-[#f1f1ef] disabled:text-[#c9c8c4]" disabled={isFirst} onClick={() => onMove(-1)}>위로</button>
-        <button className="rounded px-1.5 py-1 hover:bg-[#f1f1ef] disabled:text-[#c9c8c4]" disabled={isLast} onClick={() => onMove(1)}>아래로</button>
-        <button className="ml-auto rounded px-1.5 py-1 text-[#c34e4e] hover:bg-[#fff3f3]" onClick={onRemove}>삭제</button>
+        <button className="rounded px-1.5 py-1 hover:bg-[#f1f1ef] disabled:text-[#c9c8c4]" disabled={isFirst} onClick={() => onMove(-1)}>{tr("위로")}</button>
+        <button className="rounded px-1.5 py-1 hover:bg-[#f1f1ef] disabled:text-[#c9c8c4]" disabled={isLast} onClick={() => onMove(1)}>{tr("아래로")}</button>
+        <button className="ml-auto rounded px-1.5 py-1 text-[#c34e4e] hover:bg-[#fff3f3]" onClick={onRemove}>{tr("삭제")}</button>
       </div>
     </div>
   )

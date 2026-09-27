@@ -19,6 +19,7 @@ import { DbBoard, DbTable } from './dbviews'
 import TaskCardPopup from './TaskCardPopup'
 import TaskRunButton, { runAllTasks } from './TaskRunButton'
 import { notifyWorkspaceScopesChanged, subscribeWorkspaceScopesChanged } from '../workspaceScopeEvents'
+import { tr } from '../i18n'
 
 function isAutoFollowup(row: NoteRow): boolean {
   const created = row.props.auto_created
@@ -52,16 +53,16 @@ function GroupByPicker({
         onClick={() => setOpen((current) => !current)}
         aria-expanded={open}
         aria-haspopup="listbox"
-        title="보드 그룹 기준"
+        title={tr("보드 그룹 기준")}
       >
-        <span className="truncate">{selected?.label ?? '그룹 속성'}</span>
+        <span className="truncate">{selected?.label ?? tr("그룹 속성")}</span>
         <span className={`text-[10px] text-[#9b9a97] transition-transform ${open ? 'rotate-180' : ''}`}>⌄</span>
       </button>
       {open && (
         <>
           <button
             className="fixed inset-0 z-10 cursor-default"
-            aria-label="그룹 기준 선택 닫기"
+            aria-label={tr("그룹 기준 선택 닫기")}
             onClick={() => setOpen(false)}
           />
           <div className="absolute right-0 z-20 mt-1 min-w-40 overflow-hidden rounded-md border border-[#e3e2e0] bg-white py-1 shadow-lg" role="listbox">
@@ -117,9 +118,9 @@ function ProjectFilterPicker({
         onClick={() => setOpen((current) => !current)}
         aria-expanded={open}
         aria-haspopup="listbox"
-        title="프로젝트별 태스크 필터"
+        title={tr("프로젝트별 태스크 필터")}
       >
-        <span className="truncate">{selected?.label ?? '전체 프로젝트'}</span>
+        <span className="truncate">{selected?.label ?? tr("전체 프로젝트")}</span>
         <span className={`shrink-0 text-[10px] text-[#9b9a97] transition-transform ${open ? 'rotate-180' : ''}`}>⌄</span>
       </button>
       {open && (
@@ -127,15 +128,15 @@ function ProjectFilterPicker({
           <button
             type="button"
             className="fixed inset-0 z-10 cursor-default"
-            aria-label="프로젝트 필터 닫기"
+            aria-label={tr("프로젝트 필터 닫기")}
             onClick={() => setOpen(false)}
           />
           <div
             className="absolute left-0 z-20 mt-1 max-h-72 min-w-full overflow-y-auto rounded-md border border-[#e3e2e0] bg-white py-1 shadow-lg"
             role="listbox"
-            aria-label="프로젝트 필터"
+            aria-label={tr("프로젝트 필터")}
           >
-            {[{ value: '', label: '전체 프로젝트' }, ...options].map((option) => {
+            {[{ value: '', label: tr("전체 프로젝트") }, ...options].map((option) => {
               const active = option.value === value
               return (
                 <button
@@ -157,7 +158,7 @@ function ProjectFilterPicker({
               )
             })}
             {options.length === 0 && (
-              <p className="px-3 py-2 text-[11px] text-[#9b9a97]">설정된 프로젝트가 없습니다.</p>
+              <p className="px-3 py-2 text-[11px] text-[#9b9a97]">{tr("설정된 프로젝트가 없습니다.")}</p>
             )}
           </div>
         </>
@@ -595,12 +596,12 @@ export default function DatabaseView() {
       <header className="flex flex-wrap items-center gap-2 border-b border-[#efefed] px-6 py-3">
         <span className="text-[18px]">📊</span>
         {config.kind === 'task_board' ? (
-          <h1 className="px-1.5 py-0.5 text-[15px] font-semibold text-[#37352f]">태스크 보드</h1>
+          <h1 className="px-1.5 py-0.5 text-[15px] font-semibold text-[#37352f]">{tr("태스크 보드")}</h1>
         ) : (
           <input
             className="min-w-[100px] flex-none rounded px-1.5 py-0.5 text-[15px] font-semibold text-[#37352f] outline-none placeholder:text-[#c8c7c4] hover:bg-[#f7f7f5] focus:bg-white focus:ring-1 focus:ring-[#d3d1cb]"
             value={config.title}
-            placeholder={dbDir || '제목 없는 데이터베이스'}
+            placeholder={dbDir || tr("제목 없는 데이터베이스")}
             onChange={(e) => setConfig({ ...config, title: e.target.value })}
             onBlur={() => persistConfig(config)}
             onKeyDown={(e) => {
@@ -608,17 +609,18 @@ export default function DatabaseView() {
             }}
           />
         )}
-        <span className="text-[12px] text-[#9b9a97]" title={dbDir || '전체 노트'}>
+        <span className="text-[12px] text-[#9b9a97]" title={dbDir || tr("전체 노트")}>
           · {visible.length}
         </span>
         {dbRowFilter?.length ? (
-          <span className="rounded bg-[#f1ebff] px-1.5 py-0.5 text-[10px] text-[#6f5aa8]" title="방금 자동 등록된 카드만 표시 중">
-            자동 등록 {visible.length}개
+          <span className="rounded bg-[#f1ebff] px-1.5 py-0.5 text-[10px] text-[#6f5aa8]" title={tr("방금 자동 등록된 카드만 표시 중")}>
+
+            {tr("자동 등록")} {visible.length}{tr("개")}
           </span>
         ) : null}
         <input
           className="ml-2 w-56 rounded-md border border-[#e3e2e0] px-2.5 py-1 text-[13px] outline-none placeholder:text-[#c8c7c4] focus:border-blue-400"
-          placeholder={config.kind === 'task_board' ? '태스크 검색…' : '필터…'}
+          placeholder={config.kind === 'task_board' ? tr("태스크 검색…") : tr("필터…")}
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
         />
@@ -633,7 +635,7 @@ export default function DatabaseView() {
                 className={`rounded px-2 py-0.5 ${mode === m ? 'bg-white shadow-sm' : 'text-[#7d7c78] hover:text-[#37352f]'}`}
                 onClick={() => changeMode(m)}
               >
-                {m === 'table' ? '표' : '보드'}
+                {m === 'table' ? tr("표") : tr("보드")}
               </button>
             ))}
           </div>
@@ -645,7 +647,8 @@ export default function DatabaseView() {
           className="ml-2 rounded-md bg-[#37352f] px-3 py-1 text-[12px] font-medium text-white hover:bg-[#2b2925]"
           onClick={() => createRow()}
         >
-          + 새로 만들기
+
+          {tr("+ 새로 만들기")}
         </button>
         <button
           className="ml-auto rounded px-2 py-1 text-[13px] text-[#9b9a97] hover:bg-[#f1f1ef] hover:text-[#37352f]"
@@ -655,7 +658,8 @@ export default function DatabaseView() {
             else setView('editor')
           }}
         >
-          ✕ 닫기
+
+          {tr("✕ 닫기")}
         </button>
       </header>
 
@@ -701,9 +705,9 @@ export default function DatabaseView() {
                         ? [
                             {
                               icon: '▶▶',
-                              label: '전체 실행',
+                              label: tr("전체 실행"),
                               disabled: items.length === 0,
-                              title: '컬럼의 카드들을 위에서부터 순서대로 차례로 실행',
+                              title: tr("컬럼의 카드들을 위에서부터 순서대로 차례로 실행"),
                               onClick: () => {
                                 void runAllTasks(items).then(() => setReloadKey((k) => k + 1))
                               },
@@ -728,9 +732,10 @@ export default function DatabaseView() {
                       isAutoFollowup(row) ? (
                         <span
                           className="rounded-full bg-[#faf0ff] px-1.5 py-0.5 text-[10px] font-medium text-[#8a3fa0]"
-                          title="이전 버전에서 AI가 자동 등록한 후속 업무입니다."
+                          title={tr("이전 버전에서 AI가 자동 등록한 후속 업무입니다.")}
                         >
-                          🤖 기존 자동 후속
+
+                          {tr("🤖 기존 자동 후속")}
                         </span>
                       ) : null
                   : undefined

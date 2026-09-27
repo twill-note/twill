@@ -1,5 +1,6 @@
 import { useAiStore } from '../aiStore'
 import { SYSTEM_AI_TAB, useAppStore } from '../store'
+import { tr } from '../i18n'
 
 /**
  * 벼리 작업 완료 알림 토스트 — 메인 화면 우하단.
@@ -29,14 +30,14 @@ export default function AiToasts() {
             </span>
             <div className="min-w-0 flex-1">
               <p className="truncate text-[12px] font-semibold text-[#37352f]">
-                {t.kind === 'error' ? 'AI 작업 오류' : 'AI 작업 완료'} — {t.title}
+                {t.kind === 'error' ? tr("AI 작업 오류") : tr("AI 작업 완료")} — {t.title}
               </p>
               <p className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-[#5f5e5b]">{t.message}</p>
             </div>
             <button
               className="shrink-0 rounded px-1 text-[12px] text-[#9b9a97] hover:bg-[#f1f1ef] hover:text-[#37352f]"
               onClick={() => dismissToast(t.id)}
-              title="알림 닫기"
+              title={tr("알림 닫기")}
             >
               ✕
             </button>
@@ -51,7 +52,8 @@ export default function AiToasts() {
                   dismissToast(t.id)
                 }}
               >
-                결과 보기
+
+                {tr("결과 보기")}
               </button>
             </div>
           )}

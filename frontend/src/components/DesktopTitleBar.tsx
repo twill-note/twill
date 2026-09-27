@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import DesktopResizeHandles from './DesktopResizeHandles'
+import { tr } from '../i18n'
 
 export default function DesktopTitleBar({ title = 'Twill' }: { title?: string }) {
   const desktop = window.noteDesktop
@@ -74,8 +75,8 @@ export default function DesktopTitleBar({ title = 'Twill' }: { title?: string })
           <button
             type="button"
             className="desktop-titlebar__control flex h-full w-12 items-center justify-center hover:bg-[#ececea]"
-            title="최소화"
-            aria-label="창 최소화"
+            title={tr("최소화")}
+            aria-label={tr("창 최소화")}
             onDoubleClick={(event) => event.stopPropagation()}
             onClick={() => void desktop.windowControls.minimize()}
           >
@@ -86,8 +87,8 @@ export default function DesktopTitleBar({ title = 'Twill' }: { title?: string })
           <button
             type="button"
             className="desktop-titlebar__control flex h-full w-12 items-center justify-center hover:bg-[#ececea]"
-            title={maximized ? '이전 크기로 복원' : '최대화'}
-            aria-label={maximized ? '창 이전 크기로 복원' : '창 최대화'}
+            title={maximized ? tr("이전 크기로 복원") : tr("최대화")}
+            aria-label={maximized ? tr("창 이전 크기로 복원") : tr("창 최대화")}
             onDoubleClick={(event) => event.stopPropagation()}
             onClick={() => void desktop.windowControls.toggleMaximize()}
           >
@@ -104,8 +105,8 @@ export default function DesktopTitleBar({ title = 'Twill' }: { title?: string })
           <button
             type="button"
             className="desktop-titlebar__control flex h-full w-12 items-center justify-center hover:bg-[#c42b1c] hover:text-white"
-            title="닫기"
-            aria-label="창 닫기"
+            title={tr("닫기")}
+            aria-label={tr("창 닫기")}
             onDoubleClick={(event) => event.stopPropagation()}
             onClick={() => void desktop.windowControls.close()}
           >

@@ -1,6 +1,7 @@
 import { registerRestartGuard } from './restartGuards'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, type QuickMemoSaveResult } from './api'
+import { tr } from './i18n'
 
 const MAX_MEMO_LENGTH = 10_000
 
@@ -143,14 +144,14 @@ export default function QuickMemoApp() {
     <main className="quick-memo" aria-labelledby="quick-memo-title">
       <header className="quick-memo__header">
         <div>
-          <p className="quick-memo__eyebrow">빠른 메모</p>
-          <h1 id="quick-memo-title">떠오른 생각을 바로 남기세요</h1>
+          <p className="quick-memo__eyebrow">{tr("빠른 메모")}</p>
+          <h1 id="quick-memo-title">{tr("떠오른 생각을 바로 남기세요")}</h1>
         </div>
-        <span className="quick-memo__status-dot" aria-label="저장 준비됨" />
+        <span className="quick-memo__status-dot" aria-label={tr("저장 준비됨")} />
       </header>
 
-      <section className="quick-memo__editor" aria-label="메모 입력">
-        <label className="sr-only" htmlFor="quick-memo-content">메모</label>
+      <section className="quick-memo__editor" aria-label={tr("메모 입력")}>
+        <label className="sr-only" htmlFor="quick-memo-content">{tr("메모")}</label>
         <textarea
           ref={textareaRef}
           id="quick-memo-content"
@@ -159,14 +160,14 @@ export default function QuickMemoApp() {
             setContent(event.target.value)
             if (notice.kind !== 'idle') setNotice({ kind: 'idle' })
           }}
-          placeholder="무엇을 기록할까요?"
+          placeholder={tr("무엇을 기록할까요?")}
           disabled={isSaving}
           aria-describedby="quick-memo-help quick-memo-count quick-memo-feedback"
           aria-invalid={isTooLong}
           spellCheck
         />
         <div className="quick-memo__editor-foot">
-          <span id="quick-memo-help">일반 텍스트로 오늘의 데일리에 저장돼요.</span>
+          <span id="quick-memo-help">{tr("일반 텍스트로 오늘의 데일리에 저장돼요.")}</span>
           <span id="quick-memo-count" className={isTooLong ? 'is-warning' : undefined}>{charCountLabel}</span>
         </div>
       </section>
@@ -174,25 +175,25 @@ export default function QuickMemoApp() {
       <div id="quick-memo-feedback" className="quick-memo__feedback" aria-live="polite">
         {notice.kind === 'success' && (
           <p className="quick-memo__message quick-memo__message--success">
-            {notice.alreadySaved ? '이미 저장된 메모예요.' : `${formatDailyDate(notice.date)} 데일리에 저장했어요.`}
+            {notice.alreadySaved ? tr("이미 저장된 메모예요.") : `${formatDailyDate(notice.date)} 데일리에 저장했어요.`}
           </p>
         )}
         {notice.kind === 'error' && (
           <div className="quick-memo__message quick-memo__message--error">
             <p>{notice.message}</p>
             <div className="quick-memo__recovery-actions">
-              <button type="button" onClick={() => void save()} disabled={isSaving || isEmpty || isTooLong}>다시 시도</button>
-              <button type="button" onClick={() => void copyContent()} disabled={!content}>복사</button>
+              <button type="button" onClick={() => void save()} disabled={isSaving || isEmpty || isTooLong}>{tr("다시 시도")}</button>
+              <button type="button" onClick={() => void copyContent()} disabled={!content}>{tr("복사")}</button>
             </div>
           </div>
         )}
-        {notice.kind === 'copied' && <p className="quick-memo__message quick-memo__message--success">메모를 클립보드에 복사했어요.</p>}
+        {notice.kind === 'copied' && <p className="quick-memo__message quick-memo__message--success">{tr("메모를 클립보드에 복사했어요.")}</p>}
       </div>
 
       <footer className="quick-memo__footer">
-        <span className="quick-memo__shortcut"><kbd>{shortcut}</kbd> <kbd>Enter</kbd> 저장</span>
+        <span className="quick-memo__shortcut"><kbd>{shortcut}</kbd> <kbd>Enter</kbd>  {tr("저장")}</span>
         <button type="button" className="quick-memo__save" onClick={() => void save()} disabled={!canSave}>
-          {isSaving ? '저장 중…' : '저장'}
+          {isSaving ? tr("저장 중…") : tr("저장")}
         </button>
       </footer>
     </main>

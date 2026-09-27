@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { usePluginRegistry } from '../plugins/registry'
+import { tr } from '../i18n'
 
 type Rect = { top: number; left: number }
 
@@ -138,7 +139,7 @@ export default function SelectionToolbar({
           // 유지하므로 스크린 리더와 키보드만으로도 액션을 실행할 수 있다.
           onMouseDown={(event) => event.preventDefault()}
           role="toolbar"
-          aria-label="선택한 텍스트 작업"
+          aria-label={tr("선택한 텍스트 작업")}
         >
           <div className="flex items-center gap-0.5">
             {actions.map((action) => (

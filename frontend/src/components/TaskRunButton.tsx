@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useAiStore } from '../aiStore'
 import { SYSTEM_AI_TAB, useAppStore } from '../store'
 import type { NoteRow } from '../types'
+import { tr } from '../i18n'
 
 /**
  * 태스크 보드 '실행 중' 컬럼 카드 우측 상단의 ▶ 실행 버튼.
@@ -67,10 +68,11 @@ export default function TaskRunButton({ row, onStarted }: { row: NoteRow; onStar
       <button
         className="flex items-center gap-1 rounded border border-[#d5e6ff] bg-[#f0f7ff] px-1.5 py-0.5 text-[10px] text-[#2f6fd0]"
         onClick={onClick}
-        title="실행 중 — 클릭하면 Twill AI 세션 탭으로 이동"
+        title={tr("실행 중 — 클릭하면 Twill AI 세션 탭으로 이동")}
       >
         <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-[#4a9eff]" />
-        실행 중
+
+        {tr("실행 중")}
       </button>
     )
   }
@@ -81,9 +83,10 @@ export default function TaskRunButton({ row, onStarted }: { row: NoteRow; onStar
         // (#8a6817·#f4dfab·#fdf8ea 는 테마 생성기에서 전부 매핑되는 토큰이라 다크에서도 대비 유지)
         className="flex items-center gap-1 rounded border border-[#f4dfab] bg-[#fdf8ea] px-1.5 py-0.5 text-[10px] font-medium text-[#8a6817]"
         onClick={onClick}
-        title="대기 중 — 실행 슬롯/같은 프로젝트 실행이 끝나면 자동 시작"
+        title={tr("대기 중 — 실행 슬롯/같은 프로젝트 실행이 끝나면 자동 시작")}
       >
-        ⏳ 대기
+
+        {tr("⏳ 대기")}
       </button>
     )
   }
@@ -92,9 +95,10 @@ export default function TaskRunButton({ row, onStarted }: { row: NoteRow; onStar
       <button
         className="rounded border border-[#d5e6ff] bg-[#f0f7ff] px-1.5 py-0.5 text-[10px] text-[#2f6fd0]"
         onClick={onClick}
-        title="원본 대화가 다른 요청을 처리 중입니다. 클릭하면 해당 대화로 이동합니다."
+        title={tr("원본 대화가 다른 요청을 처리 중입니다. 클릭하면 해당 대화로 이동합니다.")}
       >
-        💬 대화 중
+
+        {tr("💬 대화 중")}
       </button>
     )
   }
@@ -105,11 +109,11 @@ export default function TaskRunButton({ row, onStarted }: { row: NoteRow; onStar
         onClick={onClick}
         title={
           sourceSession
-            ? '이 태스크를 등록한 원본 대화에서 이어서 실행'
-            : '카드에 세팅된 값대로 Twill AI 세션을 만들어 실행'
+            ? tr("이 태스크를 등록한 원본 대화에서 이어서 실행")
+            : tr("카드에 세팅된 값대로 Twill AI 세션을 만들어 실행")
         }
       >
-        {sourceSession ? '▶ 이어서 실행' : '▶ 실행'}
+        {sourceSession ? tr("▶ 이어서 실행") : tr("▶ 실행")}
       </button>
       {startError && (
         <span className="text-right text-[10px] leading-snug text-[#c92a2a]" role="alert">

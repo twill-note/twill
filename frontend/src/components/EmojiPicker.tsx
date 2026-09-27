@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { tr } from '../i18n'
 
 const PRESETS = [
   '📝', '📄', '📁', '📊', '📈', '📅', '✅', '❗',
@@ -58,7 +59,7 @@ export default function EmojiPicker({ onSelect, onRemove, onClose }: Props) {
       <div className="mt-2 flex gap-1.5">
         <input
           className="min-w-0 flex-1 rounded border border-[#e3e2e0] px-2 py-1 text-[12px] outline-none focus:border-blue-400"
-          placeholder="직접 입력 (예: 🐳)"
+          placeholder={tr("직접 입력 (예: 🐳)")}
           value={custom}
           onChange={(e) => setCustom(e.target.value)}
           onKeyDown={(e) => {
@@ -76,7 +77,8 @@ export default function EmojiPicker({ onSelect, onRemove, onClose }: Props) {
               onClose()
             }}
           >
-            제거
+
+            {tr("제거")}
           </button>
         )}
       </div>

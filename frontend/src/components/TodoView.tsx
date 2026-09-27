@@ -3,6 +3,7 @@ import { api } from '../api'
 import { useAppStore } from '../store'
 import type { TodoGroup } from '../types'
 import { dialog } from '../dialog'
+import { tr } from '../i18n'
 
 export default function TodoView() {
   const openFile = useAppStore((s) => s.openFile)
@@ -39,9 +40,10 @@ export default function TodoView() {
       <div className="mx-auto max-w-3xl">
         <div className="mb-5 flex items-center justify-between">
           <div>
-            <h2 className="text-xl font-bold text-[#37352f]">✅ 할 일 모아보기</h2>
+            <h2 className="text-xl font-bold text-[#37352f]">{tr("✅ 할 일 모아보기")}</h2>
             <p className="mt-0.5 text-[13px] text-[#9b9a97]">
-              모든 노트의 체크박스를 한곳에서 · 미완료 {total}개
+
+              {tr("모든 노트의 체크박스를 한곳에서 · 미완료")} {total}{tr("개")}
             </p>
           </div>
           <label className="flex cursor-pointer items-center gap-1.5 text-[13px] text-[#5f5e5b]">
@@ -50,17 +52,20 @@ export default function TodoView() {
               checked={includeDone}
               onChange={(e) => setIncludeDone(e.target.checked)}
             />
-            완료 항목 표시
+
+            {tr("완료 항목 표시")}
           </label>
         </div>
 
-        {loading && groups.length === 0 && <p className="text-[13px] text-[#9b9a97]">불러오는 중…</p>}
+        {loading && groups.length === 0 && <p className="text-[13px] text-[#9b9a97]">{tr("불러오는 중…")}</p>}
 
         {!loading && groups.length === 0 && (
           <div className="rounded-lg border border-dashed border-[#e3e2e0] px-4 py-10 text-center text-[13px] text-[#9b9a97]">
-            남은 할 일이 없습니다 🎉
+
+            {tr("남은 할 일이 없습니다 🎉")}
             <br />
-            노트에 <code className="rounded bg-[#f1f1ef] px-1">- [ ] 할 일</code> 을 적으면 여기에 모입니다
+
+            {tr("노트에")} <code className="rounded bg-[#f1f1ef] px-1">{tr("- [ ] 할 일")}</code>  {tr("을 적으면 여기에 모입니다")}
           </div>
         )}
 

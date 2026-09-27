@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from 'react'
 import { APP_MONO_FONT_FAMILY, ensureKoreanFontLoaded } from '../fontFamilies'
 import { useAppStore } from '../store'
 import { useThemeStore } from '../theme'
+import { tr } from '../i18n'
 
 /**
  * 우측 도크에 마운트되는 터미널 탭 본문.
@@ -109,11 +110,12 @@ export default function TerminalPanel() {
       <div className="twill-terminal-toolbar flex h-8 shrink-0 items-center justify-between border-b border-[#333] px-3">
         <span className="twill-terminal-title flex items-center gap-2 text-[12px] font-medium text-[#cccccc]">
           <span className={`inline-block h-2 w-2 rounded-full ${connected ? 'bg-[#4ec9b0]' : 'bg-[#6e6e6e]'}`} />
-          터미널
+
+          {tr("터미널")}
         </span>
         <button
           className="twill-terminal-restart rounded px-1.5 py-0.5 text-[13px] text-[#9d9d9d] hover:bg-[#333] hover:text-white"
-          title="세션 다시 시작"
+          title={tr("세션 다시 시작")}
           onClick={restart}
         >
           ↻

@@ -10,6 +10,7 @@ import { notifyWorkspaceScopesChanged } from '../workspaceScopeEvents'
 import { useBackdropDismiss } from '../useBackdropDismiss'
 import ProjectAiTasks from './ProjectAiTasks'
 import { sessionProjectId } from '../aiProjectGroups'
+import { tr } from '../i18n'
 
 interface MenuState {
   x: number
@@ -519,7 +520,7 @@ export default function FileTree() {
                 {node.db && (
                   <span
                     className="ml-1 shrink-0 rounded bg-[#e7f5ef] px-1 text-[9px] font-medium text-[#0f7a48]"
-                    title="데이터베이스 (행은 DB 뷰에서만 표시)"
+                    title={tr("데이터베이스 (행은 DB 뷰에서만 표시)")}
                   >
                     DB
                   </span>
@@ -527,7 +528,7 @@ export default function FileTree() {
                 {node.special === 'agents' && (
                   <span
                     className="ml-1 shrink-0 rounded bg-[#fef3c7] px-1 text-[9px] font-medium text-[#92400e]"
-                    title="노트 워크스페이스 AGENTS.md (Codex가 현재 작업 경로에서 자동 탐색)"
+                    title={tr("노트 워크스페이스 AGENTS.md (Codex가 현재 작업 경로에서 자동 탐색)")}
                   >
                     AGENTS
                   </span>
@@ -535,7 +536,7 @@ export default function FileTree() {
                 {node.special === 'memories' && (
                   <span
                     className="ml-1 shrink-0 rounded bg-[#ede9fe] px-1 text-[9px] font-medium text-[#6f5aa8]"
-                    title="AI 메모리 노트 (필요할 때 검색하고 직접 검토·편집)"
+                    title={tr("AI 메모리 노트 (필요할 때 검색하고 직접 검토·편집)")}
                   >
                     MEM
                   </span>
@@ -548,7 +549,7 @@ export default function FileTree() {
                 {creatingHere && (
                   <InlineInput
                     depth={depth + 1}
-                    placeholder={creating!.type === 'file' ? '새 노트 이름' : '새 폴더 이름'}
+                    placeholder={creating!.type === 'file' ? tr("새 노트 이름") : tr("새 폴더 이름")}
                     onSubmit={handleCreate}
                     onCancel={() => setCreating(null)}
                   />
@@ -577,25 +578,26 @@ export default function FileTree() {
     >
       {/* 파일 트리 헤더: 프로젝트 추가 · 새 폴더 · 새 노트 */}
       <div className="mb-1 flex items-center justify-between px-2 pt-0.5 pb-1">
-        <span className="text-[10px] font-medium uppercase tracking-wide text-[#9b9a97]">파일</span>
+        <span className="text-[10px] font-medium uppercase tracking-wide text-[#9b9a97]">{tr("파일")}</span>
         <div className="flex gap-0.5">
           <button
             className="rounded px-1.5 py-0.5 text-[11px] text-[#9b9a97] hover:bg-[#e8e7e4] hover:text-[#37352f]"
-            title="새 프로젝트 추가"
+            title={tr("새 프로젝트 추가")}
             onClick={() => setAddingSection(true)}
           >
-            + 프로젝트
+
+            {tr("+ 프로젝트")}
           </button>
           <button
             className="rounded px-1.5 py-0.5 text-[11px] text-[#9b9a97] hover:bg-[#e8e7e4] hover:text-[#37352f]"
-            title="루트에 새 폴더"
+            title={tr("루트에 새 폴더")}
             onClick={() => setCreating({ dir: '', type: 'dir' })}
           >
             📁+
           </button>
           <button
             className="rounded px-1.5 py-0.5 text-[11px] text-[#9b9a97] hover:bg-[#e8e7e4] hover:text-[#37352f]"
-            title="루트에 새 노트"
+            title={tr("루트에 새 노트")}
             onClick={() => setCreating({ dir: '', type: 'file' })}
           >
             📄+
@@ -606,7 +608,7 @@ export default function FileTree() {
       {addingSection && (
         <InlineInput
           depth={0}
-          placeholder="새 프로젝트 이름 (예: 쇼핑몰, 사내 도구…)"
+          placeholder={tr("새 프로젝트 이름 (예: 쇼핑몰, 사내 도구…)")}
           onSubmit={addSection}
           onCancel={() => setAddingSection(false)}
         />
@@ -661,7 +663,7 @@ export default function FileTree() {
                 <>
                   <button
                     className="rounded px-1 text-[11px] text-[#c9c8c4] hover:text-[#5f5e5b]"
-                    title="프로젝트 옵션"
+                    title={tr("프로젝트 옵션")}
                     onClick={(e) => {
                       e.stopPropagation()
                       const r = (e.target as HTMLElement).getBoundingClientRect()
@@ -679,7 +681,8 @@ export default function FileTree() {
               {renderNodes(s.nodes, 0)}
               {s.nodes.length === 0 && (
                 <p className="px-3 py-1 text-[11px] text-[#c9c8c4]">
-                  (비어있음 — 폴더/노트를 여기로 드래그)
+
+                  {tr("(비어있음 — 폴더/노트를 여기로 드래그)")}
                 </p>
               )}
               <ProjectAiTasks key={`${root}:${s.id}`} projectId={s.id} sessions={projectSessions.get(s.id) ?? []} error={sessionsError} />
@@ -693,14 +696,15 @@ export default function FileTree() {
       {creating && creating.dir === '' && (
         <InlineInput
           depth={0}
-          placeholder={creating.type === 'file' ? '새 노트 이름' : '새 폴더 이름'}
+          placeholder={creating.type === 'file' ? tr("새 노트 이름") : tr("새 폴더 이름")}
           onSubmit={handleCreate}
           onCancel={() => setCreating(null)}
         />
       )}
       {tree.length === 0 && !creating && (
         <p className="px-3 py-2 text-[12px] text-[#9b9a97]">
-          우클릭으로 첫 노트를 만들어 보세요
+
+          {tr("우클릭으로 첫 노트를 만들어 보세요")}
         </p>
       )}
 
@@ -745,21 +749,21 @@ export default function FileTree() {
           {menu.section && (
             <>
               <MenuItem
-                label="✏️ 프로젝트 이름 변경"
+                label={tr("✏️ 프로젝트 이름 변경")}
                 onClick={() => {
                   setRenamingSection(menu.section!.id)
                   setMenu(null)
                 }}
               />
               <MenuItem
-                label={menu.section.project_path ? '🔗 프로젝트 경로 변경' : '🔗 프로젝트 경로 지정'}
+                label={menu.section.project_path ? tr("🔗 프로젝트 경로 변경") : tr("🔗 프로젝트 경로 지정")}
                 onClick={() => {
                   setPathDialog({ project: menu.section!, creation: false })
                   setMenu(null)
                 }}
               />
               <MenuItem
-                label="🗑️ 프로젝트 삭제"
+                label={tr("🗑️ 프로젝트 삭제")}
                 danger
                 onClick={() => {
                   deleteSection(menu.section!.id)
@@ -773,7 +777,7 @@ export default function FileTree() {
           {!menu.section && (
             <>
               <MenuItem
-                label="🗂️ 새 프로젝트"
+                label={tr("🗂️ 새 프로젝트")}
                 onClick={() => {
                   setAddingSection(true)
                   setMenu(null)
@@ -790,7 +794,7 @@ export default function FileTree() {
                 />
               )}
               <MenuItem
-                label="📄 새 노트"
+                label={tr("📄 새 노트")}
                 onClick={() => {
                   const dir = !menu.node ? '' : menu.node.type === 'dir' ? menu.node.path : parentOf(menu.node.path)
                   if (menu.node?.type === 'dir') setExpanded((prev) => new Set(prev).add(menu.node!.path))
@@ -799,7 +803,7 @@ export default function FileTree() {
                 }}
               />
               <MenuItem
-                label="📁 새 폴더"
+                label={tr("📁 새 폴더")}
                 onClick={() => {
                   const dir = !menu.node ? '' : menu.node.type === 'dir' ? menu.node.path : parentOf(menu.node.path)
                   if (menu.node?.type === 'dir') setExpanded((prev) => new Set(prev).add(menu.node!.path))
@@ -809,7 +813,7 @@ export default function FileTree() {
               />
               {menu.node?.type === 'dir' && (
                 <MenuItem
-                  label="🗄️ 새 테이블"
+                  label={tr("🗄️ 새 테이블")}
                   onClick={() => {
                     createErdDiagram(menu.node!.path)
                     setMenu(null)
@@ -818,7 +822,7 @@ export default function FileTree() {
               )}
               {menu.node?.type === 'file' && (
                 <MenuItem
-                  label="🗒️ 새 하위 노트"
+                  label={tr("🗒️ 새 하위 노트")}
                   onClick={() => {
                     const dir = childDirOf(menu.node!)
                     setExpanded((prev) => new Set(prev).add(menu.node!.path))
@@ -828,7 +832,7 @@ export default function FileTree() {
                 />
               )}
               <MenuItem
-                label="📋 템플릿으로 새 노트"
+                label={tr("📋 템플릿으로 새 노트")}
                 onClick={() => {
                   const dir = !menu.node ? '' : childDirOf(menu.node)
                   if (menu.node) setExpanded((prev) => new Set(prev).add(menu.node!.path))
@@ -838,7 +842,7 @@ export default function FileTree() {
               />
               {(!menu.node || menu.node.type === 'dir') && (
                 <MenuItem
-                  label="📊 테이블로 보기"
+                  label={tr("📊 테이블로 보기")}
                   onClick={() => {
                     openDatabase(menu.node?.path ?? '')
                     setMenu(null)
@@ -849,7 +853,7 @@ export default function FileTree() {
               {menu.node && !menu.node.path.includes('/') && (
                 <>
                   <div className="my-1 border-t border-[#eeeeec]" />
-                  <div className="px-3 pt-1 pb-0.5 text-[10px] uppercase tracking-wide text-[#9b9a97]">프로젝트</div>
+                  <div className="px-3 pt-1 pb-0.5 text-[10px] uppercase tracking-wide text-[#9b9a97]">{tr("프로젝트")}</div>
                   {sections.map((sec) => {
                     const inThisSection = sec.items.includes(menu.node!.path)
                     return (
@@ -864,7 +868,7 @@ export default function FileTree() {
                     )
                   })}
                   <MenuItem
-                    label="   Root (프로젝트에서 빼기)"
+                    label={tr('Root (프로젝트에서 빼기)')}
                     onClick={() => {
                       moveToSection(menu.node!.path, null)
                       setMenu(null)
@@ -872,7 +876,8 @@ export default function FileTree() {
                   />
                   {sections.length === 0 && (
                     <p className="px-3 py-1 text-[11px] text-[#c9c8c4]">
-                      (아직 프로젝트 없음 — 상단 + 프로젝트 추가)
+
+                      {tr("(아직 프로젝트 없음 — 상단 + 프로젝트 추가)")}
                     </p>
                   )}
                 </>
@@ -889,14 +894,14 @@ export default function FileTree() {
                 <>
                   <div className="my-1 border-t border-[#eeeeec]" />
                   <MenuItem
-                    label="✏️ 이름 변경"
+                    label={tr("✏️ 이름 변경")}
                     onClick={() => {
                       setRenaming(menu.node!.path)
                       setMenu(null)
                     }}
                   />
                   <MenuItem
-                    label="🗑️ 삭제 (휴지통)"
+                    label={tr("🗑️ 삭제 (휴지통)")}
                     danger
                     onClick={() => {
                       handleDelete(menu.node!)
@@ -987,14 +992,16 @@ function TemplateModal({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="border-b border-[#efefed] px-4 py-3">
-          <h3 className="text-[15px] font-semibold text-[#37352f]">📋 템플릿으로 새 노트</h3>
-          <p className="mt-0.5 text-[12px] text-[#9b9a97]">위치: {dir || '(루트)'}</p>
+          <h3 className="text-[15px] font-semibold text-[#37352f]">{tr("📋 템플릿으로 새 노트")}</h3>
+          <p className="mt-0.5 text-[12px] text-[#9b9a97]">{tr("위치:")} {dir || tr("(루트)")}</p>
         </div>
         {templates.length === 0 ? (
           <p className="px-4 py-6 text-center text-[13px] text-[#9b9a97]">
-            아직 템플릿이 없습니다.
+
+            {tr("아직 템플릿이 없습니다.")}
             <br />
-            아래 "새 템플릿 만들기"로 첫 템플릿을 작성해 보세요.
+
+            {tr("아래 \"새 템플릿 만들기\"로 첫 템플릿을 작성해 보세요.")}
           </p>
         ) : (
           <div className="px-4 py-3">
@@ -1014,7 +1021,7 @@ function TemplateModal({
             <input
               autoFocus
               className="w-full rounded border border-[#e3e2e0] px-2.5 py-1.5 text-[13px] outline-none focus:border-blue-400"
-              placeholder="새 노트 이름"
+              placeholder={tr("새 노트 이름")}
               value={name}
               onChange={(e) => setName(e.target.value)}
               onKeyDown={(e) => {
@@ -1029,13 +1036,15 @@ function TemplateModal({
           <button
             className="rounded px-2 py-1.5 text-[13px] text-[#5f5e5b] hover:bg-[#f1f1ef]"
             onClick={createTemplate}
-            title="templates/ 폴더에 새 템플릿 노트를 만들고 에디터에서 작성"
+            title={tr("templates/ 폴더에 새 템플릿 노트를 만들고 에디터에서 작성")}
           >
-            ➕ 새 템플릿 만들기
+
+            {tr("➕ 새 템플릿 만들기")}
           </button>
           <div className="flex gap-2">
             <button className="rounded border border-[#e3e2e0] px-3 py-1.5 text-[13px] hover:bg-[#f1f1ef]" onClick={onClose}>
-              취소
+
+              {tr("취소")}
             </button>
             {templates.length > 0 && (
               <button
@@ -1043,7 +1052,8 @@ function TemplateModal({
                 disabled={!name.trim() || !selected}
                 onClick={create}
               >
-                만들기
+
+                {tr("만들기")}
               </button>
             )}
           </div>

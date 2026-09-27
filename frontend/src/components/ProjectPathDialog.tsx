@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { api } from '../api'
 import { dialog } from '../dialog'
 import type { BrowseResult } from '../types'
+import { tr } from '../i18n'
 
 type ProjectPathDialogProps = {
   projectName: string
@@ -108,14 +109,16 @@ export default function ProjectPathDialog({
       >
         <div className="border-b border-[#efefed] px-4 py-3">
           <h3 id="project-path-title" className="text-[15px] font-semibold text-[#37352f]">
-            프로젝트 경로 지정
+
+            {tr("프로젝트 경로 지정")}
           </h3>
           <p className="mt-1 text-[12px] text-[#787774]">
-            <span className="font-medium text-[#37352f]">{projectName}</span>에서 AI가 확인하고 수정할 코드·분석 폴더를 선택하세요.
+            <span className="font-medium text-[#37352f]">{projectName}</span>{tr("에서 AI가 확인하고 수정할 코드·분석 폴더를 선택하세요.")}
           </p>
           {creation && (
             <p className="mt-1 text-[11px] text-[#9b9a97]">
-              프로젝트와 독립 문서 저장소는 이미 생성되었습니다. 경로는 나중에 지정해도 됩니다.
+
+              {tr("프로젝트와 독립 문서 저장소는 이미 생성되었습니다. 경로는 나중에 지정해도 됩니다.")}
             </p>
           )}
         </div>
@@ -126,8 +129,8 @@ export default function ProjectPathDialog({
             className="rounded border border-[#e3e2e0] px-2 py-1 text-[12px] text-[#787774] hover:bg-[#f1f1ef] disabled:opacity-40"
             onClick={() => browse?.parent && void navigate(browse.parent)}
             disabled={!browse?.parent}
-            aria-label="상위 폴더"
-            title="상위 폴더"
+            aria-label={tr("상위 폴더")}
+            title={tr("상위 폴더")}
           >
             ↑
           </button>
@@ -139,22 +142,23 @@ export default function ProjectPathDialog({
             onKeyDown={(event) => {
               if (event.key === 'Enter') void navigate(input)
             }}
-            placeholder="코드·분석 폴더 경로"
-            aria-label="프로젝트 경로"
+            placeholder={tr("코드·분석 폴더 경로")}
+            aria-label={tr("프로젝트 경로")}
           />
           <button
             type="button"
             className="rounded border border-[#e3e2e0] px-2 py-1 text-[12px] text-[#5f5e5b] hover:bg-[#f1f1ef]"
             onClick={() => void navigate(input)}
           >
-            이동
+
+            {tr("이동")}
           </button>
           <button
             type="button"
             className="rounded border border-[#e3e2e0] px-2 py-1 text-[12px] hover:bg-[#f1f1ef]"
             onClick={() => browse && void navigate(browse.home)}
-            aria-label="홈 폴더"
-            title="홈 폴더"
+            aria-label={tr("홈 폴더")}
+            title={tr("홈 폴더")}
           >
             🏠
           </button>
@@ -178,7 +182,7 @@ export default function ProjectPathDialog({
             </button>
           ))}
           {browse && browse.dirs.length === 0 && (
-            <p className="px-2 py-4 text-center text-[12px] text-[#9b9a97]">하위 폴더가 없습니다</p>
+            <p className="px-2 py-4 text-center text-[12px] text-[#9b9a97]">{tr("하위 폴더가 없습니다")}</p>
           )}
         </div>
 
@@ -190,7 +194,7 @@ export default function ProjectPathDialog({
               className="rounded border border-[#e3e2e0] bg-white px-3 py-1.5 text-[13px] text-[#5f5e5b] hover:bg-[#f1f1ef]"
               onClick={onClose}
             >
-              {creation ? '선택 안함' : '취소'}
+              {creation ? tr("선택 안함") : tr("취소")}
             </button>
             <button
               type="button"
@@ -198,7 +202,7 @@ export default function ProjectPathDialog({
               onClick={() => void select()}
               disabled={!input.trim() || saving}
             >
-              {saving ? '연결 중…' : '경로 선택'}
+              {saving ? tr("연결 중…") : tr("경로 선택")}
             </button>
           </div>
         </div>

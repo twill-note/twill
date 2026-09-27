@@ -11,6 +11,7 @@ import { dialog } from '../dialog'
 import type { NoteRow } from '../types'
 import DbCell from './DbCell'
 import DbColumnConfig from './DbColumnConfig'
+import { tr } from '../i18n'
 
 /** 데이터베이스 뷰 공용 컴포넌트 — 전체 페이지(DatabaseView)와 본문 임베드 블록(dbview)이 함께 사용 */
 
@@ -168,7 +169,7 @@ export function DbTable({
               className={`${pad} cursor-pointer text-left font-medium whitespace-nowrap text-[#9b9a97] select-none hover:text-[#37352f]`}
               onClick={() => toggleSort('title')}
             >
-              {config.kind === 'scopes_board' ? '프로젝트' : '제목'}
+              {config.kind === 'scopes_board' ? tr("프로젝트") : tr("제목")}
               {sort.key === 'title' && <span className="ml-1 text-[10px]">{sort.asc ? '▲' : '▼'}</span>}
             </th>
             {showDate && (
@@ -176,10 +177,11 @@ export function DbTable({
                 className={`${pad} cursor-pointer text-left font-medium whitespace-nowrap text-[#9b9a97] select-none hover:text-[#37352f]`}
                 onClick={() => toggleSort('date')}
               >
-                날짜{sort.key === 'date' && <span className="ml-1 text-[10px]">{sort.asc ? '▲' : '▼'}</span>}
+
+                {tr("날짜")}{sort.key === 'date' && <span className="ml-1 text-[10px]">{sort.asc ? '▲' : '▼'}</span>}
               </th>
             )}
-            {displayTags && <th className={`${pad} text-left font-medium whitespace-nowrap text-[#9b9a97]`}>태그</th>}
+            {displayTags && <th className={`${pad} text-left font-medium whitespace-nowrap text-[#9b9a97]`}>{tr("태그")}</th>}
             {dataColumns.map((c) => (
               <th
                 key={c.key}
@@ -191,7 +193,7 @@ export function DbTable({
                     e.stopPropagation()
                     if (onColumnChange) setConfigCol({ col: c, anchor: e.currentTarget })
                   }}
-                  title="컬럼 설정"
+                  title={tr("컬럼 설정")}
                 >
                   <span className="text-[10px] text-[#9b9a97]">{typeIcon(c.type)}</span>
                   <span>{c.label ?? c.key}</span>
@@ -202,7 +204,7 @@ export function DbTable({
                     e.stopPropagation()
                     toggleSort(c.key)
                   }}
-                  title="정렬"
+                  title={tr("정렬")}
                 >
                   {sort.key === c.key ? (sort.asc ? '▲' : '▼') : '⇅'}
                 </button>
@@ -213,7 +215,7 @@ export function DbTable({
                 <button
                   className="rounded px-2 py-0.5 text-[12px] text-[#9b9a97] hover:bg-[#f1f1ef] hover:text-[#37352f]"
                   onClick={onColumnAdd}
-                  title="새 컬럼"
+                  title={tr("새 컬럼")}
                 >
                   +
                 </button>
@@ -236,7 +238,7 @@ export function DbTable({
               <td
                 className={`${pad} max-w-[320px] truncate font-medium text-[#37352f]`}
                 onClick={() => onOpen(r.path)}
-                title={config.kind === 'scopes_board' ? '프로젝트 AGENTS.md 열기' : undefined}
+                title={config.kind === 'scopes_board' ? tr("프로젝트 AGENTS.md 열기") : undefined}
               >
                 {config.kind === 'scopes_board' ? '🎯' : r.icon || '📄'} {displayRowTitle(r, config)}
               </td>
@@ -289,7 +291,7 @@ export function DbTable({
           onClick={onCreateRow}
         >
           <span>+</span>
-          <span>새로 만들기</span>
+          <span>{tr("새로 만들기")}</span>
         </button>
       )}
       {configCol && onColumnChange && (
@@ -331,7 +333,7 @@ export function DbTable({
                 setCtxMenu(null)
               }}
             >
-              <span>📄</span> 열기
+              <span>📄</span>  {tr("열기")}
             </button>
             {(rowMenuItems?.(ctxMenu.row) ?? []).map((item, index) => (
               <button
@@ -440,7 +442,7 @@ export function DbBoard({ rows, config, groupBy, onOpen, onOpenDocument, onCellC
   }, [rows, groupBy, groupCol])
 
   if (!groupBy) {
-    return <p className="px-2 py-6 text-center text-[13px] text-[#9b9a97]">그룹으로 사용할 속성을 선택하세요</p>
+    return <p className="px-2 py-6 text-center text-[13px] text-[#9b9a97]">{tr("그룹으로 사용할 속성을 선택하세요")}</p>
   }
 
   const cleanupColumn = async (label: string, items: NoteRow[]) => {
@@ -461,10 +463,10 @@ export function DbBoard({ rows, config, groupBy, onOpen, onOpenDocument, onCellC
       {groups.map(([value, items]) => {
         const opt = groupCol ? findOption(groupCol, value) : null
         const badge = badgeClasses(opt?.color ?? 'default')
-        const columnLabel = opt ? opt.label : value || '미분류'
+        const columnLabel = opt ? tr(opt.label) : tr(value || tr("미분류"))
         return (
           <div
-            key={value || '(없음)'}
+            key={value || tr("(없음)")}
             className={`group/col w-64 shrink-0 rounded-lg bg-[#f7f7f5] p-2 ${
               fillHeight ? 'flex max-h-full flex-col' : ''
             } ${dragOver === value ? 'ring-2 ring-blue-300' : ''}`}
@@ -494,7 +496,7 @@ export function DbBoard({ rows, config, groupBy, onOpen, onOpenDocument, onCellC
                     const rect = e.currentTarget.getBoundingClientRect()
                     setColMenu({ x: rect.right, y: rect.bottom + 4, value, label: columnLabel })
                   }}
-                  title="컬럼 메뉴"
+                  title={tr("컬럼 메뉴")}
                 >
                   ⋯
                 </button>
@@ -572,14 +574,14 @@ export function DbBoard({ rows, config, groupBy, onOpen, onOpenDocument, onCellC
                 onClick={() => onCreateRow(value)}
               >
                 <span>+</span>
-                <span>새 페이지</span>
+                <span>{tr("새 페이지")}</span>
               </button>
             )}
           </div>
         )
       })}
       {groups.length === 0 && (
-        <p className="w-full px-2 py-6 text-center text-[13px] text-[#9b9a97]">노트가 없습니다</p>
+        <p className="w-full px-2 py-6 text-center text-[13px] text-[#9b9a97]">{tr("노트가 없습니다")}</p>
       )}
 
       {/* 컬럼 ⋯ 메뉴 — 정리(휴지통) + 컬럼별 추가 액션(예: '실행'의 전체 실행) */}
@@ -627,9 +629,9 @@ export function DbBoard({ rows, config, groupBy, onOpen, onOpenDocument, onCellC
                       setColMenu(null)
                       void cleanupColumn(colMenu.label, items)
                     }}
-                    title="휴지통(.trash)으로 이동 — 필요하면 복구 가능"
+                    title={tr("휴지통(.trash)으로 이동 — 필요하면 복구 가능")}
                   >
-                    <span>🗑</span> 카드 모두 정리
+                    <span>🗑</span>  {tr("카드 모두 정리")}
                   </button>
                 )}
               </div>
@@ -662,7 +664,7 @@ export function DbBoard({ rows, config, groupBy, onOpen, onOpenDocument, onCellC
                 setCtxMenu(null)
               }}
             >
-              <span>📄</span> 열기
+              <span>📄</span>  {tr("열기")}
             </button>
             {(rowMenuItems?.(ctxMenu.row) ?? []).map((item, index) => (
               <button
@@ -687,9 +689,9 @@ export function DbBoard({ rows, config, groupBy, onOpen, onOpenDocument, onCellC
                   void onDeleteRow(ctxMenu.row.path)
                   setCtxMenu(null)
                 }}
-                title="휴지통(.trash)으로 이동 — 필요하면 복구 가능"
+                title={tr("휴지통(.trash)으로 이동 — 필요하면 복구 가능")}
               >
-                <span>🗑</span> 삭제 (휴지통 이동)
+                <span>🗑</span>  {tr("삭제 (휴지통 이동)")}
               </button>
             )}
           </div>

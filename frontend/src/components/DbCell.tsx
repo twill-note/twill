@@ -12,6 +12,7 @@ import {
   type SelectOption,
 } from '../dbschema'
 import type { BrowseResult } from '../types'
+import { tr } from '../i18n'
 
 interface Props {
   column: ColumnDef
@@ -113,7 +114,7 @@ function CellDisplay({
           {column.type === 'status' && (
             <span className={`h-1.5 w-1.5 rounded-full ${badge.text.replace('text-', 'bg-')}`} />
           )}
-          {opt?.label ?? v}
+          {tr(opt?.label ?? v)}
         </span>
       </div>
     )
@@ -129,7 +130,7 @@ function CellDisplay({
           const badge = badgeClasses(opt?.color ?? 'default')
           return (
             <span key={v} className={`rounded px-1.5 py-0.5 text-[11px] ${badge.bg} ${badge.text}`}>
-              {opt?.label ?? v}
+              {tr(opt?.label ?? v)}
             </span>
           )
         })}
@@ -152,7 +153,7 @@ function CellDisplay({
           }}
         >
           <span>📄</span>
-          <span>열기</span>
+          <span>{tr("열기")}</span>
         </button>
       )
     }
@@ -176,7 +177,7 @@ function CellDisplay({
         📁 {v}
       </span>
     ) : (
-      <span className="text-[12px] text-[#c7c6c2]">— 클릭해서 폴더 선택</span>
+      <span className="text-[12px] text-[#c7c6c2]">{tr("— 클릭해서 폴더 선택")}</span>
     )
   }
 
@@ -442,7 +443,7 @@ function OptionPicker({
         <input
           ref={inputRef}
           className="w-full rounded bg-[#f7f7f5] px-2 py-1 text-[12px] outline-none"
-          placeholder="옵션 검색 또는 새로 추가…"
+          placeholder={tr("옵션 검색 또는 새로 추가…")}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => {
@@ -469,9 +470,9 @@ function OptionPicker({
               <button
                 className="flex-1 truncate text-left"
                 onClick={() => toggle(opt.value)}
-                title={isSel ? '선택 해제' : '선택'}
+                title={isSel ? tr("선택 해제") : tr("선택")}
               >
-                <span className={`rounded px-1.5 py-0.5 text-[11px] ${badge.bg} ${badge.text}`}>{opt.label}</span>
+                <span className={`rounded px-1.5 py-0.5 text-[11px] ${badge.bg} ${badge.text}`}>{tr(opt.label)}</span>
               </button>
               {isSel && <span className="text-[11px] text-[#0f7a48]">✓</span>}
               {onColumnChange && (
@@ -482,7 +483,7 @@ function OptionPicker({
                       e.stopPropagation()
                       cycleColor(opt)
                     }}
-                    title="색상 바꾸기"
+                    title={tr("색상 바꾸기")}
                   >
                     🎨
                   </button>
@@ -490,10 +491,10 @@ function OptionPicker({
                     className="rounded px-1 text-[10px] text-[#9b9a97] hover:bg-[#efefed]"
                     onClick={(e) => {
                       e.stopPropagation()
-                      const nn = window.prompt('새 라벨', opt.label)
+                      const nn = window.prompt(tr("새 라벨"), opt.label)
                       if (nn && nn !== opt.label) rename(opt, nn)
                     }}
-                    title="이름 변경"
+                    title={tr("이름 변경")}
                   >
                     ✎
                   </button>
@@ -503,7 +504,7 @@ function OptionPicker({
                       e.stopPropagation()
                       if (window.confirm(`옵션 "${opt.label}" 을 삭제할까요?`)) removeOption(opt)
                     }}
-                    title="옵션 삭제"
+                    title={tr("옵션 삭제")}
                   >
                     ✕
                   </button>
@@ -518,13 +519,13 @@ function OptionPicker({
             onClick={addNew}
           >
             <span className="text-[10px]">+</span>
-            <span>새 옵션 "</span>
+            <span>{tr('새 옵션 "')}</span>
             <span className="rounded bg-[#f1f1ef] px-1.5 py-0.5 text-[11px]">{query.trim()}</span>
-            <span>" 추가</span>
+            <span>" {tr('추가')}</span>
           </button>
         )}
         {filtered.length === 0 && !query && (
-          <p className="px-2 py-2 text-center text-[11px] text-[#9b9a97]">옵션이 없습니다. 위에서 추가하세요.</p>
+          <p className="px-2 py-2 text-center text-[11px] text-[#9b9a97]">{tr("옵션이 없습니다. 위에서 추가하세요.")}</p>
         )}
       </div>
     </div>
@@ -570,7 +571,7 @@ function PathPicker({
           className="rounded px-1.5 py-0.5 text-[11px] text-[#9b9a97] hover:bg-[#efefed] disabled:opacity-40"
           onClick={() => browse?.parent && navigate(browse.parent)}
           disabled={!browse?.parent}
-          title="상위 폴더"
+          title={tr("상위 폴더")}
         >
           ↑
         </button>
@@ -581,19 +582,20 @@ function PathPicker({
           onKeyDown={(e) => {
             if (e.key === 'Enter') navigate(input)
           }}
-          placeholder="/Users/... 경로 입력 또는 아래에서 선택"
+          placeholder={tr("/Users/... 경로 입력 또는 아래에서 선택")}
         />
         <button
           className="rounded bg-[#37352f] px-2 py-0.5 text-[11px] font-medium text-white hover:bg-[#2b2925]"
           onClick={() => onPick(input)}
-          title="이 경로 사용"
+          title={tr("이 경로 사용")}
         >
-          선택
+
+          {tr("선택")}
         </button>
         <button
           className="rounded px-1.5 py-0.5 text-[11px] text-[#9b9a97] hover:bg-[#efefed]"
           onClick={onCancel}
-          title="취소"
+          title={tr("취소")}
         >
           ✕
         </button>
@@ -606,14 +608,14 @@ function PathPicker({
             className="flex w-full items-center gap-1.5 rounded px-2 py-1 text-left hover:bg-[#f7f7f5]"
             onClick={() => navigate(d.path)}
             onDoubleClick={() => onPick(d.path)}
-            title="더블클릭으로 선택"
+            title={tr("더블클릭으로 선택")}
           >
             <span className="text-[13px]">📁</span>
             <span className="truncate text-[#37352f]">{d.name}</span>
           </button>
         ))}
         {browse && browse.dirs.length === 0 && (
-          <p className="px-2 py-3 text-center text-[11px] text-[#9b9a97]">하위 폴더 없음</p>
+          <p className="px-2 py-3 text-center text-[11px] text-[#9b9a97]">{tr("하위 폴더 없음")}</p>
         )}
       </div>
       {browse?.home && (
@@ -622,7 +624,8 @@ function PathPicker({
             className="rounded px-2 py-0.5 text-[10px] text-[#5f5e5b] hover:bg-[#efefed]"
             onClick={() => navigate(browse.home)}
           >
-            🏠 홈
+
+            {tr("🏠 홈")}
           </button>
         </div>
       )}

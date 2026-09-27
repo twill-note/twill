@@ -45,6 +45,7 @@ import MermaidBlockView from './MermaidBlock'
 import SelectionToolbar from './SelectionToolbar'
 import DocumentTaskDialog from './DocumentTaskDialog'
 import SpellcheckToggleButton from './SpellcheckToggleButton'
+import { tr } from '../i18n'
 
 /** 노션식 하위 노트(페이지) 블록 — 본문 안에서 일반 블록처럼 드래그로 이동 가능 */
 function PageBlockView({ target }: { target: string }) {
@@ -135,7 +136,7 @@ function CalloutView({ block, editor, contentRef }: any) {
       <div className="relative shrink-0" contentEditable={false}>
         <button
           className="rounded p-0.5 text-[18px] leading-none hover:bg-[#ececea]"
-          title="이모지 변경"
+          title={tr("이모지 변경")}
           onClick={() => setPickerOpen(true)}
         >
           {block.props.emoji}
@@ -309,22 +310,24 @@ function DbViewBlock({ block, editor }: any) {
     const dirs = collectDirs(tree)
     return (
       <div contentEditable={false} className="my-1 w-full rounded-lg border border-[#e9e9e7] p-3">
-        <p className="mb-2 text-[13px] font-medium text-[#37352f]">📊 데이터 소스 선택</p>
+        <p className="mb-2 text-[13px] font-medium text-[#37352f]">{tr("📊 데이터 소스 선택")}</p>
         <div className="flex flex-wrap gap-1.5">
           {currentPath && (
             <button
               className="rounded-md border border-[#37352f] bg-[#37352f] px-2.5 py-1 text-[12px] font-medium text-white hover:bg-[#2b2925]"
               onClick={() => setProps({ source: '@self' })}
-              title="새 행이 이 페이지 하위 페이지로 저장됩니다"
+              title={tr("새 행이 이 페이지 하위 페이지로 저장됩니다")}
             >
-              📄 이 페이지 하위
+
+              {tr("📄 이 페이지 하위")}
             </button>
           )}
           <button
             className="rounded-md border border-[#e3e2e0] px-2.5 py-1 text-[12px] text-[#5f5e5b] hover:bg-[#f1f1ef]"
             onClick={() => setProps({ source: '/' })}
           >
-            🗂️ 전체 노트
+
+            {tr("🗂️ 전체 노트")}
           </button>
           {dirs.map((d) => (
             <button
@@ -347,12 +350,12 @@ function DbViewBlock({ block, editor }: any) {
       <div className="flex flex-wrap items-center gap-1.5 border-b border-[#efefed] px-2.5 py-1.5 text-[12px]">
         <span className="text-[14px]">📊</span>
         {config.kind === 'task_board' ? (
-          <span className="px-1 py-0.5 text-[13px] font-semibold text-[#37352f]">태스크 보드</span>
+          <span className="px-1 py-0.5 text-[13px] font-semibold text-[#37352f]">{tr("태스크 보드")}</span>
         ) : (
           <input
             className="min-w-[80px] flex-none rounded px-1 py-0.5 text-[13px] font-semibold text-[#37352f] outline-none placeholder:text-[#c8c7c4] hover:bg-[#f7f7f5] focus:bg-white focus:ring-1 focus:ring-[#d3d1cb]"
             value={config.title}
-            placeholder="제목 없는 데이터베이스"
+            placeholder={tr("제목 없는 데이터베이스")}
             onChange={(e) => setConfig({ ...config, title: e.target.value })}
             onBlur={async () => {
               try {
@@ -398,7 +401,7 @@ function DbViewBlock({ block, editor }: any) {
                   })
                 }}
               >
-                {m === 'table' ? '표' : '보드'}
+                {m === 'table' ? tr("표") : tr("보드")}
               </button>
             ))}
           </div>
@@ -407,9 +410,9 @@ function DbViewBlock({ block, editor }: any) {
               className="rounded-md border border-[#e3e2e0] px-1 py-0.5 text-[12px] text-[#5f5e5b] outline-none"
               value={groupBy}
               onChange={(e) => setProps({ groupBy: e.target.value })}
-              title="그룹 기준 속성"
+              title={tr("그룹 기준 속성")}
             >
-              <option value="">그룹 속성…</option>
+              <option value="">{tr("그룹 속성…")}</option>
               {groupCandidates.map((c) => (
                 <option key={c.key} value={c.key}>
                   {c.label}
@@ -672,11 +675,12 @@ export default function Editor({ path }: { path?: string }) {
   if (error)
     return (
       <div className="flex h-full items-center justify-center text-sm text-red-500">
-        파일을 열 수 없습니다: {error}
+
+        {tr("파일을 열 수 없습니다:")} {error}
       </div>
     )
   if (!content)
-    return <div className="flex h-full items-center justify-center text-sm text-[#9b9a97]">불러오는 중…</div>
+    return <div className="flex h-full items-center justify-center text-sm text-[#9b9a97]">{tr("불러오는 중…")}</div>
 
   return (
     <NoteEditor
@@ -1027,35 +1031,35 @@ function NoteEditor({
       <header className="flex items-center gap-2 border-b border-[#efefed] px-4 py-2">
         <button
           className="rounded px-1.5 py-0.5 text-[14px] text-[#9b9a97] hover:bg-[#f1f1ef] hover:text-[#37352f]"
-          title="이전 노트"
+          title={tr("이전 노트")}
           onClick={() => window.history.back()}
         >
           ←
         </button>
         <button
           className="rounded px-1.5 py-0.5 text-[14px] text-[#9b9a97] hover:bg-[#f1f1ef] hover:text-[#37352f]"
-          title="다음 노트"
+          title={tr("다음 노트")}
           onClick={() => window.history.forward()}
         >
           →
         </button>
         <span className="flex-1 truncate text-[12px] text-[#9b9a97]">{content.path}</span>
         <SaveIndicator status={saveStatus} />
-        <button type="button" disabled={exportingPdf} title="PDF로 내보내기"
+        <button type="button" disabled={exportingPdf} title={tr("PDF로 내보내기")}
           className="shrink-0 rounded px-1.5 py-0.5 text-[12px] text-[#9b9a97] hover:bg-[#f1f1ef] disabled:opacity-50"
           onClick={async () => {
             const element = editorWrapRef.current?.querySelector<HTMLElement>('.bn-editor')
             if (!element) return
             setExportingPdf(true)
-            try { await exportDocumentPdf(element, fm.title || content.path.split('/').pop() || '문서') }
-            catch (error) { await dialog.alert('PDF 내보내기 실패', { detail: (error as Error).message }) }
+            try { await exportDocumentPdf(element, fm.title || content.path.split('/').pop() || tr("문서")) }
+            catch (error) { await dialog.alert(tr("PDF 내보내기 실패"), { detail: (error as Error).message }) }
             finally { setExportingPdf(false) }
-          }}>{exportingPdf ? 'PDF 생성 중…' : 'PDF ↓'}</button>
+          }}>{exportingPdf ? tr("PDF 생성 중…") : 'PDF ↓'}</button>
         <button
           type="button"
           className="rounded px-1.5 py-0.5 text-[13px] text-[#9b9a97] hover:bg-[#f1f1ef] hover:text-[#37352f] disabled:cursor-not-allowed disabled:text-[#d3d1cb]"
-          title="문서 작업 등록"
-          aria-label="문서 작업 등록"
+          title={tr("문서 작업 등록")}
+          aria-label={tr("문서 작업 등록")}
           onClick={() => setDocumentTaskOpen(true)}
           disabled={content.path.startsWith('/')}
         >
@@ -1073,12 +1077,15 @@ function NoteEditor({
 
       {saveStatus === 'conflict' && (
         <div className="flex items-center gap-3 border-b border-amber-200 bg-amber-50 px-8 py-2 text-[13px] text-amber-800">
-          ⚠️ 파일이 외부에서 수정되었습니다. 어떻게 할까요?
+
+          {tr("⚠️ 파일이 외부에서 수정되었습니다. 어떻게 할까요?")}
           <button className="rounded border border-amber-300 bg-white px-2 py-0.5 hover:bg-amber-100" onClick={onReload}>
-            다시 불러오기
+
+            {tr("다시 불러오기")}
           </button>
           <button className="rounded border border-amber-300 bg-white px-2 py-0.5 hover:bg-amber-100" onClick={() => save(true)}>
-            내 내용으로 덮어쓰기
+
+            {tr("내 내용으로 덮어쓰기")}
           </button>
         </div>
       )}
@@ -1098,7 +1105,8 @@ function NoteEditor({
             <>
               <h1 className="text-[34px] font-bold text-[#37352f]">AGENTS.md</h1>
               <p className="mt-1 mb-6 text-[12px] text-[#9b9a97]">
-                프로젝트에서 AI가 따라야 할 지침 · 원문 Markdown으로 저장
+
+                {tr("프로젝트에서 AI가 따라야 할 지침 · 원문 Markdown으로 저장")}
               </p>
             </>
           ) : (
@@ -1106,7 +1114,7 @@ function NoteEditor({
               <input
                 className="w-full border-none text-[34px] font-bold text-[#37352f] outline-none placeholder:text-[#d3d1cb]"
                 value={fm.title}
-                placeholder="제목 없음"
+                placeholder={tr("제목 없음")}
                 onChange={(e) => updateFm({ title: e.target.value })}
               />
 
@@ -1134,7 +1142,7 @@ function NoteEditor({
                 ))}
                 <input
                   className="w-24 bg-transparent px-1 text-[12px] outline-none placeholder:text-[#c8c7c4]"
-                  placeholder="+ 태그"
+                  placeholder={tr("+ 태그")}
                   value={tagInput}
                   onChange={(e) => setTagInput(e.target.value)}
                   onKeyDown={(e) => {
@@ -1193,7 +1201,7 @@ function NoteEditor({
             <div className="mt-10 border-t border-[#efefed] pt-4">
               {outgoingLinks.length > 0 && (
                 <div className="mb-3">
-                  <p className="mb-1.5 text-[12px] font-medium text-[#9b9a97]">🔗 연결된 노트</p>
+                  <p className="mb-1.5 text-[12px] font-medium text-[#9b9a97]">{tr("🔗 연결된 노트")}</p>
                   <div className="flex flex-wrap gap-1.5">
                     {outgoingLinks.map((l) => (
                       <button
@@ -1204,7 +1212,7 @@ function NoteEditor({
                             : 'cursor-default bg-[#f7f7f5] text-[#c8c7c4]'
                         }`}
                         onClick={() => l.path && openFile(l.path)}
-                        title={l.path ?? '아직 없는 노트'}
+                        title={l.path ?? tr("아직 없는 노트")}
                       >
                         [[{l.target}]]
                       </button>
@@ -1214,7 +1222,7 @@ function NoteEditor({
               )}
               {links.incoming.length > 0 && (
                 <div>
-                  <p className="mb-1.5 text-[12px] font-medium text-[#9b9a97]">↩️ 이 노트를 참조하는 노트 (백링크)</p>
+                  <p className="mb-1.5 text-[12px] font-medium text-[#9b9a97]">{tr("↩️ 이 노트를 참조하는 노트 (백링크)")}</p>
                   {links.incoming.map((n) => (
                     <button
                       key={n.path}
@@ -1257,13 +1265,15 @@ function CoverBanner({ url, onChange }: { url: string; onChange: (cover: string 
           className="rounded border border-[#e3e2e0] bg-white/90 px-2 py-1 text-[12px] text-[#5f5e5b] hover:bg-white"
           onClick={() => fileRef.current?.click()}
         >
-          커버 변경
+
+          {tr("커버 변경")}
         </button>
         <button
           className="rounded border border-[#e3e2e0] bg-white/90 px-2 py-1 text-[12px] text-[#5f5e5b] hover:bg-white"
           onClick={() => onChange(null)}
         >
-          제거
+
+          {tr("제거")}
         </button>
       </div>
       <CoverFileInput inputRef={fileRef} onUploaded={onChange} />
@@ -1313,7 +1323,7 @@ function IconAndCoverControls({
       {fm.icon ? (
         <button
           className="rounded p-1 text-[52px] leading-none hover:bg-[#f1f1ef]"
-          title="아이콘 변경"
+          title={tr("아이콘 변경")}
           onClick={() => setPickerOpen(true)}
         >
           {fm.icon}
@@ -1326,12 +1336,14 @@ function IconAndCoverControls({
       >
         {!fm.icon && (
           <button className="rounded px-1.5 py-0.5 hover:bg-[#f1f1ef]" onClick={() => setPickerOpen(true)}>
-            😀 아이콘 추가
+
+            {tr("😀 아이콘 추가")}
           </button>
         )}
         {!fm.cover && (
           <button className="rounded px-1.5 py-0.5 hover:bg-[#f1f1ef]" onClick={() => fileRef.current?.click()}>
-            🖼️ 커버 추가
+
+            {tr("🖼️ 커버 추가")}
           </button>
         )}
       </div>
@@ -1388,11 +1400,11 @@ function CodeCopyButton({ wrapperRef }: { wrapperRef: React.RefObject<HTMLDivEle
           setCopied(true)
           setTimeout(() => setCopied(false), 1500)
         } catch {
-          dialog.alert('클립보드 복사에 실패했습니다')
+          dialog.alert(tr("클립보드 복사에 실패했습니다"))
         }
       }}
     >
-      {copied ? '복사됨 ✓' : '복사'}
+      {copied ? tr("복사됨 ✓") : tr("복사")}
     </button>
   )
 }
@@ -1455,9 +1467,10 @@ export function ImageAnnotateButton({ wrapperRef, editor }: { wrapperRef: React.
           className="absolute z-10 rounded border border-[#e3e2e0] bg-white/95 px-2 py-0.5 text-[11px] text-[#5f5e5b] shadow-sm hover:bg-[#f1f1ef]"
           style={{ top: pos.top, left: pos.left }}
           onClick={() => setModal({ url: target.url, blockId: target.blockId })}
-          title="사각형/화살표/텍스트로 주석 추가"
+          title={tr("사각형/화살표/텍스트로 주석 추가")}
         >
-          ✏️ 주석
+
+          {tr("✏️ 주석")}
         </button>
       )}
       {modal && (

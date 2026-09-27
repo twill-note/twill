@@ -4,6 +4,7 @@ import { dbApi } from '../dbschema'
 import { useAppStore } from '../store'
 import type { Section } from '../types'
 import { useBackdropDismiss } from '../useBackdropDismiss'
+import { tr } from '../i18n'
 
 type TemplateId = 'review' | 'improve' | 'custom'
 
@@ -177,22 +178,24 @@ export default function DocumentTaskDialog({ documentPath, onClose }: { document
       >
         <div className="border-b border-[#efefed] px-5 py-4">
           <h2 id="document-task-title" className="text-[15px] font-semibold text-[#37352f]">
-            문서 작업 등록
+
+            {tr("문서 작업 등록")}
           </h2>
           <p className="mt-1 truncate text-[12px] text-[#787774]" title={documentPath}>
-            원본 문서: {documentPath}
+
+            {tr("원본 문서:")} {documentPath}
           </p>
           <p className="mt-1 text-[11px] text-[#9b9a97]">
             {section
-              ? `실행 문맥: ${section.name} · ${section.scope_id || '워크스페이스 기본'}`
-              : '문서가 속한 프로젝트를 찾지 못해 워크스페이스 기본 문맥을 사용합니다.'}
+              ? `실행 문맥: ${section.name} · ${section.scope_id || tr("워크스페이스 기본")}`
+              : tr("문서가 속한 프로젝트를 찾지 못해 워크스페이스 기본 문맥을 사용합니다.")}
           </p>
         </div>
 
         <div className="space-y-4 px-5 py-4">
           <fieldset>
-            <legend className="mb-1.5 text-[12px] font-medium text-[#5f5e5b]">작업 템플릿</legend>
-            <div className="grid gap-2 sm:grid-cols-3" role="radiogroup" aria-label="작업 템플릿">
+            <legend className="mb-1.5 text-[12px] font-medium text-[#5f5e5b]">{tr("작업 템플릿")}</legend>
+            <div className="grid gap-2 sm:grid-cols-3" role="radiogroup" aria-label={tr("작업 템플릿")}>
               {TEMPLATES.map((template) => {
                 const selected = template.id === templateId
                 return (
@@ -217,7 +220,8 @@ export default function DocumentTaskDialog({ documentPath, onClose }: { document
           </fieldset>
 
           <label className="block text-[12px] font-medium text-[#5f5e5b]">
-            태스크 제목
+
+            {tr("태스크 제목")}
             <input
               ref={titleRef}
               value={title}
@@ -229,7 +233,8 @@ export default function DocumentTaskDialog({ documentPath, onClose }: { document
           </label>
 
           <label className="block text-[12px] font-medium text-[#5f5e5b]">
-            Twill AI에게 전달할 요청
+
+            {tr("Twill AI에게 전달할 요청")}
             <textarea
               value={prompt}
               rows={6}
@@ -248,7 +253,8 @@ export default function DocumentTaskDialog({ documentPath, onClose }: { document
             onClick={onClose}
             disabled={busy}
           >
-            취소
+
+            {tr("취소")}
           </button>
           <button
             type="button"
@@ -256,7 +262,7 @@ export default function DocumentTaskDialog({ documentPath, onClose }: { document
             onClick={() => void createTask()}
             disabled={busy || !title.trim() || !prompt.trim()}
           >
-            {busy ? '등록 중…' : '태스크 만들기'}
+            {busy ? tr("등록 중…") : tr("태스크 만들기")}
           </button>
         </div>
       </div>

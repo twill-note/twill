@@ -33,6 +33,7 @@ import ImageAnnotator from './ImageAnnotator'
 import MentionPopover, { type MentionState } from './MentionPopover'
 import { MermaidExpandButton, MermaidPreview } from './MermaidBlock'
 import { subscribeWorkspaceScopesChanged } from '../workspaceScopeEvents'
+import { tr } from '../i18n'
 
 // 배열을 렌더 때마다 새로 만들면 ReactMarkdown도 매번 새 플러그인 설정으로 판단한다.
 const MARKDOWN_REMARK_PLUGINS = [remarkGfm]
@@ -98,8 +99,8 @@ function ChatCopyButton({ value, className = '' }: { value: string; className?: 
       type="button"
       className={`flex h-6 w-6 items-center justify-center rounded-sm border-0 bg-transparent p-0 text-current shadow-none transition-opacity hover:bg-transparent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#7a5eb0] ${copied ? 'opacity-100' : 'opacity-50 hover:opacity-100'} ${className}`}
       onClick={() => void copy()}
-      aria-label={copied ? '코드 복사됨' : '코드 복사'}
-      title={copied ? '복사됨' : '코드 복사'}
+      aria-label={copied ? tr("코드 복사됨") : tr("코드 복사")}
+      title={copied ? tr("복사됨") : tr("코드 복사")}
     >
       {copied ? (
         <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true">
@@ -162,7 +163,7 @@ function ChatMermaidDiagram({ source }: { source: string }) {
             className="chat-mermaid-source-toggle hover:bg-black/10 hover:text-current"
           />
           <details className="shrink-0">
-            <summary className="chat-mermaid-source-toggle cursor-pointer select-none">코드</summary>
+            <summary className="chat-mermaid-source-toggle cursor-pointer select-none">{tr("코드")}</summary>
             <pre className="chat-mermaid-source absolute right-0 z-10 mt-1 max-h-56 max-w-[min(30rem,calc(100vw-3rem))] overflow-auto rounded-md border p-2 text-left text-[10px] shadow-lg">
               <code>{source}</code>
             </pre>
@@ -231,7 +232,7 @@ function ChatDocumentLink({
     <a
       {...props}
       href={`#${encodeURIComponent(target.kind === 'erd' ? `view:erd:${target.path}` : target.path)}`}
-      title={`${target.kind === 'erd' ? 'ERD 열기' : '문서 열기'}: ${target.path}`}
+      title={`${target.kind === 'erd' ? tr("ERD 열기") : tr("문서 열기")}: ${target.path}`}
       onClick={(event) => {
         onClick?.(event)
         if (event.defaultPrevented) return
@@ -276,7 +277,8 @@ function ChatImageButton({
         }
         title={label}
       >
-        이미지 오류
+
+        {tr("이미지 오류")}
       </span>
     )
   }
@@ -291,7 +293,7 @@ function ChatImageButton({
       }
       onClick={() => onPreview(image)}
       aria-label={`${label} 확대해서 보기`}
-      title="클릭하여 크게 보기"
+      title={tr("클릭하여 크게 보기")}
     >
       <img
         src={image.url}
@@ -307,7 +309,8 @@ function ChatImageButton({
       />
       {generated && (
         <span className="pointer-events-none absolute bottom-2 right-2 rounded-full bg-black/55 px-2 py-1 text-[10px] text-white opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
-          크게 보기
+
+          {tr("크게 보기")}
         </span>
       )}
     </button>
@@ -383,7 +386,7 @@ function ChatImageLightbox({ image, onClose }: { image: ChatImage; onClose: () =
             type="button"
             className="flex h-7 w-7 items-center justify-center rounded-full bg-white/10 text-[14px] text-white hover:bg-white/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
             onClick={onClose}
-            aria-label="이미지 미리보기 닫기"
+            aria-label={tr("이미지 미리보기 닫기")}
           >
             ✕
           </button>
@@ -437,7 +440,7 @@ const MessageBubble = memo(function MessageBubble({
       img: ({ node: _node, src, alt }: { node?: unknown } & ImgHTMLAttributes<HTMLImageElement>) =>
         typeof src === 'string' && src ? (
           <ChatImageButton
-            image={{ url: src, alt: alt || '답변 이미지' }}
+            image={{ url: src, alt: alt || tr("답변 이미지") }}
             variant="assistant"
             onPreview={onPreviewImage}
           />
@@ -646,10 +649,10 @@ function TaskSourceBanner({ session, openFile }: { session: AiSession; openFile:
   const path = deleted ? null : status?.path || source.last_path || source.path
   const projectWarning = status?.scope_mismatch ? (
     <div className="rounded-lg border border-[#f4dfab] bg-[#fff9eb] px-3 py-2 text-[11px] leading-snug text-[#8a6817]" role="alert">
-      <div className="font-medium">카드와 세션의 프로젝트가 다릅니다</div>
+      <div className="font-medium">{tr("카드와 세션의 프로젝트가 다릅니다")}</div>
       <div className="mt-0.5">
         {status.scope_error ||
-          '이 세션의 프로젝트 권한은 시작 시점 값으로 유지됩니다. 태스크 카드에서 ‘변경된 프로젝트로 새 실행’을 시작해주세요.'}
+          tr("이 세션의 프로젝트 권한은 시작 시점 값으로 유지됩니다. 태스크 카드에서 ‘변경된 프로젝트로 새 실행’을 시작해주세요.")}
       </div>
     </div>
   ) : null
@@ -659,8 +662,8 @@ function TaskSourceBanner({ session, openFile }: { session: AiSession; openFile:
       <div className="space-y-1.5">
         {projectWarning}
         <div className="rounded-lg border border-[#e7e0cf] bg-[#fffcf5] px-3 py-2 text-[12px] text-[#795f28]" role="note">
-          <span className="font-medium">요청 대상: {title}</span>
-          <span className="ml-1.5 text-[11px] text-[#9a8050]">삭제된 카드</span>
+          <span className="font-medium">{tr("요청 대상:")} {title}</span>
+          <span className="ml-1.5 text-[11px] text-[#9a8050]">{tr("삭제된 카드")}</span>
         </div>
       </div>
     )
@@ -677,9 +680,9 @@ function TaskSourceBanner({ session, openFile }: { session: AiSession; openFile:
       >
         <span aria-hidden="true">↗</span>
         <span className="min-w-0 flex-1 truncate">
-          <span className="font-medium">요청 대상: {title}</span>
+          <span className="font-medium">{tr("요청 대상:")} {title}</span>
         </span>
-        <span className="shrink-0 text-[10px] text-[#5c7db8]">카드 열기</span>
+        <span className="shrink-0 text-[10px] text-[#5c7db8]">{tr("카드 열기")}</span>
       </button>
     </div>
   )
@@ -725,7 +728,7 @@ function WorkingStatus({
   return (
     <div
       className="flex min-w-0 items-center gap-2 px-1 py-1 text-[11px] text-[#5f5e5b]"
-      aria-label={waiting ? '실행 대기 중' : `작업 중${elapsed ? `, ${elapsed}` : ''}`}
+      aria-label={waiting ? tr("실행 대기 중") : `작업 중${elapsed ? `, ${elapsed}` : ''}`}
     >
       <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${waiting ? 'bg-[#c09a38]' : 'animate-pulse bg-[#4a7ccc]'}`} />
       <span className="shrink-0 font-semibold text-[#37352f]">{waiting ? 'Waiting' : 'Working'}</span>
@@ -738,7 +741,7 @@ function WorkingStatus({
       )}
       {elapsed && <span className="shrink-0 tabular-nums text-[#7d7c78]">({elapsed})</span>}
       <span className="min-w-0 flex-1 truncate text-[#7d7c78]">
-        {waiting ? '실행을 기다리는 중' : session.currentStatus || '작업을 계속하는 중'}
+        {waiting ? tr("실행을 기다리는 중") : session.currentStatus || tr("작업을 계속하는 중")}
       </span>
       <button
         type="button"
@@ -746,7 +749,7 @@ function WorkingStatus({
         onClick={onCancel}
         disabled={session.cancelRequested}
       >
-        {session.cancelRequested ? '중단 중…' : waiting ? '대기 취소' : '중단'}
+        {session.cancelRequested ? tr("중단 중…") : waiting ? tr("대기 취소") : tr("중단")}
       </button>
     </div>
   )
@@ -774,7 +777,7 @@ function limitWindowLabel(limit: AiUsageLimitWindow | null, fallback: string): s
 
 function UsageLimitMeter({ label, limit }: { label: string; limit: AiUsageLimitWindow | null }) {
   if (!limit) {
-    return <span className="text-[#9b9a97]">{label} 정보를 받을 수 없음</span>
+    return <span className="text-[#9b9a97]">{label}  {tr("정보를 받을 수 없음")}</span>
   }
   const remaining = Math.max(0, 100 - limit.used_percent)
   const tone = remaining === 0 ? 'bg-[#d9534f]' : remaining <= 20 ? 'bg-[#d6a33c]' : 'bg-[#4a7ccc]'
@@ -1531,7 +1534,7 @@ export default function ByeoriPanel({
 
   // ── 상태별 화면 ──
   if (!status) {
-    return <div className="p-4 text-[12px] text-[#9b9a97]">상태 확인 중…</div>
+    return <div className="p-4 text-[12px] text-[#9b9a97]">{tr("상태 확인 중…")}</div>
   }
 
   if (!status.engine || !status.available) {
@@ -1539,18 +1542,18 @@ export default function ByeoriPanel({
       <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center text-[13px] text-[#5f5e5b]">
         <span className="text-3xl">🤖</span>
         {!status.engine ? (
-          <p>AI 엔진을 초기화하지 못했습니다. 앱을 다시 시작한 뒤 상태를 확인하세요.</p>
+          <p>{tr("AI 엔진을 초기화하지 못했습니다. 앱을 다시 시작한 뒤 상태를 확인하세요.")}</p>
         ) : (
           <>
-            <p>AI 실행에 필요한 Codex CLI가 설치되어 있지 않습니다.</p>
-            <p className="text-[12px] text-[#9b9a97]">Twill 전용 최신 CLI를 설치하면 앱이 자동으로 재시작됩니다.</p>
+            <p>{tr("AI 실행에 필요한 Codex CLI가 설치되어 있지 않습니다.")}</p>
+            <p className="text-[12px] text-[#9b9a97]">{tr("Twill 전용 최신 CLI를 설치하면 앱이 자동으로 재시작됩니다.")}</p>
             <button
               type="button"
               className="mt-1 rounded-md bg-[#37352f] px-3 py-1.5 text-[12px] font-medium text-white hover:bg-[#2b2925] disabled:opacity-60"
               onClick={() => void updateCodexCliAndRestart()}
               disabled={cliUpdateBusy}
             >
-              {cliUpdateBusy ? 'Codex CLI 업데이트 중…' : 'Codex CLI 설치 및 재시작'}
+              {cliUpdateBusy ? tr("Codex CLI 업데이트 중…") : tr("Codex CLI 설치 및 재시작")}
             </button>
             {uiError && <p className="text-[11px] text-[#c92a2a]">{uiError}</p>}
           </>
@@ -1563,19 +1566,21 @@ export default function ByeoriPanel({
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
         <span className="text-3xl">🤖</span>
-        <p className="text-[13px] text-[#37352f]">AI 엔진 로그인이 필요합니다</p>
+        <p className="text-[13px] text-[#37352f]">{tr("AI 엔진 로그인이 필요합니다")}</p>
         <button
           className="rounded-md bg-[#37352f] px-3 py-1.5 text-[12px] font-medium text-white hover:bg-[#2b2925] disabled:opacity-60"
           onClick={startLogin}
           disabled={loginBusy}
         >
-          {loginBusy ? '로그인 진행 중…' : 'AI 엔진 로그인'}
+          {loginBusy ? tr("로그인 진행 중…") : tr("AI 엔진 로그인")}
         </button>
         {loginUrl && (
           <p className="text-[11px] text-[#9b9a97]">
-            브라우저에서 인증을 완료해주세요.{' '}
+
+            {tr("브라우저에서 인증을 완료해주세요.")}{' '}
             <a href={loginUrl} target="_blank" rel="noreferrer" className="underline">
-              URL 다시 열기
+
+              {tr("URL 다시 열기")}
             </a>
           </p>
         )}
@@ -1619,10 +1624,10 @@ export default function ByeoriPanel({
             setScopePickerOpen(false)
           }}
           aria-expanded={sessionListOpen}
-          title="대화 목록"
+          title={tr("대화 목록")}
         >
           <span aria-hidden="true">🤖</span>
-          <span className="min-w-0 flex-1 truncate">{sessionId !== undefined ? '대화 목록' : active ? active.title : 'Twill AI'}</span>
+          <span className="min-w-0 flex-1 truncate">{sessionId !== undefined ? tr("대화 목록") : active ? active.title : 'Twill AI'}</span>
           <span className="text-[9px] text-[#9b9a97]">▾</span>
         </button>
         {currentModel && (
@@ -1633,14 +1638,14 @@ export default function ByeoriPanel({
               setSessionListOpen(false)
               setScopePickerOpen(false)
             }}
-            title="모델·강도 선택"
+            title={tr("모델·강도 선택")}
           >
             <span className="font-medium">{currentModel.displayName}</span>
             <span className="text-[#9b9a97]">· {currentEffort || 'default'}</span>
             <span className="text-[9px] text-[#9b9a97]">▾</span>
           </button>
         )}
-        <button className="rounded px-1.5 py-0.5 hover:bg-[#efefed]" onClick={() => void startNewChat()} title="새 대화">
+        <button className="rounded px-1.5 py-0.5 hover:bg-[#efefed]" onClick={() => void startNewChat()} title={tr("새 대화")}>
           +
         </button>
         {onReattach && (
@@ -1648,8 +1653,8 @@ export default function ByeoriPanel({
             type="button"
             className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-[#7d7c78] hover:bg-[#efefed] hover:text-[#37352f]"
             onClick={onReattach}
-            title="메인 창에서 열기"
-            aria-label="Twill AI를 메인 창에서 열기"
+            title={tr("메인 창에서 열기")}
+            aria-label={tr("Twill AI를 메인 창에서 열기")}
           >
             <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.25" aria-hidden="true">
               <rect x="2.5" y="3" width="11" height="9.5" rx="1.25" />
@@ -1661,8 +1666,8 @@ export default function ByeoriPanel({
           type="button"
           className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-[#9b9a97] hover:bg-[#efefed] hover:text-[#37352f]"
           onClick={() => void logout()}
-          title="Codex 계정 로그아웃"
-          aria-label="Codex 계정 로그아웃"
+          title={tr("Codex 계정 로그아웃")}
+          aria-label={tr("Codex 계정 로그아웃")}
         >
           <svg
             viewBox="0 0 24 24"
@@ -1683,7 +1688,7 @@ export default function ByeoriPanel({
           <>
             <div className="fixed inset-0 z-30" onClick={() => setPickerOpen(false)} />
             <div className="absolute right-2 top-8 z-40 w-64 rounded-lg border border-[#e3e2e0] bg-white p-2 shadow-lg">
-              <p className="mb-1 px-1 text-[10px] font-medium uppercase tracking-wide text-[#9b9a97]">모델</p>
+              <p className="mb-1 px-1 text-[10px] font-medium uppercase tracking-wide text-[#9b9a97]">{tr("모델")}</p>
               <div className="max-h-56 space-y-0.5 overflow-y-auto">
                 {models.map((m) => (
                   <button
@@ -1695,7 +1700,7 @@ export default function ByeoriPanel({
                   >
                     <span className="flex items-center gap-1">
                       {m.displayName}
-                      {m.isDefault && <span className="text-[9px] text-[#9b9a97]">(기본)</span>}
+                      {m.isDefault && <span className="text-[9px] text-[#9b9a97]">{tr("(기본)")}</span>}
                     </span>
                     {m.description && (
                       <span className="text-[10px] font-normal text-[#9b9a97] line-clamp-2">{m.description}</span>
@@ -1703,7 +1708,7 @@ export default function ByeoriPanel({
                   </button>
                 ))}
               </div>
-              <p className="mb-1 mt-2 px-1 text-[10px] font-medium uppercase tracking-wide text-[#9b9a97]">추론 강도</p>
+              <p className="mb-1 mt-2 px-1 text-[10px] font-medium uppercase tracking-wide text-[#9b9a97]">{tr("추론 강도")}</p>
               <div className="flex flex-wrap gap-1">
                 {(currentModel.supportedEfforts.length > 0
                   ? currentModel.supportedEfforts
@@ -1722,19 +1727,21 @@ export default function ByeoriPanel({
               </div>
               {currentEffort === 'ultra' && (
                 <p className="mt-1.5 rounded bg-[#fff7e6] px-2 py-1 text-[10px] text-[#a67c1b]">
-                  ⚠️ ultra 는 내부 서브에이전트를 병렬 실행해 토큰 소모가 매우 큽니다. 까다로운 작업에만 권장.
+
+                  {tr("⚠️ ultra 는 내부 서브에이전트를 병렬 실행해 토큰 소모가 매우 큽니다. 까다로운 작업에만 권장.")}
                 </p>
               )}
               {active && (
                 <button
                   className="mt-2 w-full rounded border border-[#e3e2e0] px-2 py-1 text-[10px] text-[#9b9a97] hover:bg-[#f7f7f5]"
                   onClick={() => setSessionModel(active.id, null, null)}
-                  title="대화별 모델 설정 해제"
+                  title={tr("대화별 모델 설정 해제")}
                 >
-                  기본값으로 초기화
+
+                  {tr("기본값으로 초기화")}
                 </button>
               )}
-              <p className="mt-1 px-1 text-[9px] text-[#9b9a97]">변경 사항은 다음 턴부터 적용됩니다.</p>
+              <p className="mt-1 px-1 text-[9px] text-[#9b9a97]">{tr("변경 사항은 다음 턴부터 적용됩니다.")}</p>
             </div>
           </>
         )}
@@ -1747,21 +1754,21 @@ export default function ByeoriPanel({
             type="button"
             className="absolute inset-x-0 bottom-0 top-8 z-10 cursor-default"
             onClick={() => setSessionListOpen(false)}
-            aria-label="대화 목록 닫기"
+            aria-label={tr("대화 목록 닫기")}
           />
           <section className="absolute inset-x-0 top-8 z-20 border-b border-[#e9e9e7] bg-[#fbfbfa] shadow-md">
             <div className="flex h-8 items-center gap-2 px-2.5">
               <SessionSelectionCheckbox
                 checked={allFilteredSessionsSelected}
                 mixed={filteredSelectedCount > 0 && !allFilteredSessionsSelected}
-                label={allFilteredSessionsSelected ? '현재 목록 선택 해제' : '현재 목록 전체 선택'}
+                label={allFilteredSessionsSelected ? tr("현재 목록 선택 해제") : tr("현재 목록 전체 선택")}
                 onChange={toggleAllFilteredSessions}
               />
               <span className="min-w-0 flex-1 text-[11px] text-[#5f5e5b]">
-                <span className="font-medium">대화 목록</span>
+                <span className="font-medium">{tr("대화 목록")}</span>
                 <span className="ml-1 rounded bg-[#efefed] px-1 py-px text-[10px] text-[#7d7c78]">{sessions.length}</span>
                 {selectedSessions.length > 0 && (
-                  <span className="ml-1.5 text-[10px] text-[#375a9e]">{selectedSessions.length}개 선택</span>
+                  <span className="ml-1.5 text-[10px] text-[#375a9e]">{selectedSessions.length}{tr("개 선택")}</span>
                 )}
               </span>
               <button
@@ -1770,13 +1777,14 @@ export default function ByeoriPanel({
                 onClick={requestDeleteSelected}
                 disabled={selectedSessions.length === 0 || sessionDeleteBusy}
               >
-                {sessionDeleteBusy ? '삭제 중…' : '선택 삭제'}
+                {sessionDeleteBusy ? tr("삭제 중…") : tr("선택 삭제")}
               </button>
             </div>
 
           <div className="border-t border-[#efefed] px-2 pb-2 pt-1.5">
             <label className="sr-only" htmlFor={`${panelId}-session-search`}>
-              대화 검색
+
+              {tr("대화 검색")}
             </label>
             <div className="flex items-center rounded-md border border-[#e3e2e0] bg-white px-2 focus-within:border-[#a8a6a1]">
               <span className="mr-1 text-[11px] text-[#9b9a97]">⌕</span>
@@ -1784,7 +1792,7 @@ export default function ByeoriPanel({
                 id={`${panelId}-session-search`}
                 value={sessionQuery}
                 onChange={(event) => setSessionQuery(event.target.value)}
-                placeholder="대화·문서·태스크 검색"
+                placeholder={tr("대화·문서·태스크 검색")}
                 className="h-6 min-w-0 flex-1 bg-transparent text-[11px] text-[#37352f] outline-none placeholder:text-[#b3b2ae]"
               />
               {sessionQuery && (
@@ -1792,7 +1800,7 @@ export default function ByeoriPanel({
                   type="button"
                   className="text-[11px] text-[#9b9a97] hover:text-[#37352f]"
                   onClick={() => setSessionQuery('')}
-                  title="검색어 지우기"
+                  title={tr("검색어 지우기")}
                 >
                   ✕
                 </button>
@@ -1856,7 +1864,7 @@ export default function ByeoriPanel({
                           event.stopPropagation()
                           void requestRename(session)
                         }}
-                        title="대화 이름 변경"
+                        title={tr("대화 이름 변경")}
                         aria-label={`${session.title} 이름 변경`}
                       >
                         ✎
@@ -1868,7 +1876,7 @@ export default function ByeoriPanel({
                           event.stopPropagation()
                           void requestDelete(session)
                         }}
-                        title="대화 삭제"
+                        title={tr("대화 삭제")}
                         aria-label={`${session.title} 삭제`}
                       >
                         ✕
@@ -1878,10 +1886,10 @@ export default function ByeoriPanel({
                 )
               })}
               {sessions.length === 0 && (
-                <p className="px-1 py-3 text-center text-[11px] text-[#9b9a97]">아직 대화가 없습니다.</p>
+                <p className="px-1 py-3 text-center text-[11px] text-[#9b9a97]">{tr("아직 대화가 없습니다.")}</p>
               )}
               {sessions.length > 0 && filteredSessions.length === 0 && (
-                <p className="px-1 py-3 text-center text-[11px] text-[#9b9a97]">일치하는 대화가 없습니다.</p>
+                <p className="px-1 py-3 text-center text-[11px] text-[#9b9a97]">{tr("일치하는 대화가 없습니다.")}</p>
               )}
             </div>
           </div>
@@ -1896,17 +1904,19 @@ export default function ByeoriPanel({
           <div className="mt-10 flex flex-col items-center gap-2 text-center text-[12px] text-[#9b9a97]">
             <span className="text-2xl">🤖</span>
             <p>
-              질문을 하거나,
+
+              {tr("질문을 하거나,")}
               <br />
-              태스크 보드에서 카드를 실행해보세요.
+
+              {tr("태스크 보드에서 카드를 실행해보세요.")}
             </p>
           </div>
         )}
         {active && messages.length === 0 && !active.busy && (
           <p className="mt-8 text-center text-[12px] text-[#9b9a97]">
             {active.kind === 'task'
-              ? '태스크 실행 결과가 여기에 표시됩니다.'
-              : '질문을 하거나 작업을 요청해보세요. 문서를 참조하려면 @로 첨부하거나 현재 문서를 분명히 지칭하세요.'}
+              ? tr("태스크 실행 결과가 여기에 표시됩니다.")
+              : tr("질문을 하거나 작업을 요청해보세요. 문서를 참조하려면 @로 첨부하거나 현재 문서를 분명히 지칭하세요.")}
           </p>
         )}
 
@@ -1930,9 +1940,11 @@ export default function ByeoriPanel({
             <p className="text-[10px] font-medium uppercase tracking-wide text-[#9b9a97]">{summaryLabel}</p>
             {active.taskStatus && (
               <div className="rounded-md border border-[#e7f5ef] bg-[#f0fdf4] px-3 py-1.5 text-[12px] text-[#0f7a48]">
-                태스크 상태 → <span className="font-medium">{active.taskStatus.status}</span>{' '}
+
+                {tr("태스크 상태 →")} <span className="font-medium">{active.taskStatus.status}</span>{' '}
                 <button className="underline" onClick={() => openFile(active.taskStatus!.path)}>
-                  카드 열기
+
+                  {tr("카드 열기")}
                 </button>
               </div>
             )}
@@ -1942,7 +1954,7 @@ export default function ByeoriPanel({
                 onClick={() => openFile(active.runLogPath!)}
               >
                 <span>📋</span>
-                <span className="font-medium">실행 로그 열기</span>
+                <span className="font-medium">{tr("실행 로그 열기")}</span>
                 <span className="truncate text-[11px] text-[#9b9a97]">{active.runLogPath}</span>
               </button>
             )}
@@ -1962,7 +1974,7 @@ export default function ByeoriPanel({
             )}
             {showMemoryError && active.memoryError && (
               <div className="rounded-md border-l-2 border-[#d92d20] bg-[#fff5f3] px-3 py-1.5 text-[11px] text-[#b42318]">
-                <div className="mb-0.5 font-medium">🧠 메모리를 저장하지 못했습니다</div>
+                <div className="mb-0.5 font-medium">{tr("🧠 메모리를 저장하지 못했습니다")}</div>
                 <p>{active.memoryError}</p>
               </div>
             )}
@@ -1974,8 +1986,8 @@ export default function ByeoriPanel({
           <div className="space-y-1.5 rounded-lg border border-[#d9ccff] bg-[#faf7ff] p-2.5">
             <p className="text-[11px] font-medium text-[#5d4a91]">
               {active.runOrderProposal.parseFailed
-                ? '⚠️ 결론 JSON 해석에 실패해 카드 순서 그대로 제안합니다'
-                : '🤖 AI가 제안한 실행 순서'}
+                ? tr("⚠️ 결론 JSON 해석에 실패해 카드 순서 그대로 제안합니다")
+                : tr("🤖 AI가 제안한 실행 순서")}
             </p>
             <ol className="ml-4 list-decimal space-y-0.5 text-[12px] text-[#37352f]">
               {active.runOrderProposal.titles.map((t, i) => (
@@ -1983,21 +1995,23 @@ export default function ByeoriPanel({
               ))}
             </ol>
             {active.runOrderProposal.reason && (
-              <p className="text-[11px] leading-snug text-[#7b6aa7]">판단 근거: {active.runOrderProposal.reason}</p>
+              <p className="text-[11px] leading-snug text-[#7b6aa7]">{tr("판단 근거:")} {active.runOrderProposal.reason}</p>
             )}
             <div className="flex gap-1.5 pt-0.5">
               <button
                 className="rounded-md bg-[#37352f] px-2.5 py-1 text-[11px] font-medium text-white hover:bg-[#2b2925]"
                 onClick={() => void confirmRunOrder(active.id)}
-                title="이 순서대로 카드마다 세션을 만들어 차례로 실행"
+                title={tr("이 순서대로 카드마다 세션을 만들어 차례로 실행")}
               >
-                ▶ 이 순서로 실행
+
+                {tr("▶ 이 순서로 실행")}
               </button>
               <button
                 className="rounded-md border border-[#e3e2e0] bg-white px-2.5 py-1 text-[11px] text-[#5f5e5b] hover:bg-[#f7f7f5]"
                 onClick={() => dismissRunOrder(active.id)}
               >
-                취소
+
+                {tr("취소")}
               </button>
             </div>
           </div>
@@ -2020,21 +2034,23 @@ export default function ByeoriPanel({
                         className="rounded border border-current/25 bg-white px-2 py-1 text-[11px] font-medium hover:bg-white/70"
                         onClick={() => retryChat(active.id)}
                       >
-                        {active.recovery.kind === 'cancelled' ? '같은 대화에서 다시 시작' : '같은 대화에서 다시 시도'}
+                        {active.recovery.kind === 'cancelled' ? tr("같은 대화에서 다시 시작") : tr("같은 대화에서 다시 시도")}
                       </button>
                       <button
                         type="button"
                         className="rounded border border-current/20 bg-white/60 px-2 py-1 text-[11px] hover:bg-white"
                         onClick={() => restoreRecoveryToDraft(active)}
                       >
-                        질문·문맥을 입력창으로 복원
+
+                        {tr("질문·문맥을 입력창으로 복원")}
                       </button>
                       <button
                         type="button"
                         className="rounded border border-current/20 bg-white/60 px-2 py-1 text-[11px] hover:bg-white"
                         onClick={() => void moveRecoveryToNewChat(active)}
                       >
-                        새 대화에서 다시 시도
+
+                        {tr("새 대화에서 다시 시도")}
                       </button>
                       {active.recovery.kind === 'auth' && (
                         <button
@@ -2043,19 +2059,22 @@ export default function ByeoriPanel({
                           onClick={startLogin}
                           disabled={loginBusy}
                         >
-                          로그인 다시 하기
+
+                          {tr("로그인 다시 하기")}
                         </button>
                       )}
                     </div>
                     <p className="mt-1.5 text-[10px] opacity-75">
-                      기본 재시도는 현재 대화의 맥락을 유지합니다. 새 대화는 이전 대화 맥락 없이 이 질문과 첨부 자료만 다시 보냅니다.
+
+                      {tr("기본 재시도는 현재 대화의 맥락을 유지합니다. 새 대화는 이전 대화 맥락 없이 이 질문과 첨부 자료만 다시 보냅니다.")}
                     </p>
                   </>
                 )}
                 {shouldOfferCodexUpdate(active.recovery) && (
                   <div className="mt-2 rounded border border-current/15 bg-white/55 p-2">
                     <p className="text-[10px] opacity-80">
-                      이 오류는 오래된 Codex CLI에서 발생할 수 있습니다.
+
+                      {tr("이 오류는 오래된 Codex CLI에서 발생할 수 있습니다.")}
                       {status?.version ? ` 현재 버전: ${status.version}` : ''}
                     </p>
                     <button
@@ -2064,7 +2083,7 @@ export default function ByeoriPanel({
                       onClick={() => void updateCodexCliAndRestart()}
                       disabled={cliUpdateBusy || active.busy}
                     >
-                      {cliUpdateBusy ? '업데이트 중…' : 'Codex CLI 업데이트 및 재시작'}
+                      {cliUpdateBusy ? tr("업데이트 중…") : tr("Codex CLI 업데이트 및 재시작")}
                     </button>
                   </div>
                 )}
@@ -2073,8 +2092,8 @@ export default function ByeoriPanel({
                 type="button"
                 className="shrink-0 rounded px-1 text-[12px] opacity-60 hover:bg-white/60 hover:opacity-100"
                 onClick={() => dismissRecovery(active.id)}
-                aria-label="복구 안내 닫기"
-                title="복구 안내 닫기"
+                aria-label={tr("복구 안내 닫기")}
+                title={tr("복구 안내 닫기")}
               >
                 ✕
               </button>
@@ -2098,7 +2117,7 @@ export default function ByeoriPanel({
       {/* 사용량 한도 초과 — 갱신 전까지 새 요청 불가 */}
       {limitBlocked && (
         <div className="shrink-0 border-t border-[#f4dfab] bg-[#fff9eb] px-3 py-1.5 text-[11px] text-[#8a6817]">
-          ⏳ Codex 사용량 한도에 도달했습니다 — {limitResetHint}. 갱신 전까지 새 요청을 보낼 수 없습니다.
+          ⏳ Codex 사용량 한도에 도달했습니다 — {limitResetHint}{tr(". 갱신 전까지 새 요청을 보낼 수 없습니다.")}
         </div>
       )}
 
@@ -2109,13 +2128,13 @@ export default function ByeoriPanel({
             className="mb-1.5 flex min-w-0 items-center gap-2 rounded-md border border-[#d5e6ff] bg-[#f5f8ff] px-2 py-1 text-[11px] text-[#2f6fd0]"
             title={`대상 프로젝트: ${activeTaskProjectName}`}
           >
-            <span className="shrink-0 text-[#5f7fb5]">대상 프로젝트</span>
+            <span className="shrink-0 text-[#5f7fb5]">{tr("대상 프로젝트")}</span>
             <span className="min-w-0 flex-1 truncate font-medium text-[#275eab]">{activeTaskProjectName}</span>
-            <span className="shrink-0 text-[10px] text-[#5f7fb5]">태스크에서 고정</span>
+            <span className="shrink-0 text-[10px] text-[#5f7fb5]">{tr("태스크에서 고정")}</span>
           </div>
         ) : active?.kind === 'chat' ? (
           <div className="relative mb-1.5 flex min-w-0 items-center gap-2 rounded-md border border-[#e3e2e0] bg-[#fbfbfa] px-2 py-1 text-[11px] text-[#5f5e5b]">
-          <span className="shrink-0 text-[#7d7c78]">질문 대상</span>
+          <span className="shrink-0 text-[#7d7c78]">{tr("질문 대상")}</span>
           <button
             type="button"
             className="flex min-w-0 flex-1 items-center gap-1 rounded px-1 py-0.5 text-left font-medium text-[#37352f] outline-none hover:bg-[#f1f1ef] focus-visible:ring-2 focus-visible:ring-[#4a9eff] disabled:cursor-not-allowed disabled:text-[#9b9a97]"
@@ -2126,8 +2145,8 @@ export default function ByeoriPanel({
             disabled={scopePickerBusy}
             aria-haspopup="listbox"
             aria-expanded={scopePickerOpen}
-            aria-label="질문 대상 프로젝트 선택"
-            title="프로젝트 선택"
+            aria-label={tr("질문 대상 프로젝트 선택")}
+            title={tr("프로젝트 선택")}
           >
             <span className="min-w-0 flex-1 truncate">
               {active?.kind === 'chat' && active.scopeId
@@ -2136,11 +2155,11 @@ export default function ByeoriPanel({
                     ? `${activeProject.project} · ${activeProject.label}`
                     : activeProject.label
                   : `등록 해제된 프로젝트 · ${active.scopeId}`
-                : '자동 · 워크스페이스'}
+                : tr("자동 · 워크스페이스")}
             </span>
             <span className="shrink-0 text-[10px] text-[#9b9a97]" aria-hidden="true">{scopePickerOpen ? '▴' : '▾'}</span>
           </button>
-          {scopePickerBusy && <span className="shrink-0 text-[10px] text-[#9b9a97]">대화 준비 중…</span>}
+          {scopePickerBusy && <span className="shrink-0 text-[10px] text-[#9b9a97]">{tr("대화 준비 중…")}</span>}
 
           {scopePickerOpen && (
             <>
@@ -2148,12 +2167,12 @@ export default function ByeoriPanel({
                 type="button"
                 className="fixed inset-0 z-30 cursor-default"
                 onClick={() => setScopePickerOpen(false)}
-                aria-label="질문 대상 프로젝트 선택 닫기"
+                aria-label={tr("질문 대상 프로젝트 선택 닫기")}
               />
               <div
                 className="absolute bottom-full left-0 right-0 z-40 mb-1 max-h-56 overflow-y-auto rounded-md border border-[#e3e2e0] bg-[#fbfbfa] py-1 shadow-lg"
                 role="listbox"
-                aria-label="질문 대상 프로젝트"
+                aria-label={tr("질문 대상 프로젝트")}
               >
                 <button
                   type="button"
@@ -2169,8 +2188,8 @@ export default function ByeoriPanel({
                     void selectQuestionTarget('')
                   }}
                 >
-                  <span className="text-[11px] font-medium">자동 · 워크스페이스</span>
-                  <span className="mt-0.5 text-[10px] text-[#9b9a97]">워크스페이스 기본 설정을 사용</span>
+                  <span className="text-[11px] font-medium">{tr("자동 · 워크스페이스")}</span>
+                  <span className="mt-0.5 text-[10px] text-[#9b9a97]">{tr("워크스페이스 기본 설정을 사용")}</span>
                 </button>
                 {scopes.map((scope) => {
                   const selected = active?.kind === 'chat' && active.scopeId === scope.id
@@ -2193,7 +2212,7 @@ export default function ByeoriPanel({
                           {scope.project ? `${scope.project} · ${scope.label}` : scope.label}
                         </span>
                         <span className="mt-0.5 block truncate text-[10px] text-[#9b9a97]">
-                          {scope.path || '문서 전용 · 코드·분석 경로 없음'}
+                          {scope.path || tr("문서 전용 · 코드·분석 경로 없음")}
                         </span>
                       </span>
                       {selected && <span className="shrink-0 text-[12px] text-[#37352f]">✓</span>}
@@ -2201,7 +2220,7 @@ export default function ByeoriPanel({
                   )
                 })}
                 {scopes.length === 0 && (
-                  <p className="px-2.5 py-2 text-[10px] text-[#9b9a97]">아직 프로젝트가 없습니다.</p>
+                  <p className="px-2.5 py-2 text-[10px] text-[#9b9a97]">{tr("아직 프로젝트가 없습니다.")}</p>
                 )}
               </div>
             </>
@@ -2210,12 +2229,14 @@ export default function ByeoriPanel({
         ) : null}
         {active?.kind === 'chat' && active.scopeId && !activeProject && (
           <p className="-mt-0.5 mb-1.5 px-1 text-[10px] text-[#a67c1b]">
-            선택한 프로젝트({active.scopeId})를 찾을 수 없습니다. 다음 질문은 등록된 경로를 확인한 뒤 보내세요.
+
+            {tr("선택한 프로젝트(")}{active.scopeId}{tr(")를 찾을 수 없습니다. 다음 질문은 등록된 경로를 확인한 뒤 보내세요.")}
           </p>
         )}
         {taskScopeMismatch && !active?.busy && (
           <div className="mb-1.5 rounded-md border border-[#f4dfab] bg-[#fff9eb] px-2 py-1.5 text-[11px] text-[#8a6817]" role="alert">
-            후속 요청은 이 세션에서 보낼 수 없습니다. 태스크 카드에서 ‘변경된 프로젝트로 새 실행’을 시작해주세요.
+
+            {tr("후속 요청은 이 세션에서 보낼 수 없습니다. 태스크 카드에서 ‘변경된 프로젝트로 새 실행’을 시작해주세요.")}
           </div>
         )}
         {/* 선택 액션으로만 생기는 명시적 문서/텍스트 컨텍스트. 일반 채팅에는 만들지 않는다. */}
@@ -2242,7 +2263,7 @@ export default function ByeoriPanel({
                 setPendingIncludeDocument(false)
                 setDraftDocumentPath(null)
               }}
-              title="선택 텍스트와 문서 첨부 제거"
+              title={tr("선택 텍스트와 문서 첨부 제거")}
             >
               ✕
             </button>
@@ -2262,7 +2283,7 @@ export default function ByeoriPanel({
                     type="button"
                     className="h-9 w-9 shrink-0 overflow-hidden rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#4a9eff]"
                     onClick={() => setPreviewImage({ url: att.url, name: att.name, alt: att.name })}
-                    title="첨부 이미지 크게 보기"
+                    title={tr("첨부 이미지 크게 보기")}
                     aria-label={`${att.name} 크게 보기`}
                   >
                     <img src={att.url} alt={att.name} className="h-full w-full object-cover" />
@@ -2278,7 +2299,7 @@ export default function ByeoriPanel({
                     type="button"
                     className="rounded px-1 py-0.5 text-[11px] text-[#9b9a97] hover:bg-[#efefed] hover:text-[#37352f]"
                     onClick={() => setAnnotatingUrl(att.url)}
-                  title="주석 달기"
+                  title={tr("주석 달기")}
                   >
                     ✏️
                   </button>
@@ -2287,7 +2308,7 @@ export default function ByeoriPanel({
                   type="button"
                   className="rounded px-1 py-0.5 text-[11px] text-[#9b9a97] hover:bg-[#fdf0f0] hover:text-[#c92a2a]"
                   onClick={() => setAttachments((prev) => prev.filter((x) => x.url !== att.url))}
-                  title="첨부 제거"
+                  title={tr("첨부 제거")}
                 >
                   ✕
                 </button>
@@ -2307,12 +2328,12 @@ export default function ByeoriPanel({
             rows={3}
             placeholder={
               taskScopeMismatch && !active?.busy
-                ? '카드의 최신 프로젝트로 새 실행을 시작한 뒤 후속 요청을 보내세요.'
+                ? tr("카드의 최신 프로젝트로 새 실행을 시작한 뒤 후속 요청을 보내세요.")
                 : active?.busy
                 ? active.turnId
-                  ? '기존 작업에 이어서 추가 지시 (Enter 전송, Shift+Enter 줄바꿈)'
-                  : '작업을 시작하거나 마무리하는 중입니다 — 다음 질문 초안 작성 가능'
-                : '질문·요청. @ 로 노트 본문 첨부 (Enter 전송, Shift+Enter 줄바꿈)'
+                  ? tr("기존 작업에 이어서 추가 지시 (Enter 전송, Shift+Enter 줄바꿈)")
+                  : tr("작업을 시작하거나 마무리하는 중입니다 — 다음 질문 초안 작성 가능")
+                : tr("질문·요청. @ 로 노트 본문 첨부 (Enter 전송, Shift+Enter 줄바꿈)")
             }
             value={prompt}
             onChange={(e) => {
@@ -2364,8 +2385,8 @@ export default function ByeoriPanel({
               className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[#7d7c78] hover:bg-[#f1f1ef] hover:text-[#37352f] disabled:opacity-50"
               onClick={() => fileInputRef.current?.click()}
               disabled={uploadBusy}
-              title="파일 첨부"
-              aria-label={uploadBusy ? '파일 업로드 중' : '파일 첨부'}
+              title={tr("파일 첨부")}
+              aria-label={uploadBusy ? tr("파일 업로드 중") : tr("파일 첨부")}
             >
               {uploadBusy ? (
                 <span className="animate-pulse text-[11px]" aria-hidden="true">…</span>
@@ -2387,15 +2408,15 @@ export default function ByeoriPanel({
             <span className="min-w-0 flex-1 truncate text-[10px] text-[#9b9a97]" title={root ?? ''}>
               {active?.busy ? (
                 active.turnId
-                  ? 'Enter: 추가 지시 전송 · Shift+Enter: 줄바꿈'
-                  : '응답을 마무리하는 중입니다.'
+                  ? tr("Enter: 추가 지시 전송 · Shift+Enter: 줄바꿈")
+                  : tr("응답을 마무리하는 중입니다.")
               ) : (
                 ''
               )}
             </span>
             <button
               type="button"
-              aria-label={active?.busy ? '추가 지시 보내기' : '전송'}
+              aria-label={active?.busy ? tr("추가 지시 보내기") : tr("전송")}
               className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-white disabled:opacity-50 ${
                 active?.busy ? 'bg-[#6f5aa8] hover:bg-[#5d4a91]' : 'bg-[#37352f] hover:bg-[#2b2925]'
               }`}
@@ -2408,13 +2429,13 @@ export default function ByeoriPanel({
               title={
                 active?.busy
                   ? active.turnId
-                    ? '추가 지시 보내기 (Enter)'
-                    : '현재 작업 턴이 끝나 응답을 정리하고 있습니다. 완료 뒤 다음 질문으로 보내세요.'
+                    ? tr("추가 지시 보내기 (Enter)")
+                    : tr("현재 작업 턴이 끝나 응답을 정리하고 있습니다. 완료 뒤 다음 질문으로 보내세요.")
                   : limitBlocked
                     ? `사용량 한도 초과 — ${limitResetHint}`
                     : taskScopeMismatch
-                      ? '카드의 프로젝트가 변경되어 새 실행이 필요합니다.'
-                    : '전송 (Enter)'
+                      ? tr("카드의 프로젝트가 변경되어 새 실행이 필요합니다.")
+                    : tr("전송 (Enter)")
               }
             >
               <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -2428,8 +2449,8 @@ export default function ByeoriPanel({
         {/* 하단: Codex 계정 사용량 한도 (5시간 · 주간) */}
         {usageLimits?.available && (
           <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-[#f1f1ef] pt-1.5 text-[10px] text-[#7d7c78]">
-            <UsageLimitMeter label={limitWindowLabel(usageLimits.primary, '5시간')} limit={usageLimits.primary} />
-            <UsageLimitMeter label={limitWindowLabel(usageLimits.secondary, '주간')} limit={usageLimits.secondary} />
+            <UsageLimitMeter label={limitWindowLabel(usageLimits.primary, tr("5시간"))} limit={usageLimits.primary} />
+            <UsageLimitMeter label={limitWindowLabel(usageLimits.secondary, tr("주간"))} limit={usageLimits.secondary} />
             {usageLimits.plan_type && <span className="ml-auto shrink-0 text-[#b3b2ae]">{usageLimits.plan_type}</span>}
           </div>
         )}
@@ -2473,11 +2494,12 @@ export default function ByeoriPanel({
                 </p>
                 <p id={`${panelId}-session-delete-detail`} className="mt-1 text-[11px] leading-relaxed text-[#7d7c78]">
                   {sessionDeleteRequest.kind === 'single' && sessionDeleteRequest.running
-                    ? '진행 중이거나 대기 중인 실행도 함께 중단됩니다. '
+                    ? tr("진행 중이거나 대기 중인 실행도 함께 중단됩니다. ")
                     : sessionDeleteRequest.kind === 'selected' && sessionDeleteRequest.runningCount > 0
                       ? `진행 중이거나 대기 중인 실행 ${sessionDeleteRequest.runningCount}개도 함께 중단됩니다. `
                       : ''}
-                  삭제한 대화는 되돌릴 수 없습니다.
+
+                  {tr("삭제한 대화는 되돌릴 수 없습니다.")}
                 </p>
               </div>
             </div>
@@ -2488,7 +2510,8 @@ export default function ByeoriPanel({
                 onClick={() => setSessionDeleteRequest(null)}
                 disabled={sessionDeleteBusy}
               >
-                취소
+
+                {tr("취소")}
               </button>
               <button
                 ref={sessionDeleteConfirmRef}
@@ -2498,9 +2521,9 @@ export default function ByeoriPanel({
                 disabled={sessionDeleteBusy}
               >
                 {sessionDeleteBusy
-                  ? '삭제 중…'
+                  ? tr("삭제 중…")
                   : sessionDeleteRequest.kind === 'single'
-                    ? '대화 삭제'
+                    ? tr("대화 삭제")
                     : `${sessionDeleteRequest.count}개 삭제`}
               </button>
             </div>

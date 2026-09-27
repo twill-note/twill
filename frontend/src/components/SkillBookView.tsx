@@ -16,6 +16,7 @@ import { isDarkTheme, useThemeStore } from '../theme'
 import type { NoteRow } from '../types'
 import { DbTable } from './dbviews'
 import { fromMarkdownBlocks, schema, toMarkdownBlocks } from './Editor'
+import { tr } from '../i18n'
 
 
 const SKILLBOOK_CONFIG: DbConfig = {
@@ -139,32 +140,34 @@ export default function SkillBookView() {
     <div className="flex h-full flex-col">
       <header className="flex items-center gap-2 border-b border-[#efefed] px-6 py-3">
         <span className="text-[18px]">📚</span>
-        <h1 className="text-[15px] font-semibold text-[#37352f]">스킬북</h1>
+        <h1 className="text-[15px] font-semibold text-[#37352f]">{tr("스킬북")}</h1>
         <span className="text-[12px] text-[#9b9a97]">· {visible.length}</span>
         <input
           className="ml-3 w-64 rounded-md border border-[#e3e2e0] px-2.5 py-1 text-[13px] outline-none placeholder:text-[#c8c7c4] focus:border-blue-400"
           value={filter}
           onChange={(event) => setFilter(event.target.value)}
-          placeholder="스킬 제목·설명 검색…"
+          placeholder={tr("스킬 제목·설명 검색…")}
         />
         <button
           className="ml-2 rounded-md bg-[#37352f] px-3 py-1 text-[12px] font-medium text-white hover:bg-[#2b2925]"
           onClick={() => void createSkill()}
         >
-          + 새 스킬
+
+          {tr("+ 새 스킬")}
         </button>
         <button
           className="ml-auto rounded px-2 py-1 text-[13px] text-[#9b9a97] hover:bg-[#f1f1ef] hover:text-[#37352f]"
           onClick={closeBoardView}
         >
-          ✕ 닫기
+
+          {tr("✕ 닫기")}
         </button>
       </header>
 
       {error ? (
         <div className="flex flex-1 items-center justify-center text-[13px] text-red-500">{error}</div>
       ) : loading ? (
-        <div className="flex flex-1 items-center justify-center text-[13px] text-[#9b9a97]">불러오는 중…</div>
+        <div className="flex flex-1 items-center justify-center text-[13px] text-[#9b9a97]">{tr("불러오는 중…")}</div>
       ) : (
         <div className="flex-1 overflow-auto px-6 py-4">
           <DbTable
@@ -175,11 +178,12 @@ export default function SkillBookView() {
             showDate={false}
             showTags={false}
             readOnly
-            emptyLabel="등록된 스킬이 없습니다"
+            emptyLabel={tr("등록된 스킬이 없습니다")}
           />
           <p className="mt-3 text-[11px] text-[#9b9a97]">
-            🔒 시스템 매뉴얼은 수정할 수 없습니다. 스킬은 앱 설치 폴더 밖에 보존됩니다.
-            {storagePath && <span className="mt-1 block break-all">저장 위치: {storagePath}</span>}
+
+            {tr("🔒 시스템 매뉴얼은 수정할 수 없습니다. 스킬은 앱 설치 폴더 밖에 보존됩니다.")}
+            {storagePath && <span className="mt-1 block break-all">{tr("저장 위치:")} {storagePath}</span>}
           </p>
         </div>
       )}
@@ -269,7 +273,8 @@ function SkillBookDetailView({
           className="rounded px-2 py-1 text-[12px] text-[#5f5e5b] hover:bg-[#f1f1ef]"
           onClick={onBack}
         >
-          ← 목록
+
+          {tr("← 목록")}
         </button>
         <span className="text-[16px]">{detail?.summary.read_only ? '🔒' : '📘'}</span>
         <div className="min-w-0">
@@ -281,7 +286,8 @@ function SkillBookDetailView({
             className="ml-auto rounded px-2 py-1 text-[11px] text-red-500 hover:bg-red-50"
             onClick={() => void remove()}
           >
-            스킬 삭제
+
+            {tr("스킬 삭제")}
           </button>
         )}
       </header>
@@ -294,7 +300,7 @@ function SkillBookDetailView({
 
       <div className="flex min-h-0 flex-1">
         <aside className="w-64 shrink-0 overflow-auto border-r border-[#efefed] bg-[#fbfbfa] p-2">
-          <p className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-wide text-[#9b9a97]">구성요소</p>
+          <p className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-wide text-[#9b9a97]">{tr("구성요소")}</p>
           {detail?.components.map((component) => {
             const active = component.path === selectedPath
             const depth = component.path.split('/').length - 1
@@ -322,7 +328,7 @@ function SkillBookDetailView({
                 <span>{icon}</span>
                 <span className="truncate">{component.path.split('/').at(-1)}</span>
                 {!component.editable && component.kind !== 'directory' ? (
-                  <span className="ml-auto text-[9px] text-[#b4b3af]">조회</span>
+                  <span className="ml-auto text-[9px] text-[#b4b3af]">{tr("조회")}</span>
                 ) : null}
               </button>
             )
@@ -333,7 +339,7 @@ function SkillBookDetailView({
           {error ? (
             <div className="flex h-full items-center justify-center text-[13px] text-red-500">{error}</div>
           ) : loading || !content ? (
-            <div className="flex h-full items-center justify-center text-[13px] text-[#9b9a97]">불러오는 중…</div>
+            <div className="flex h-full items-center justify-center text-[13px] text-[#9b9a97]">{tr("불러오는 중…")}</div>
           ) : (
             <SkillBookContentEditor
               key={`${content.id}:${content.path}:${content.mtime}`}
@@ -379,14 +385,15 @@ function SkillBookContentEditor({
   return (
     <div className="flex h-full flex-col items-center justify-center gap-2 text-[#9b9a97]">
       <span className="text-3xl">📦</span>
-      <p className="text-[13px]">이 구성요소는 편집기에서 미리 볼 수 없습니다.</p>
+      <p className="text-[13px]">{tr("이 구성요소는 편집기에서 미리 볼 수 없습니다.")}</p>
       <a
         className="text-[12px] text-blue-600 underline"
         href={api.skillbook.assetUrl(value.id, value.path)}
         target="_blank"
         rel="noreferrer"
       >
-        파일 열기
+
+        {tr("파일 열기")}
       </a>
       {value.editable && <ReplaceAssetButton value={value} onSaved={onSaved} />}
     </div>
@@ -433,7 +440,7 @@ function ReplaceAssetButton({
         disabled={saving}
         onClick={() => inputRef.current?.click()}
       >
-        {saving ? '교체 중…' : '파일 교체'}
+        {saving ? tr("교체 중…") : tr("파일 교체")}
       </button>
     </>
   )
@@ -505,14 +512,14 @@ function SkillBookMarkdownEditor({
       <div className="mb-4 flex items-center gap-2">
         <code className="text-[11px] text-[#9b9a97]">{value.path}</code>
         {value.read_only ? (
-          <span className="rounded bg-[#ececea] px-1.5 py-0.5 text-[10px] text-[#787774]">읽기 전용</span>
+          <span className="rounded bg-[#ececea] px-1.5 py-0.5 text-[10px] text-[#787774]">{tr("읽기 전용")}</span>
         ) : (
           <button
             className="ml-auto rounded-md bg-[#37352f] px-3 py-1 text-[11px] font-medium text-white disabled:opacity-40"
             disabled={!dirty || saving}
             onClick={() => void save()}
           >
-            {saving ? '저장 중…' : '저장'}
+            {saving ? tr("저장 중…") : tr("저장")}
           </button>
         )}
       </div>
@@ -520,7 +527,8 @@ function SkillBookMarkdownEditor({
       {isSkillEntry && (
         <div className="mb-5 grid gap-3 rounded-lg border border-[#e9e9e7] bg-[#fbfbfa] p-4">
           <label className="grid gap-1 text-[11px] font-medium text-[#787774]">
-            스킬 이름
+
+            {tr("스킬 이름")}
             <input
               className="rounded border border-[#e3e2e0] bg-white px-2.5 py-1.5 font-mono text-[12px] text-[#37352f] outline-none focus:border-blue-400"
               value={String(metadata.name ?? '')}
@@ -528,7 +536,8 @@ function SkillBookMarkdownEditor({
             />
           </label>
           <label className="grid gap-1 text-[11px] font-medium text-[#787774]">
-            간단 설명
+
+            {tr("간단 설명")}
             <textarea
               className="min-h-16 resize-y rounded border border-[#e3e2e0] bg-white px-2.5 py-1.5 text-[12px] text-[#37352f] outline-none focus:border-blue-400"
               value={String(metadata.description ?? '')}
@@ -540,7 +549,7 @@ function SkillBookMarkdownEditor({
 
       {!isSkillEntry && Object.keys(value.frontmatter).length > 0 && !value.read_only ? (
         <details className="mb-4 rounded border border-[#e9e9e7] bg-[#fbfbfa] px-3 py-2">
-          <summary className="cursor-pointer text-[11px] text-[#787774]">Frontmatter 편집</summary>
+          <summary className="cursor-pointer text-[11px] text-[#787774]">{tr("Frontmatter 편집")}</summary>
           <textarea
             className="mt-2 min-h-32 w-full resize-y rounded border border-[#e3e2e0] bg-white p-2 font-mono text-[11px] outline-none"
             value={metadataJson}
@@ -598,14 +607,14 @@ function SkillBookTextEditor({
       <div className="mb-3 flex items-center gap-2">
         <code className="text-[11px] text-[#9b9a97]">{value.path}</code>
         {value.read_only ? (
-          <span className="rounded bg-[#ececea] px-1.5 py-0.5 text-[10px] text-[#787774]">읽기 전용</span>
+          <span className="rounded bg-[#ececea] px-1.5 py-0.5 text-[10px] text-[#787774]">{tr("읽기 전용")}</span>
         ) : (
           <button
             className="ml-auto rounded-md bg-[#37352f] px-3 py-1 text-[11px] font-medium text-white disabled:opacity-40"
             disabled={!dirty || saving}
             onClick={() => void save()}
           >
-            {saving ? '저장 중…' : '저장'}
+            {saving ? tr("저장 중…") : tr("저장")}
           </button>
         )}
       </div>

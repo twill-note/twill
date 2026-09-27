@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { CellType, ColumnDef } from '../dbschema'
+import { tr } from '../i18n'
 
 const TYPE_LABELS: Record<CellType, string> = {
   text: '텍스트',
@@ -66,7 +67,7 @@ export default function DbColumnConfig({
       onClick={(e) => e.stopPropagation()}
     >
       <div className="border-b border-[#e9e9e7] p-2">
-        <label className="text-[10px] font-medium uppercase tracking-wide text-[#9b9a97]">이름</label>
+        <label className="text-[10px] font-medium uppercase tracking-wide text-[#9b9a97]">{tr("이름")}</label>
         <input
           className="mt-1 w-full rounded border border-[#e3e2e0] px-2 py-1 text-[12px] outline-none focus:border-[#8a8886]"
           value={column.label ?? column.key}
@@ -74,7 +75,7 @@ export default function DbColumnConfig({
         />
       </div>
       <div className="border-b border-[#e9e9e7] p-2">
-        <label className="text-[10px] font-medium uppercase tracking-wide text-[#9b9a97]">타입</label>
+        <label className="text-[10px] font-medium uppercase tracking-wide text-[#9b9a97]">{tr("타입")}</label>
         <div className="mt-1 grid grid-cols-2 gap-1">
           {TYPES.map((t) => (
             <button
@@ -98,7 +99,7 @@ export default function DbColumnConfig({
         }}
       >
         <span>🗑</span>
-        <span>컬럼 삭제</span>
+        <span>{tr("컬럼 삭제")}</span>
       </button>
     </div>
   )

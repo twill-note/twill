@@ -18,6 +18,7 @@ import {
   type ErdRelation,
   type ErdTable,
 } from './types'
+import { tr } from '../../i18n'
 
 interface Props {
   initial: ErdDiagram
@@ -690,8 +691,8 @@ export default function ErdDesigner({
             <input
               className="w-[320px] max-w-[40vw] rounded border border-[#d3d1cb] bg-white px-2 py-1 text-[16px] font-semibold text-[#37352f] outline-none focus:border-[#9b9a97]"
               value={titleDraft}
-              placeholder="ERD 제목"
-              aria-label="ERD 제목"
+              placeholder={tr("ERD 제목")}
+              aria-label={tr("ERD 제목")}
               autoFocus
               onFocus={(event) => event.currentTarget.select()}
               onChange={(event) => setTitleDraft(event.target.value)}
@@ -713,32 +714,33 @@ export default function ErdDesigner({
                 className="max-w-[min(420px,40vw)] truncate text-[16px] font-semibold text-[#37352f]"
                 title={diagram.meta.title}
               >
-                {diagram.meta.title || '제목 없는 ERD'}
+                {diagram.meta.title || tr("제목 없는 ERD")}
               </span>
               <button
                 type="button"
                 className="grid h-7 w-7 shrink-0 place-items-center rounded text-[#9b9a97] hover:bg-[#f1f1ef] hover:text-[#37352f]"
                 onClick={beginTitleEditing}
-                title="ERD 제목 수정"
-                aria-label="ERD 제목 수정"
+                title={tr("ERD 제목 수정")}
+                aria-label={tr("ERD 제목 수정")}
               >
                 <EditIcon />
               </button>
             </>
           )}
           <span className="shrink-0 text-[11px] text-[#9b9a97]">
-            {diagram.tables.length} 테이블 · {diagram.relations.length} 관계
+            {diagram.tables.length}  {tr("테이블 ·")} {diagram.relations.length}  {tr("관계")}
           </span>
-          {dirty && <span className="shrink-0 text-[11px] text-orange-600">● 저장 안 됨</span>}
+          {dirty && <span className="shrink-0 text-[11px] text-orange-600">{tr("● 저장 안 됨")}</span>}
         </div>
         {externalChangeAvailable ? (
           <button
             type="button"
             className="rounded-md border border-amber-300 bg-amber-50 px-2 py-1 text-[11px] font-medium text-amber-700 hover:bg-amber-100"
             onClick={() => void refreshFromDisk()}
-            title="다시 불러오기"
+            title={tr("다시 불러오기")}
           >
-            외부 변경됨
+
+            {tr("외부 변경됨")}
           </button>
         ) : (
           <ErdSaveIndicator status={saveStatus} />
@@ -748,8 +750,8 @@ export default function ErdDesigner({
           className="grid h-8 w-8 place-items-center rounded-md border border-[#e3e2e0] text-[#5f5e5b] hover:bg-[#f1f1ef] disabled:cursor-not-allowed disabled:text-[#c9c8c4]"
           onClick={() => void refreshFromDisk()}
           disabled={!savedPath || refreshing}
-          title="다시 불러오기"
-          aria-label="ERD 새로고침"
+          title={tr("다시 불러오기")}
+          aria-label={tr("ERD 새로고침")}
         >
           <RefreshIcon spinning={refreshing} />
         </button>
@@ -757,7 +759,8 @@ export default function ErdDesigner({
           className="rounded-md border border-[#e3e2e0] px-3 py-1.5 text-[12px] hover:bg-[#f1f1ef]"
           onClick={tryClose}
         >
-          닫기
+
+          {tr("닫기")}
         </button>
         <button
           className={`rounded-md px-3 py-1.5 text-[12px] font-medium text-white ${
@@ -765,9 +768,9 @@ export default function ErdDesigner({
           }`}
           onClick={() => { void save('manual') }}
           disabled={saving || (!dirty && !pathEditing && !!savedPath)}
-          title="저장"
+          title={tr("저장")}
         >
-          {saving ? '저장 중…' : `저장 (${displayCombo('Mod+KeyS')})`}
+          {saving ? tr("저장 중…") : `저장 (${displayCombo('Mod+KeyS')})`}
         </button>
       </div>
 
@@ -911,7 +914,7 @@ export default function ErdDesigner({
 
             {canvasTool === 'relation' && (
               <div className="pointer-events-none absolute left-14 top-3 z-20 rounded-md border border-[#e3e2e0] bg-white px-2.5 py-1.5 text-[10px] text-[#5f5e5b] shadow-sm">
-                {linking ? '연결할 대상 컬럼을 클릭하세요. Esc로 취소' : '관계를 시작할 컬럼을 클릭하세요'}
+                {linking ? tr("연결할 대상 컬럼을 클릭하세요. Esc로 취소") : tr("관계를 시작할 컬럼을 클릭하세요")}
               </div>
             )}
 
@@ -921,7 +924,7 @@ export default function ErdDesigner({
               <span className="w-10 text-center tabular-nums text-[#5f5e5b]">{Math.round(camera.scale * 100)}%</span>
               <button className="rounded px-1.5 py-0.5 hover:bg-[#f1f1ef]" onClick={() => setCamera((c) => ({ ...c, scale: Math.min(3, c.scale + 0.1) }))}>+</button>
               <span className="mx-1 h-3 w-px bg-[#e3e2e0]" />
-              <button className="rounded px-1.5 py-0.5 text-[#5f5e5b] hover:bg-[#f1f1ef]" onClick={resetView} title="뷰 초기화">
+              <button className="rounded px-1.5 py-0.5 text-[#5f5e5b] hover:bg-[#f1f1ef]" onClick={resetView} title={tr("뷰 초기화")}>
                 🎯
               </button>
             </div>
@@ -931,16 +934,18 @@ export default function ErdDesigner({
               <button
                 className="rounded px-2 py-1 text-[#5f5e5b] hover:bg-[#f1f1ef]"
                 onClick={() => setDdlImportOpen(true)}
-                title="SQL DDL 가져오기"
+                title={tr("SQL DDL 가져오기")}
               >
-                📥 DDL 가져오기
+
+                {tr("📥 DDL 가져오기")}
               </button>
               <button
                 className="rounded px-2 py-1 text-[#5f5e5b] hover:bg-[#f1f1ef]"
                 onClick={() => setSqlOpen(true)}
-                title="SQL DDL 내보내기"
+                title={tr("SQL DDL 내보내기")}
               >
-                📤 DDL 내보내기
+
+                {tr("📤 DDL 내보내기")}
               </button>
             </div>
           </div>
@@ -948,7 +953,8 @@ export default function ErdDesigner({
         {/* 하단 힌트 바 */}
         <div className="flex items-center justify-between border-t border-[#efefed] bg-[#fafafa] px-4 py-2 text-[11px] text-[#9b9a97]">
           <span>
-            💡 휠: 상하 이동 · <b>Shift + 휠</b>: 좌우 이동 · <b>Ctrl + 휠</b>: 확대/축소
+
+            {tr("💡 휠: 상하 이동 ·")} <b>{tr("Shift + 휠")}</b>{tr(": 좌우 이동 ·")} <b>{tr("Ctrl + 휠")}</b>{tr(": 확대/축소")}
           </span>
         </div>
       {sqlOpen && (
@@ -1048,14 +1054,14 @@ function CanvasToolbar({
       className="pointer-events-auto absolute left-3 top-3 z-20 flex w-8 flex-col items-center overflow-hidden rounded-md border border-[#e3e2e0] bg-white p-0.5 shadow-sm"
       onMouseDown={(event) => event.stopPropagation()}
     >
-      <ToolButton active={tool === 'select'} title="선택 / 이동" onClick={onSelect}><CursorIcon /></ToolButton>
+      <ToolButton active={tool === 'select'} title={tr("선택 / 이동")} onClick={onSelect}><CursorIcon /></ToolButton>
       <div className="my-0.5 h-px w-full bg-[#efefed]" />
-      <ToolButton title="새 테이블" onClick={onAddTable}><TableIcon /></ToolButton>
-      <ToolButton active={tool === 'relation'} title={linking ? '연결 대상 선택 중' : '관계 연결'} onClick={onRelation}><RelationIcon /></ToolButton>
+      <ToolButton title={tr("새 테이블")} onClick={onAddTable}><TableIcon /></ToolButton>
+      <ToolButton active={tool === 'relation'} title={linking ? tr("연결 대상 선택 중") : tr("관계 연결")} onClick={onRelation}><RelationIcon /></ToolButton>
       <div className="my-0.5 h-px w-full bg-[#efefed]" />
-      <ToolButton title="확대" onClick={onZoomIn}><PlusIcon /></ToolButton>
-      <ToolButton title="축소" onClick={onZoomOut}><MinusIcon /></ToolButton>
-      <ToolButton title="뷰 초기화" onClick={onReset}><TargetIcon /></ToolButton>
+      <ToolButton title={tr("확대")} onClick={onZoomIn}><PlusIcon /></ToolButton>
+      <ToolButton title={tr("축소")} onClick={onZoomOut}><MinusIcon /></ToolButton>
+      <ToolButton title={tr("뷰 초기화")} onClick={onReset}><TargetIcon /></ToolButton>
     </div>
   )
 }
@@ -1103,8 +1109,8 @@ function RelationPopover({
       onClick={(event) => event.stopPropagation()}
     >
       <div className="mb-1.5 flex items-center justify-between">
-        <span className="font-semibold text-[#37352f]">관계 설정</span>
-        <button className="rounded px-1 text-[#c34e4e] hover:bg-[#fff3f3]" title="관계 삭제" onClick={onRemove}><TrashIcon /></button>
+        <span className="font-semibold text-[#37352f]">{tr("관계 설정")}</span>
+        <button className="rounded px-1 text-[#c34e4e] hover:bg-[#fff3f3]" title={tr("관계 삭제")} onClick={onRemove}><TrashIcon /></button>
       </div>
       <p className="mb-2 truncate rounded bg-[#f7f6f3] px-1.5 py-1 font-mono text-[9px] text-[#777672]" title={`${fromTable?.name}.${fromColumn?.name} → ${toTable?.name}.${toColumn?.name}`}>
         {fromTable?.name}.{fromColumn?.name} → {toTable?.name}.{toColumn?.name}
@@ -1127,11 +1133,12 @@ function RelationPopover({
       </div>
       <label className="mt-2 flex items-center gap-1.5">
         <input type="checkbox" checked={relation.optional ?? false} onChange={(event) => onChange({ optional: event.target.checked })} />
-        선택적 관계 (점선)
+
+        {tr("선택적 관계 (점선)")}
       </label>
       <input
         className="mt-2 w-full rounded border border-[#e3e2e0] px-1.5 py-1 text-[10px] outline-none focus:border-[#d3d1cb]"
-        placeholder="관계 설명 (선택)"
+        placeholder={tr("관계 설명 (선택)")}
         value={relation.label ?? ''}
         onChange={(event) => onChange({ label: event.target.value || undefined })}
       />
@@ -1195,19 +1202,20 @@ function SqlExportDialog({ sql, filename, onClose }: { sql: string; filename: st
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-[#efefed] px-4 py-3">
-          <h3 className="text-[14px] font-semibold text-[#37352f]">📤 MariaDB SQL DDL 내보내기</h3>
+          <h3 className="text-[14px] font-semibold text-[#37352f]">{tr("📤 MariaDB SQL DDL 내보내기")}</h3>
           <div className="flex gap-2">
             <button
               className="rounded border border-[#e3e2e0] px-2.5 py-1 text-[12px] text-[#5f5e5b] hover:bg-[#f1f1ef]"
               onClick={copy}
             >
-              {copied ? '복사됨 ✓' : '📋 클립보드 복사'}
+              {copied ? tr("복사됨 ✓") : tr("📋 클립보드 복사")}
             </button>
             <button
               className="rounded border border-[#e3e2e0] px-2.5 py-1 text-[12px] text-[#5f5e5b] hover:bg-[#f1f1ef]"
               onClick={download}
             >
-              💾 .sql 저장
+
+              {tr("💾 .sql 저장")}
             </button>
             <button className="rounded px-2 py-1 text-[13px] text-[#9b9a97] hover:bg-[#f1f1ef]" onClick={onClose}>
               ✕
@@ -1235,8 +1243,8 @@ function SqlImportDialog({ onImport, onClose }: { onImport: (sql: string) => boo
       >
         <div className="flex items-center justify-between border-b border-[#efefed] px-4 py-3">
           <div>
-            <h3 className="text-[14px] font-semibold text-[#37352f]">📥 SQL DDL 가져오기</h3>
-            <p className="mt-0.5 text-[11px] text-[#9b9a97]">CREATE TABLE, PK, UNIQUE, DEFAULT, FK를 읽어 현재 설계에 추가합니다. 기존 테이블과 관계는 유지됩니다.</p>
+            <h3 className="text-[14px] font-semibold text-[#37352f]">{tr("📥 SQL DDL 가져오기")}</h3>
+            <p className="mt-0.5 text-[11px] text-[#9b9a97]">{tr("CREATE TABLE, PK, UNIQUE, DEFAULT, FK를 읽어 현재 설계에 추가합니다. 기존 테이블과 관계는 유지됩니다.")}</p>
           </div>
           <button className="rounded px-2 py-1 text-[13px] text-[#9b9a97] hover:bg-[#f1f1ef]" onClick={onClose}>
             ✕
@@ -1251,7 +1259,8 @@ function SqlImportDialog({ onImport, onClose }: { onImport: (sql: string) => boo
         />
         <div className="flex justify-end gap-2 border-t border-[#efefed] px-4 py-3">
           <button className="rounded border border-[#e3e2e0] px-3 py-1.5 text-[12px] hover:bg-[#f1f1ef]" onClick={onClose}>
-            취소
+
+            {tr("취소")}
           </button>
           <button
             className="rounded bg-[#37352f] px-3 py-1.5 text-[12px] font-medium text-white hover:bg-[#565452] disabled:cursor-not-allowed disabled:bg-[#c9c8c4]"
@@ -1260,7 +1269,8 @@ function SqlImportDialog({ onImport, onClose }: { onImport: (sql: string) => boo
               if (onImport(sql)) onClose()
             }}
           >
-            테이블 가져오기
+
+            {tr("테이블 가져오기")}
           </button>
         </div>
       </div>

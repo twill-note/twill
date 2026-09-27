@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { APP_UI_FONT_FAMILY, ensureKoreanFontLoaded } from '../fontFamilies'
 import { isDarkTheme, useThemeStore } from '../theme'
 import { useBackdropDismiss } from '../useBackdropDismiss'
+import { tr } from '../i18n'
 
 /** mermaid 동적 로드 + 캐싱 — 초기 번들 부담 최소화. */
 let mermaidPromise: Promise<typeof import('mermaid').default> | null = null
@@ -88,8 +89,8 @@ export function MermaidPreview({ source, className = '' }: { source: string; cla
       />
     )
   }
-  if (err) return <pre data-mermaid-source={source} className="whitespace-pre-wrap px-3 py-2 text-[11px] text-red-600">에러: {err}</pre>
-  return <p data-mermaid-source={source} className="px-3 py-4 text-center text-[12px] text-[#9b9a97]">다이어그램을 준비하는 중…</p>
+  if (err) return <pre data-mermaid-source={source} className="whitespace-pre-wrap px-3 py-2 text-[11px] text-red-600">{tr("에러:")} {err}</pre>
+  return <p data-mermaid-source={source} className="px-3 py-4 text-center text-[12px] text-[#9b9a97]">{tr("다이어그램을 준비하는 중…")}</p>
 }
 
 /** 문서 블록과 채팅 카드에서 공유하는 Mermaid 확대 버튼. */
@@ -102,8 +103,8 @@ export function MermaidExpandButton({ source, className = '' }: { source: string
         type="button"
         className={`flex h-6 w-6 items-center justify-center rounded text-[#787774] hover:bg-[#ececea] hover:text-[#37352f] ${className}`}
         onClick={() => setOpen(true)}
-        title="다이어그램 확대"
-        aria-label="다이어그램 확대"
+        title={tr("다이어그램 확대")}
+        aria-label={tr("다이어그램 확대")}
       >
         <svg
           viewBox="0 0 24 24"
@@ -159,13 +160,13 @@ function MermaidZoomDialog({ source, onClose }: { source: string; onClose: () =>
         contentEditable={false}
       >
         <header className="flex h-11 shrink-0 items-center gap-2 border-b border-[#e9e9e7] bg-[#faf9f7] px-3">
-          <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-[#37352f]">{kind} 확대 보기</span>
+          <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-[#37352f]">{kind}  {tr("확대 보기")}</span>
           <button
             type="button"
             className="rounded px-2 py-1 text-[14px] text-[#5f5e5b] hover:bg-[#ececea]"
             onClick={() => setZoom((value) => Math.max(0.5, value - 0.25))}
             disabled={zoom <= 0.5}
-            title="축소"
+            title={tr("축소")}
           >
             −
           </button>
@@ -173,7 +174,7 @@ function MermaidZoomDialog({ source, onClose }: { source: string; onClose: () =>
             type="button"
             className="min-w-14 rounded px-2 py-1 text-[11px] tabular-nums text-[#5f5e5b] hover:bg-[#ececea]"
             onClick={() => setZoom(1)}
-            title="크기 초기화"
+            title={tr("크기 초기화")}
           >
             {Math.round(zoom * 100)}%
           </button>
@@ -182,7 +183,7 @@ function MermaidZoomDialog({ source, onClose }: { source: string; onClose: () =>
             className="rounded px-2 py-1 text-[14px] text-[#5f5e5b] hover:bg-[#ececea]"
             onClick={() => setZoom((value) => Math.min(2.5, value + 0.25))}
             disabled={zoom >= 2.5}
-            title="확대"
+            title={tr("확대")}
           >
             +
           </button>
@@ -191,8 +192,8 @@ function MermaidZoomDialog({ source, onClose }: { source: string; onClose: () =>
             type="button"
             className="flex h-7 w-7 items-center justify-center rounded text-[18px] text-[#787774] hover:bg-[#ececea] hover:text-[#37352f]"
             onClick={onClose}
-            aria-label="확대 보기 닫기"
-            title="닫기"
+            aria-label={tr("확대 보기 닫기")}
+            title={tr("닫기")}
           >
             ×
           </button>
@@ -238,13 +239,15 @@ export default function MermaidBlockView({ block, editor }: any) {
             className={`rounded px-2 py-0.5 ${mode === 'edit' ? 'bg-[#f1f1ef] text-[#37352f]' : 'hover:bg-[#f1f1ef]'}`}
             onClick={() => setMode('edit')}
           >
-            소스
+
+            {tr("소스")}
           </button>
           <button
             className={`rounded px-2 py-0.5 ${mode === 'preview' ? 'bg-[#f1f1ef] text-[#37352f]' : 'hover:bg-[#f1f1ef]'}`}
             onClick={commit}
           >
-            미리보기
+
+            {tr("미리보기")}
           </button>
         </div>
       </div>
@@ -253,7 +256,7 @@ export default function MermaidBlockView({ block, editor }: any) {
           className="block w-full resize-y bg-[#fafafa] px-3 py-2 font-mono text-[12px] leading-5 text-[#37352f] outline-none"
           rows={Math.max(4, Math.min(20, draft.split('\n').length + 1))}
           value={draft}
-          placeholder={'graph TD\n  A[시작] --> B{조건}\n  B -->|예| C[동작]\n  B -->|아니오| D[종료]'}
+          placeholder={tr("graph TD\n  A[시작] --> B{조건}\n  B -->|예| C[동작]\n  B -->|아니오| D[종료]")}
           onChange={(e) => setDraft(e.target.value)}
           onBlur={commit}
           onKeyDown={(e) => {

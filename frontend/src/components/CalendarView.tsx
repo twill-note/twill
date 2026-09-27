@@ -3,6 +3,7 @@ import { api } from '../api'
 import { useAppStore } from '../store'
 import type { NoteMeta } from '../types'
 import { dialog } from '../dialog'
+import { tr } from '../i18n'
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토']
 
@@ -63,7 +64,7 @@ export default function CalendarView() {
         <div className="mx-auto max-w-3xl">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-xl font-bold text-[#37352f]">
-              {cursor.year}년 {cursor.month}월
+              {cursor.year}{tr("년")} {cursor.month}{tr("월")}
             </h2>
             <div className="flex gap-1 text-[13px]">
               <button className="rounded border border-[#e3e2e0] px-2.5 py-1 hover:bg-[#f1f1ef]" onClick={() => moveMonth(-1)}>
@@ -76,7 +77,8 @@ export default function CalendarView() {
                   setSelected(todayStr)
                 }}
               >
-                오늘
+
+                {tr("오늘")}
               </button>
               <button className="rounded border border-[#e3e2e0] px-2.5 py-1 hover:bg-[#f1f1ef]" onClick={() => moveMonth(1)}>
                 →
@@ -118,7 +120,8 @@ export default function CalendarView() {
                   </span>
                   {count > 0 && (
                     <div className="mt-1 inline-block rounded bg-blue-50 px-1.5 py-0.5 text-[11px] text-blue-600">
-                      노트 {count}
+
+                      {tr("노트")} {count}
                     </div>
                   )}
                 </button>
@@ -135,7 +138,8 @@ export default function CalendarView() {
             className="rounded bg-[#37352f] px-2 py-1 text-[12px] text-white hover:bg-[#565452]"
             onClick={createDailyNote}
           >
-            + 새 노트
+
+            {tr("+ 새 노트")}
           </button>
         </div>
         <div className="flex-1 overflow-y-auto p-2">
@@ -159,7 +163,7 @@ export default function CalendarView() {
             </button>
           ))}
           {notes.length === 0 && (
-            <p className="px-2 py-4 text-center text-[12px] text-[#9b9a97]">이 날짜에 작성된 노트가 없습니다</p>
+            <p className="px-2 py-4 text-center text-[12px] text-[#9b9a97]">{tr("이 날짜에 작성된 노트가 없습니다")}</p>
           )}
         </div>
       </div>

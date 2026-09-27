@@ -16,6 +16,9 @@ import {
 import { DEFAULT_THEME, THEMES, useThemeStore } from '../theme'
 import { APP_BUILD_INFO, formatBuildTime } from '../buildInfo'
 import { isRepeatedClick, useBackdropDismiss } from '../useBackdropDismiss'
+import { useTranslation } from 'react-i18next'
+import { LANGUAGES, setLanguage } from '../i18n'
+import { tr } from '../i18n'
 
 // 모델 목록을 아직 못 받았을 때의 강도 후보 (GPT-5.6부터 max·ultra 가 추가됨 — 실제 지원
 // 여부는 모델별 supportedEfforts 가 우선)
@@ -61,7 +64,7 @@ function ShortcutsSection() {
         return (
           <div key={a.id} className="flex items-center gap-2 border-b border-[#f1f1ef] px-3 py-1.5 last:border-b-0">
             <span className="w-6 shrink-0 text-center text-[13px]">{a.icon}</span>
-            <span className="min-w-0 flex-1 truncate text-[12px] text-[#37352f]">{a.label}</span>
+            <span className="min-w-0 flex-1 truncate text-[12px] text-[#37352f]">{tr(a.label)}</span>
             {isRecording ? (
               <button
                 autoFocus
@@ -71,9 +74,10 @@ function ShortcutsSection() {
                   setRecording(null)
                   setError(null)
                 }}
-                title="원하는 키 조합을 누르세요 (Esc: 취소)"
+                title={tr("원하는 키 조합을 누르세요 (Esc: 취소)")}
               >
-                키 입력 대기…
+
+                {tr("키 입력 대기…")}
               </button>
             ) : (
               <kbd className="rounded bg-[#f1f1ef] px-1.5 py-0.5 text-[11px] text-[#5f5e5b]">
@@ -87,7 +91,8 @@ function ShortcutsSection() {
                 setError(null)
               }}
             >
-              변경
+
+              {tr("변경")}
             </button>
             <button
               className={`shrink-0 rounded px-1 py-0.5 text-[11px] ${
@@ -99,7 +104,7 @@ function ShortcutsSection() {
                   setError(null)
                 }
               }}
-              title="기본값으로 되돌리기"
+              title={tr("기본값으로 되돌리기")}
               disabled={isDefault}
             >
               ↺
@@ -108,7 +113,8 @@ function ShortcutsSection() {
         )
       })}
       <p className="px-3 py-1.5 text-[10px] text-[#9b9a97]">
-        고정된 노트는 고정 순서대로 {IS_MAC ? 'Option(⌥)+1~9' : 'Alt+1~9'}로 열립니다 (재지정 대상 아님).
+
+        {tr("고정된 노트는 고정 순서대로")} {IS_MAC ? 'Option(⌥)+1~9' : 'Alt+1~9'}{tr("로 열립니다 (재지정 대상 아님).")}
       </p>
       {error && <p className="border-t border-[#f1f1ef] px-3 py-1.5 text-[11px] text-[#c92a2a]">{error}</p>}
     </div>
@@ -148,16 +154,16 @@ function ThemePicker() {
           if (!isRepeatedClick(event)) setOpen((v) => !v)
         }}
         aria-expanded={open}
-        title="테마 선택"
+        title={tr("테마 선택")}
       >
         <ThemeDots dots={current.dots} />
         <span className="shrink-0 text-[12px] font-medium text-[#37352f]">
-          {current.name}
+          {tr(current.name)}
           {current.dark && (
             <span className="ml-1.5 rounded bg-[#37352f] px-1 py-px align-middle text-[9px] text-white">DARK</span>
           )}
         </span>
-        <span className="min-w-0 flex-1 truncate text-[11px] text-[#9b9a97]">{current.desc}</span>
+        <span className="min-w-0 flex-1 truncate text-[11px] text-[#9b9a97]">{tr(current.desc)}</span>
         <span className="shrink-0 text-[10px] text-[#9b9a97]">{open ? '▴' : '▾'}</span>
       </button>
 
@@ -182,20 +188,21 @@ function ThemePicker() {
                   <ThemeDots dots={t.dots} />
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center gap-1.5 text-[12px] font-medium text-[#37352f]">
-                      {t.name}
-                      {t.id === DEFAULT_THEME && <span className="text-[10px] font-normal text-[#9b9a97]">기본</span>}
+                      {tr(t.name)}
+                      {t.id === DEFAULT_THEME && <span className="text-[10px] font-normal text-[#9b9a97]">{tr("기본")}</span>}
                       {t.dark && (
                         <span className="rounded bg-[#37352f] px-1 py-px text-[9px] font-normal text-white">DARK</span>
                       )}
                     </span>
-                    <span className="mt-0.5 block truncate text-[10px] text-[#9b9a97]">{t.desc}</span>
+                    <span className="mt-0.5 block truncate text-[10px] text-[#9b9a97]">{tr(t.desc)}</span>
                   </span>
                   {active && <span className="shrink-0 text-[12px] text-[#37352f]">✓</span>}
                 </button>
               )
             })}
             <p className="border-t border-[#efefed] px-2.5 pb-1 pt-1.5 text-[10px] text-[#9b9a97]">
-              선택 즉시 적용됩니다 (이 기기에만 저장).
+
+              {tr("선택 즉시 적용됩니다 (이 기기에만 저장).")}
             </p>
           </div>
         </>
@@ -220,6 +227,7 @@ type ModelOption = {
  * 이미 상시 버튼이 있어 중복)는 제거됨 — 프로젝트 구분은 이제 섹션이 담당.
  */
 export default function WorkspaceSettingsDialog({ onClose }: { onClose: () => void }) {
+  const { i18n } = useTranslation()
   const [settings, setSettings] = useState<WorkspaceSettings | null>(null)
   const [models, setModels] = useState<ModelOption[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -312,7 +320,7 @@ export default function WorkspaceSettingsDialog({ onClose }: { onClose: () => vo
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-[#e9e9e7] px-5 py-3">
-          <h2 className="text-[14px] font-semibold text-[#37352f]">⚙ 설정</h2>
+          <h2 className="text-[14px] font-semibold text-[#37352f]">{tr("⚙ 설정")}</h2>
           <button className="rounded px-2 py-0.5 text-[13px] text-[#9b9a97] hover:bg-[#efefed]" onClick={onClose}>
             ✕
           </button>
@@ -320,21 +328,37 @@ export default function WorkspaceSettingsDialog({ onClose }: { onClose: () => vo
 
         {!settings ? (
           <div className="p-6 text-center text-[13px] text-[#9b9a97]">
-            {error ? <span className="text-[#c92a2a]">{error}</span> : '로드 중…'}
+            {error ? <span className="text-[#c92a2a]">{error}</span> : tr("로드 중…")}
           </div>
         ) : (
           <div className="space-y-5 p-5">
+            <div>
+              <label className="mb-2 block text-[11px] font-medium uppercase tracking-wide text-[#9b9a97]">
+                {tr("언어")}
+              </label>
+              <select
+                aria-label={tr("언어")}
+                className="w-full rounded-md border border-[#e3e2e0] bg-white px-2.5 py-2 text-[12px] text-[#37352f]"
+                value={i18n.language === 'en' ? 'en' : 'ko'}
+                onChange={(event) => setLanguage(event.target.value === 'en' ? 'en' : 'ko')}
+              >
+                {LANGUAGES.map((language) => <option key={language.id} value={language.id}>{language.name}</option>)}
+              </select>
+              <p className="mt-1 text-[10px] text-[#9b9a97]">{tr("선택 즉시 앱 전체에 적용됩니다 (이 기기에만 저장).")}</p>
+            </div>
             {/* 테마 — 클릭 즉시 적용 (기기별 저장, 저장 버튼과 무관) */}
             <div>
               <label className="mb-2 block text-[11px] font-medium uppercase tracking-wide text-[#9b9a97]">
-                테마
+
+                {tr("테마")}
               </label>
               <ThemePicker />
             </div>
 
             <div>
               <label className="mb-2 block text-[11px] font-medium uppercase tracking-wide text-[#9b9a97]">
-                파일 탐색기
+
+                {tr("파일 탐색기")}
               </label>
               <label className="flex cursor-pointer items-start gap-2.5 rounded-md border border-[#e9e9e7] p-3">
                 <input
@@ -349,9 +373,10 @@ export default function WorkspaceSettingsDialog({ onClose }: { onClose: () => vo
                   }
                 />
                 <span className="min-w-0">
-                  <span className="block text-[12px] font-medium text-[#37352f]">모든 파일 표시</span>
+                  <span className="block text-[12px] font-medium text-[#37352f]">{tr("모든 파일 표시")}</span>
                   <span className="mt-0.5 block text-[10px] leading-snug text-[#9b9a97]">
-                    저장소의 모든 파일을 표시합니다.
+
+                    {tr("저장소의 모든 파일을 표시합니다.")}
                   </span>
                 </span>
               </label>
@@ -360,13 +385,14 @@ export default function WorkspaceSettingsDialog({ onClose }: { onClose: () => vo
             {/* AI 설정 */}
             <div>
               <label className="mb-2 block text-[11px] font-medium uppercase tracking-wide text-[#9b9a97]">
-                AI 설정
+
+                {tr("AI 설정")}
               </label>
               <div className="space-y-2 rounded-md border border-[#e9e9e7] p-3">
                 <CodexUpdateNotice manual />
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="mb-1 block text-[11px] text-[#5f5e5b]">기본 모델</label>
+                    <label className="mb-1 block text-[11px] text-[#5f5e5b]">{tr("기본 모델")}</label>
                     <select
                       className="w-full rounded border border-[#e3e2e0] bg-white px-2 py-1 text-[12px] outline-none"
                       value={settings.codex.default_model}
@@ -374,17 +400,17 @@ export default function WorkspaceSettingsDialog({ onClose }: { onClose: () => vo
                         setSettings({ ...settings, codex: { ...settings.codex, default_model: e.target.value } })
                       }
                     >
-                      <option value="">(엔진 전역 기본값 사용)</option>
+                      <option value="">{tr("(엔진 전역 기본값 사용)")}</option>
                       {modelSelectOptions.map((m) => (
                         <option key={m.id} value={m.id}>
                           {m.displayName}
-                          {m.isDefault ? ' (기본)' : ''}
+                          {m.isDefault ? tr(" (기본)") : ''}
                         </option>
                       ))}
                     </select>
                   </div>
                   <div>
-                    <label className="mb-1 block text-[11px] text-[#5f5e5b]">기본 강도</label>
+                    <label className="mb-1 block text-[11px] text-[#5f5e5b]">{tr("기본 강도")}</label>
                     <select
                       className="w-full rounded border border-[#e3e2e0] bg-white px-2 py-1 text-[12px] outline-none"
                       value={settings.codex.default_effort}
@@ -392,7 +418,7 @@ export default function WorkspaceSettingsDialog({ onClose }: { onClose: () => vo
                         setSettings({ ...settings, codex: { ...settings.codex, default_effort: e.target.value } })
                       }
                     >
-                      <option value="">(모델 기본값 사용)</option>
+                      <option value="">{tr("(모델 기본값 사용)")}</option>
                       {effortOptions.map((eff) => (
                         <option key={eff} value={eff}>
                           {eff}
@@ -401,7 +427,8 @@ export default function WorkspaceSettingsDialog({ onClose }: { onClose: () => vo
                     </select>
                     {settings.codex.default_effort === 'ultra' && (
                       <p className="mt-1 rounded bg-[#fff7e6] px-2 py-1 text-[10px] text-[#a67c1b]">
-                        ⚠️ ultra 는 서브에이전트 병렬 실행으로 토큰 소모가 매우 큽니다. 기본값으로는 비추천.
+
+                        {tr("⚠️ ultra 는 서브에이전트 병렬 실행으로 토큰 소모가 매우 큽니다. 기본값으로는 비추천.")}
                       </p>
                     )}
                   </div>
@@ -415,9 +442,10 @@ export default function WorkspaceSettingsDialog({ onClose }: { onClose: () => vo
                     onChange={(e) => void updateGitMetadataAccess(e.target.checked)}
                   />
                   <span className="min-w-0">
-                    <span className="block text-[12px] font-medium text-[#37352f]">Git 메타데이터 쓰기 권한 (기기 전체)</span>
+                    <span className="block text-[12px] font-medium text-[#37352f]">{tr("Git 메타데이터 쓰기 권한 (기기 전체)")}</span>
                     <span className="mt-0.5 block text-[10px] leading-snug text-[#9b9a97]">
-                      사용자 허용 후 Twill AI가 다른 프로젝트에서도 .git 메타데이터를 갱신할 수 있습니다. 원격 push와 git reset --hard는 제외됩니다.
+
+                      {tr("사용자 허용 후 Twill AI가 다른 프로젝트에서도 .git 메타데이터를 갱신할 수 있습니다. 원격 push와 git reset --hard는 제외됩니다.")}
                     </span>
                   </span>
                 </label>
@@ -427,7 +455,8 @@ export default function WorkspaceSettingsDialog({ onClose }: { onClose: () => vo
             {/* 단축키 — 검색과 주요 화면 열기/토글 키 재지정 */}
             <div>
               <label className="mb-2 block text-[11px] font-medium uppercase tracking-wide text-[#9b9a97]">
-                단축키
+
+                {tr("단축키")}
               </label>
               <ShortcutsSection />
             </div>
@@ -440,25 +469,26 @@ export default function WorkspaceSettingsDialog({ onClose }: { onClose: () => vo
           <div
             className="min-w-0 text-[10px] leading-relaxed text-[#9b9a97]"
             aria-label={`Twill 버전 ${APP_BUILD_INFO.version}, 빌드 ${formatBuildTime(APP_BUILD_INFO.builtAt)}`}
-            title={`UI 빌드 시각: ${APP_BUILD_INFO.builtAt || '개발 환경'}`}
+            title={`UI 빌드 시각: ${APP_BUILD_INFO.builtAt || tr("개발 환경")}`}
           >
             <span className="font-medium text-[#787774]">Twill v{APP_BUILD_INFO.version}</span>
             <span className="mx-1.5" aria-hidden="true">·</span>
-            <span>빌드 {formatBuildTime(APP_BUILD_INFO.builtAt)}</span>
+            <span>{tr("빌드")} {formatBuildTime(APP_BUILD_INFO.builtAt)}</span>
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <button
               className="rounded-md border border-[#e3e2e0] bg-white px-3 py-1 text-[12px] text-[#5f5e5b] hover:bg-[#f7f7f5]"
               onClick={onClose}
             >
-              취소
+
+              {tr("취소")}
             </button>
             <button
               className="rounded-md bg-[#37352f] px-3 py-1 text-[12px] font-medium text-white hover:bg-[#2b2925] disabled:opacity-60"
               onClick={save}
               disabled={busy || !settings}
             >
-              {busy ? '저장 중…' : '저장'}
+              {busy ? tr("저장 중…") : tr("저장")}
             </button>
           </div>
         </div>

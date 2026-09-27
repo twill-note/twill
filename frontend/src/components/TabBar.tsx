@@ -3,6 +3,7 @@ import { dialog } from '../dialog'
 import { dbApi } from '../dbschema'
 import { useAppStore, activeTabId, type DocTab } from '../store'
 import { isRepeatedClick } from '../useBackdropDismiss'
+import { tr } from '../i18n'
 
 /**
  * 메인 화면 상단 바.
@@ -53,8 +54,8 @@ export default function TabBar() {
     <div className="flex h-9 shrink-0 items-center border-b border-[#e9e9e7] bg-[#f7f7f5]">
       <button
         type="button"
-        aria-label={sidebarCollapsed ? '왼쪽 패널 펼치기' : '왼쪽 패널 접기'}
-        title={sidebarCollapsed ? '왼쪽 패널 펼치기' : '왼쪽 패널 접기'}
+        aria-label={sidebarCollapsed ? tr("왼쪽 패널 펼치기") : tr("왼쪽 패널 접기")}
+        title={sidebarCollapsed ? tr("왼쪽 패널 펼치기") : tr("왼쪽 패널 접기")}
         aria-expanded={!sidebarCollapsed}
         aria-controls="workspace-sidebar"
         className="flex h-full w-9 shrink-0 items-center justify-center border-r border-[#e9e9e7] text-[#7d7c78] hover:bg-[#ececea] hover:text-[#37352f] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[#4a9eff]"
@@ -74,7 +75,7 @@ export default function TabBar() {
         onClick={(event) => {
           if (!isRepeatedClick(event)) void toggleBoard('tasks', taskBoardActive)
         }}
-        title="태스크 보드"
+        title={tr("태스크 보드")}
       >
         📋
       </button>
@@ -85,14 +86,14 @@ export default function TabBar() {
         onClick={(event) => {
           if (!isRepeatedClick(event)) void toggleBoard('scopes', scopesActive)
         }}
-        title="프로젝트 관리"
+        title={tr("프로젝트 관리")}
       >
         🌐
       </button>
       <button
         className="flex h-full shrink-0 items-center border-r border-[#e9e9e7] px-2.5 text-[14px] text-[#7d7c78] hover:bg-[#ececea] hover:text-[#37352f]"
         onClick={() => openToday().catch((e) => dialog.alert((e as Error).message))}
-        title="오늘의 노트"
+        title={tr("오늘의 노트")}
       >
         ☀️
       </button>
@@ -105,7 +106,7 @@ export default function TabBar() {
           if (view === 'calendar') closeBoardView()
           else setView('calendar')
         }}
-        title="캘린더"
+        title={tr("캘린더")}
       >
         📅
       </button>
@@ -118,7 +119,7 @@ export default function TabBar() {
           if (view === 'todos') closeBoardView()
           else setView('todos')
         }}
-        title="할 일"
+        title={tr("할 일")}
       >
         ✅
       </button>
@@ -131,7 +132,7 @@ export default function TabBar() {
           if (view === 'skillbook') closeBoardView()
           else setView('skillbook')
         }}
-        title="스킬북"
+        title={tr("스킬북")}
       >
         📚
       </button>
@@ -206,7 +207,7 @@ export default function TabBar() {
                   e.stopPropagation()
                   closeTab(t.id)
                 }}
-                title="탭 닫기"
+                title={tr("탭 닫기")}
               >
                 ✕
               </button>
@@ -237,7 +238,7 @@ export default function TabBar() {
                 setPinMenu(null)
               }}
             >
-              <span>📌</span> 고정 해제
+              <span>📌</span>  {tr("고정 해제")}
             </button>
           </div>
         </>

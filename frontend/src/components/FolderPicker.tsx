@@ -3,6 +3,7 @@ import { api } from '../api'
 import { useAppStore } from '../store'
 import type { BrowseResult } from '../types'
 import { useBackdropDismiss } from '../useBackdropDismiss'
+import { tr } from '../i18n'
 
 export default function FolderPicker({ onClose }: { onClose: () => void }) {
   const { root, recent, openWorkspace } = useAppStore()
@@ -48,8 +49,8 @@ export default function FolderPicker({ onClose }: { onClose: () => void }) {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="border-b border-[#efefed] px-4 py-3">
-          <h3 className="text-[15px] font-semibold text-[#37352f]">📂 폴더 열기</h3>
-          <p className="mt-0.5 text-[12px] text-[#9b9a97]">선택한 폴더를 저장소로 설정합니다</p>
+          <h3 className="text-[15px] font-semibold text-[#37352f]">{tr("📂 폴더 열기")}</h3>
+          <p className="mt-0.5 text-[12px] text-[#9b9a97]">{tr("선택한 폴더를 저장소로 설정합니다")}</p>
         </div>
 
         <div className="flex gap-1.5 border-b border-[#efefed] px-4 py-2">
@@ -61,12 +62,13 @@ export default function FolderPicker({ onClose }: { onClose: () => void }) {
             placeholder="/home/user/notes"
           />
           <button className="rounded border border-[#e3e2e0] px-2 py-1 text-[12px] hover:bg-[#f1f1ef]" onClick={() => navigate(pathInput)}>
-            이동
+
+            {tr("이동")}
           </button>
           <button
             className="rounded border border-[#e3e2e0] px-2 py-1 text-[12px] hover:bg-[#f1f1ef]"
             onClick={() => browse && navigate(browse.home)}
-            title="홈 디렉토리"
+            title={tr("홈 디렉토리")}
           >
             🏠
           </button>
@@ -93,13 +95,13 @@ export default function FolderPicker({ onClose }: { onClose: () => void }) {
             </button>
           ))}
           {browse && browse.dirs.length === 0 && (
-            <p className="px-2 py-3 text-center text-[12px] text-[#9b9a97]">하위 폴더가 없습니다</p>
+            <p className="px-2 py-3 text-center text-[12px] text-[#9b9a97]">{tr("하위 폴더가 없습니다")}</p>
           )}
         </div>
 
         {recent.length > 0 && (
           <div className="border-t border-[#efefed] px-4 py-2">
-            <p className="mb-1 text-[11px] font-medium text-[#9b9a97]">최근 워크스페이스</p>
+            <p className="mb-1 text-[11px] font-medium text-[#9b9a97]">{tr("최근 워크스페이스")}</p>
             {recent.slice(0, 4).map((p) => (
               <button
                 key={p}
@@ -109,7 +111,7 @@ export default function FolderPicker({ onClose }: { onClose: () => void }) {
                 onClick={() => open(p)}
                 title={p}
               >
-                🕘 {p} {p === root && '(현재)'}
+                🕘 {p} {p === root && tr("(현재)")}
               </button>
             ))}
           </div>
@@ -119,14 +121,15 @@ export default function FolderPicker({ onClose }: { onClose: () => void }) {
           {error ? <span className="truncate text-[12px] text-red-500">{error}</span> : <span />}
           <div className="flex shrink-0 gap-2">
             <button className="rounded border border-[#e3e2e0] px-3 py-1.5 text-[13px] hover:bg-[#f1f1ef]" onClick={onClose}>
-              취소
+
+              {tr("취소")}
             </button>
             <button
               className="rounded bg-[#37352f] px-3 py-1.5 text-[13px] text-white hover:bg-[#565452] disabled:opacity-50"
               disabled={!browse || opening || browse.path === root}
               onClick={() => browse && open(browse.path)}
             >
-              {opening ? '여는 중…' : '이 폴더 열기'}
+              {opening ? tr("여는 중…") : tr("이 폴더 열기")}
             </button>
           </div>
         </div>

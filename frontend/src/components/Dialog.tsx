@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useDialogStore } from '../dialog'
 import { useBackdropDismiss } from '../useBackdropDismiss'
+import { tr } from '../i18n'
 
 /** 공통 팝업 렌더러 — dialog.alert/confirm/prompt 요청을 큐 순서대로 표시. App에 한 번만 마운트. */
 export default function DialogHost() {
@@ -45,20 +46,20 @@ export default function DialogHost() {
       <div
         role="dialog"
         aria-modal="true"
-        aria-label={current.message}
+        aria-label={tr(current.message)}
         className="w-[400px] max-w-[90vw] overflow-hidden rounded-xl border border-[#e3e2e0] bg-white shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-4 pt-4 pb-3">
-          <p className="text-[14px] font-medium whitespace-pre-line text-[#37352f]">{current.message}</p>
+          <p className="text-[14px] font-medium whitespace-pre-line text-[#37352f]">{tr(current.message)}</p>
           {current.detail && (
-            <p className="mt-1 text-[12px] whitespace-pre-line text-[#9b9a97]">{current.detail}</p>
+            <p className="mt-1 text-[12px] whitespace-pre-line text-[#9b9a97]">{tr(current.detail)}</p>
           )}
           {current.kind === 'prompt' && (
             <input
               ref={inputRef}
               defaultValue={current.defaultValue}
-              placeholder={current.placeholder}
+              placeholder={tr(current.placeholder ?? '')}
               className="mt-3 w-full rounded border border-[#e3e2e0] px-2.5 py-1.5 text-[13px] outline-none focus:border-blue-400"
               onKeyDown={(e) => {
                 if (e.key === 'Enter') submit()
@@ -72,7 +73,8 @@ export default function DialogHost() {
               className="rounded border border-[#e3e2e0] bg-white px-3 py-1.5 text-[13px] text-[#5f5e5b] hover:bg-[#f1f1ef]"
               onClick={() => finish(cancelValue)}
             >
-              취소
+
+              {tr("취소")}
             </button>
           )}
           <button
@@ -82,7 +84,7 @@ export default function DialogHost() {
             }`}
             onClick={submit}
           >
-            {current.confirmLabel ?? '확인'}
+            {tr(current.confirmLabel ?? tr("확인"))}
           </button>
         </div>
       </div>

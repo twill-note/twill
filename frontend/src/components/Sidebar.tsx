@@ -7,6 +7,7 @@ import { displayCombo, useShortcutStore } from '../shortcuts'
 import FileTree from './FileTree'
 import FolderPicker from './FolderPicker'
 import WorkspaceSettingsDialog from './WorkspaceSettingsDialog'
+import { tr } from '../i18n'
 
 // 기존 고정 폭(w-64 = 256px)보다 좁아지지 않도록 한다.
 const MIN_WIDTH = 256
@@ -71,23 +72,23 @@ export default function Sidebar() {
   return (
     <aside
       id="workspace-sidebar"
-      aria-label="문서 탐색 패널"
+      aria-label={tr("문서 탐색 패널")}
       className={`relative h-full shrink-0 flex-col border-r border-[#e9e9e7] bg-[#f7f7f5] ${collapsed ? 'hidden' : 'flex'}`}
       style={{ width }}
     >
       <div
         className="absolute inset-y-0 right-0 z-10 w-1 cursor-col-resize hover:bg-[#4a9eff]/60"
         onPointerDown={onResizeStart}
-        title="패널 너비 조절"
+        title={tr("패널 너비 조절")}
       />
       <div className="flex items-center justify-between px-3 pt-3 pb-1">
         <h1 className="truncate text-[14px] font-semibold text-[#37352f]" title={root ?? undefined}>
-          📝 {rootName ?? '내 노트'}
+          📝 {rootName ?? tr("내 노트")}
         </h1>
         <div className="flex shrink-0 gap-0.5">
           <button
             className="rounded px-1.5 py-0.5 text-[12px] text-[#9b9a97] hover:bg-[#efefed]"
-            title="폴더 열기"
+            title={tr("폴더 열기")}
             onClick={() => setPickerOpen(true)}
           >
             📂
@@ -95,7 +96,7 @@ export default function Sidebar() {
           {/* 이모지 아이콘으로 통일 (⟳·⚙ 텍스트 글리프는 다른 버튼과 스타일이 달라 이질감) */}
           <button
             className="rounded px-1.5 py-0.5 text-[12px] text-[#9b9a97] hover:bg-[#efefed]"
-            title="새로고침"
+            title={tr("새로고침")}
             onClick={handleReindex}
             disabled={reindexing}
           >
@@ -103,7 +104,7 @@ export default function Sidebar() {
           </button>
           <button
             className="rounded px-1.5 py-0.5 text-[12px] text-[#9b9a97] hover:bg-[#efefed]"
-            title="설정"
+            title={tr("설정")}
             onClick={() => setSettingsOpen(true)}
             data-testid="workspace-settings-button"
           >
@@ -118,7 +119,8 @@ export default function Sidebar() {
         className="mx-3 mt-1 flex items-center gap-2 rounded-md border border-[#e3e2e0] bg-white px-2.5 py-1.5 text-[13px] text-[#9b9a97] hover:bg-[#fbfbfa]"
         onClick={() => setPaletteOpen(true)}
       >
-        🔍 검색…
+
+        {tr("🔍 검색…")}
         <kbd className="ml-auto rounded bg-[#f1f1ef] px-1.5 text-[11px] text-[#9b9a97]">
           {displayCombo(searchShortcut)}
         </kbd>
@@ -131,7 +133,8 @@ export default function Sidebar() {
           <div className="mb-1 flex items-center justify-between px-1">
             <span className="text-[12px] font-medium text-[#37352f]">#{tagFilter}</span>
             <button className="text-[12px] text-[#9b9a97] hover:text-[#37352f]" onClick={() => setTagFilter(null)}>
-              ✕ 닫기
+
+              {tr("✕ 닫기")}
             </button>
           </div>
           {tagNotes.map((n) => (
@@ -145,7 +148,7 @@ export default function Sidebar() {
               {n.date && <span className="ml-1 text-[11px] text-[#9b9a97]">{n.date}</span>}
             </button>
           ))}
-          {tagNotes.length === 0 && <p className="px-2 text-[12px] text-[#9b9a97]">노트 없음</p>}
+          {tagNotes.length === 0 && <p className="px-2 text-[12px] text-[#9b9a97]">{tr("노트 없음")}</p>}
         </div>
       ) : (
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
@@ -160,10 +163,11 @@ export default function Sidebar() {
             className="flex w-full items-center gap-1 text-left text-[11px] font-medium tracking-wide text-[#9b9a97] hover:text-[#5f5e5b]"
             onClick={toggleTags}
             aria-expanded={!tagsCollapsed}
-            title="태그"
+            title={tr("태그")}
           >
             <span aria-hidden="true">{tagsCollapsed ? '▸' : '▾'}</span>
-            태그
+
+            {tr("태그")}
           </button>
           {!tagsCollapsed && (
             <div className="mt-1 flex max-h-28 flex-wrap gap-1 overflow-y-auto">

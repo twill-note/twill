@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { api } from '../api'
 import type { SearchResult } from '../types'
+import { tr } from '../i18n'
 
 /**
  * @-mention 자동완성 팝오버.
@@ -142,7 +143,7 @@ export default function MentionPopover({ state, onSelect, onDismiss }: Props) {
       }}
     >
       <div className="border-b border-[#efefed] px-2 py-1 text-[10px] text-[#9b9a97]">
-        @{state.query || '검색어'} — 선택하면 노트 본문 첨부 · ↑↓ 이동 · Enter 선택 · Esc 취소
+        @{state.query || tr("검색어")} — 선택하면 노트 본문 첨부 · ↑↓ 이동 · Enter 선택 · Esc 취소
       </div>
       {results.map((r, i) => (
         <button

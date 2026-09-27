@@ -10,7 +10,7 @@ function AiDockHost() {
   const tabId = useAppStore((s) => s.dockedAiTabId)
   const tabs = useAppStore((s) => s.dockedAiTabs)
   return <div className="flex h-full min-h-0 flex-col">
-    <div className="flex h-9 shrink-0 overflow-x-auto border-b border-[#e9e9e7] bg-[#f7f7f5]" role="tablist" aria-label="AI 대화 탭">
+    <div className="flex h-9 shrink-0 overflow-x-auto border-b border-[#e9e9e7] bg-[#f7f7f5]" role="tablist" aria-label={tr("AI 대화 탭")}>
       {tabs.map((tab) => <div key={tab.id} data-ai-dock-tab-id={tab.id} draggable
         className={`group flex shrink-0 items-center gap-1 border-r border-[#e9e9e7] px-2 text-[12px] ${tab.id === tabId ? 'bg-white text-[#37352f]' : 'text-[#7d7c78]'}`}
         onDragStart={(event) => {
@@ -21,7 +21,7 @@ function AiDockHost() {
         }}>
         <button role="tab" aria-selected={tab.id === tabId} title={tab.title} className="max-w-40 truncate py-2"
           onClick={() => useAppStore.getState().moveAi('right', tab.id)}>✦ {tab.title}</button>
-        <button title="탭 닫기" aria-label={`${tab.title} 탭 닫기`} className="rounded px-1 text-[#9b9a97] hover:bg-[#e9e9e7]"
+        <button title={tr("탭 닫기")} aria-label={`${tab.title} 탭 닫기`} className="rounded px-1 text-[#9b9a97] hover:bg-[#e9e9e7]"
           onClick={() => useAppStore.getState().closeDockedAiTab(tab.id)}>×</button>
       </div>)}
     </div>
@@ -33,6 +33,7 @@ function AiDockHost() {
   </div>
 }
 import TerminalPanel from './TerminalPanel'
+import { tr } from '../i18n'
 
 const MIN_WIDTH = 320
 const RAIL_WIDTH = 40
@@ -189,7 +190,7 @@ export default function RightDock() {
         useAppStore.getState().moveAi('right', tabId)
       }}
     >
-      {aiDropOver && <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center bg-[#4a9eff]/10"><span className="rounded bg-white px-2 py-1 text-[11px] text-[#2f6fd0] shadow">여기에 AI 배치</span></div>}
+      {aiDropOver && <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center bg-[#4a9eff]/10"><span className="rounded bg-white px-2 py-1 text-[11px] text-[#2f6fd0] shadow">{tr("여기에 AI 배치")}</span></div>}
       <aside
         id="right-tool-panel"
         className={`relative h-full shrink-0 flex-col border-l border-[#e9e9e7] bg-white ${rightDockOpen ? 'flex' : 'hidden'}`}
@@ -199,20 +200,20 @@ export default function RightDock() {
         <div
           className="absolute inset-y-0 left-0 z-10 w-1 cursor-col-resize hover:bg-[#4a9eff]/60"
           onPointerDown={onResizeStart}
-          title="패널 너비 조절"
+          title={tr("패널 너비 조절")}
         />
         <div className="flex h-9 shrink-0 items-center border-b border-[#e9e9e7] bg-[#f7f7f5] px-2.5">
           <div className={`flex min-w-0 flex-1 items-center gap-2 text-[12px] font-medium text-[#37352f] ${activeTool.id === SYSTEM_AI_TAB ? 'cursor-grab' : ''}`}
             draggable={activeTool.id === SYSTEM_AI_TAB && !byeoriDetached}
             onDragStart={startByeoriDrag}
             onDragEnd={finishByeoriDrag}
-            title={activeTool.id === SYSTEM_AI_TAB ? '드래그하여 문서와 함께 배치' : undefined}>
+            title={activeTool.id === SYSTEM_AI_TAB ? tr("드래그하여 문서와 함께 배치") : undefined}>
             <ToolIcon tab={activeTool} compact />
             <span className="truncate" title={dockedTitle}>{activeTool.id === SYSTEM_AI_TAB ? dockedTitle ?? activeTool.title : activeTool.title}</span>
             {activeTool.id === SYSTEM_AI_TAB && aiBusyCount > 0 && (
               <span className="flex shrink-0 items-center gap-1 text-[10px] font-normal text-[#2f6fd0]">
                 <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#4a9eff]" />
-                {aiBusyCount}개 실행 중
+                {aiBusyCount}{tr("개 실행 중")}
               </span>
             )}
           </div>
@@ -220,8 +221,8 @@ export default function RightDock() {
             <button
               type="button"
               className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-[#9b9a97] hover:bg-[#efefed] hover:text-[#37352f]"
-              title="새 창에서 열기"
-              aria-label="Twill AI를 새 창에서 열기"
+              title={tr("새 창에서 열기")}
+              aria-label={tr("Twill AI를 새 창에서 열기")}
               onClick={() => void detachByeori()}
             >
               <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.25" aria-hidden="true">
@@ -233,7 +234,7 @@ export default function RightDock() {
           <button
             type="button"
             className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-[#9b9a97] hover:bg-[#efefed] hover:text-[#37352f]"
-            title="닫기"
+            title={tr("닫기")}
             aria-label={`${activeTool.title} 패널 닫기`}
             onClick={() => setRightDockOpen(false)}
           >
@@ -243,7 +244,7 @@ export default function RightDock() {
         {detachError && (
           <div role="alert" className="flex shrink-0 items-center gap-2 border-b border-[#fbcaca] bg-[#fdf2f2] px-2.5 py-1.5 text-[11px] text-[#c92a2a]">
             <span className="min-w-0 flex-1">{detachError}</span>
-            <button type="button" className="rounded px-1 hover:bg-[#f8dede]" onClick={() => setDetachError(null)} aria-label="오류 닫기">✕</button>
+            <button type="button" className="rounded px-1 hover:bg-[#f8dede]" onClick={() => setDetachError(null)} aria-label={tr("오류 닫기")}>✕</button>
           </div>
         )}
         <div className="min-h-0 flex-1 overflow-hidden">
@@ -254,13 +255,14 @@ export default function RightDock() {
               <div key={tab.id} className={tab.id === activeRightTab ? 'h-full' : 'hidden'}>
                 {tab.id === SYSTEM_AI_TAB && byeoriDetached ? (
                   <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center text-[#7d7c78]">
-                    <p className="text-[12px] font-medium text-[#37352f]">Twill AI가 별도 창에서 열려 있습니다</p>
+                    <p className="text-[12px] font-medium text-[#37352f]">{tr("Twill AI가 별도 창에서 열려 있습니다")}</p>
                     <button
                       type="button"
                       className="rounded-md border border-[#e3e2e0] bg-white px-2.5 py-1 text-[11px] hover:bg-[#f7f7f5]"
                       onClick={() => void window.noteDesktop?.focusByeoriWindow()}
                     >
-                      별도 창 보기
+
+                      {tr("별도 창 보기")}
                     </button>
                   </div>
                 ) : (
@@ -274,7 +276,7 @@ export default function RightDock() {
 
       <nav
         className="flex h-full w-10 shrink-0 flex-col items-center border-l border-[#e3e2e0] bg-[#f7f7f5] py-1"
-        aria-label="우측 도구"
+        aria-label={tr("우측 도구")}
       >
         {tabs.map((tab) => {
           const selected = rightDockOpen && activeRightTab === tab.id

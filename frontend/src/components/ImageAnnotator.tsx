@@ -4,6 +4,7 @@ import { api } from '../api'
 import { dialog } from '../dialog'
 import { APP_UI_FONT_FAMILY, ensureKoreanFontLoaded } from '../fontFamilies'
 import { useBackdropDismiss } from '../useBackdropDismiss'
+import { tr } from '../i18n'
 
 // ─────────────────────────────────────────────────────────
 // 주석 데이터 모델 — 좌표는 항상 "이미지 원본 픽셀 공간"
@@ -223,7 +224,7 @@ export default function ImageAnnotator({ imageUrl, onSave, onClose }: Props) {
   const dirty = items.length > 0
 
   return createPortal(
-    <div ref={overlayRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="이미지 편집"
+    <div ref={overlayRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label={tr("이미지 편집")}
       className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 outline-none" onClick={dismissFromBackdrop}
       onKeyDown={(e) => {
         e.stopPropagation()
@@ -240,19 +241,20 @@ export default function ImageAnnotator({ imageUrl, onSave, onClose }: Props) {
         <div className="flex items-center gap-3 border-b border-[#efefed] px-5 py-3">
           <span className="text-[20px]">✏️</span>
           <div className="min-w-0 flex-1">
-            <h3 className="text-[15px] font-semibold text-[#37352f]">이미지 편집</h3>
+            <h3 className="text-[15px] font-semibold text-[#37352f]">{tr("이미지 편집")}</h3>
             <p className="mt-0.5 text-[11px] text-[#9b9a97]">
               {img
-                ? <>원본 <b className="text-[#5f5e5b]">{nw} × {nh}</b> px · 현재 <b className="text-[#5f5e5b]">{Math.round(zoom * 100)}%</b> 표시 · {items.length}개 주석</>
-                : '이미지 로딩 중…'}
-              {dirty && <span className="ml-2 text-orange-600">● 저장 안 됨</span>}
+                ? <>{tr("원본")} <b className="text-[#5f5e5b]">{nw} × {nh}</b>  {tr("px · 현재")} <b className="text-[#5f5e5b]">{Math.round(zoom * 100)}%</b>  {tr("표시 ·")} {items.length}{tr("개 주석")}</>
+                : tr("이미지 로딩 중…")}
+              {dirty && <span className="ml-2 text-orange-600">{tr("● 저장 안 됨")}</span>}
             </p>
           </div>
           <button
             className="rounded-md border border-[#e3e2e0] px-3 py-1.5 text-[12px] hover:bg-[#f1f1ef]"
             onClick={onClose}
           >
-            취소
+
+            {tr("취소")}
           </button>
           <button
             className={`rounded-md px-3 py-1.5 text-[12px] font-medium text-white ${
@@ -260,9 +262,9 @@ export default function ImageAnnotator({ imageUrl, onSave, onClose }: Props) {
             }`}
             onClick={save}
             disabled={saving || !img}
-            title="저장"
+            title={tr("저장")}
           >
-            {saving ? '저장 중…' : '저장 (⌘S)'}
+            {saving ? tr("저장 중…") : tr("저장 (⌘S)")}
           </button>
         </div>
 
@@ -272,7 +274,7 @@ export default function ImageAnnotator({ imageUrl, onSave, onClose }: Props) {
           <div className="flex w-[220px] flex-col gap-4 overflow-y-auto border-r border-[#efefed] p-3 text-[12px]">
             {/* 도구 */}
             <section>
-              <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-[#9b9a97]">도구</p>
+              <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-[#9b9a97]">{tr("도구")}</p>
               <div className="grid grid-cols-2 gap-1">
                 {TOOLS.map((t) => (
                   <button
@@ -294,7 +296,7 @@ export default function ImageAnnotator({ imageUrl, onSave, onClose }: Props) {
 
             {/* 색상 */}
             <section>
-              <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-[#9b9a97]">색상</p>
+              <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-[#9b9a97]">{tr("색상")}</p>
               <div className="grid grid-cols-7 gap-1">
                 {COLORS.map((c) => (
                   <button
@@ -311,7 +313,7 @@ export default function ImageAnnotator({ imageUrl, onSave, onClose }: Props) {
             {/* 굵기 / 크기 */}
             {tool === 'text' ? (
               <section>
-                <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-[#9b9a97]">글자 크기</p>
+                <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-[#9b9a97]">{tr("글자 크기")}</p>
                 <div className="flex items-center gap-2">
                   <input
                     type="range"
@@ -326,7 +328,7 @@ export default function ImageAnnotator({ imageUrl, onSave, onClose }: Props) {
               </section>
             ) : (
               <section>
-                <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-[#9b9a97]">선 굵기</p>
+                <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-[#9b9a97]">{tr("선 굵기")}</p>
                 <div className="flex items-center gap-2">
                   <input
                     type="range"
@@ -344,7 +346,8 @@ export default function ImageAnnotator({ imageUrl, onSave, onClose }: Props) {
             {/* 줌 */}
             <section>
               <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-[#9b9a97]">
-                줌 (Ctrl+휠)
+
+                {tr("줌 (Ctrl+휠)")}
               </p>
               <div className="mb-1 grid grid-cols-4 gap-1">
                 {[0.25, 0.5, 1, 2].map((z) => (
@@ -368,7 +371,7 @@ export default function ImageAnnotator({ imageUrl, onSave, onClose }: Props) {
                     const idx = ZOOM_LEVELS.indexOf(zoom)
                     if (idx > 0) setZoom(ZOOM_LEVELS[idx - 1])
                   }}
-                  title="축소"
+                  title={tr("축소")}
                 >
                   −
                 </button>
@@ -379,7 +382,7 @@ export default function ImageAnnotator({ imageUrl, onSave, onClose }: Props) {
                     const idx = ZOOM_LEVELS.indexOf(zoom)
                     if (idx < ZOOM_LEVELS.length - 1) setZoom(ZOOM_LEVELS[idx + 1])
                   }}
-                  title="확대"
+                  title={tr("확대")}
                 >
                   +
                 </button>
@@ -393,16 +396,18 @@ export default function ImageAnnotator({ imageUrl, onSave, onClose }: Props) {
                   className="rounded border border-[#e3e2e0] px-2 py-1 text-[12px] text-[#5f5e5b] hover:bg-[#f1f1ef] disabled:opacity-40"
                   onClick={undo}
                   disabled={items.length === 0}
-                  title="되돌리기"
+                  title={tr("되돌리기")}
                 >
-                  ↶ 실행 취소 ({items.length})
+
+                  {tr("↶ 실행 취소 (")}{items.length})
                 </button>
                 <button
                   className="rounded border border-[#e3e2e0] px-2 py-1 text-[12px] text-[#5f5e5b] hover:bg-[#f1f1ef] disabled:opacity-40"
                   onClick={clear}
                   disabled={items.length === 0}
                 >
-                  🗑 모두 지우기
+
+                  {tr("🗑 모두 지우기")}
                 </button>
               </div>
             </section>
@@ -460,7 +465,8 @@ export default function ImageAnnotator({ imageUrl, onSave, onClose }: Props) {
               </div>
             ) : (
               <div className="flex h-full items-center justify-center text-[13px] text-white">
-                이미지 로딩 중…
+
+                {tr("이미지 로딩 중…")}
               </div>
             )}
           </div>
@@ -469,9 +475,10 @@ export default function ImageAnnotator({ imageUrl, onSave, onClose }: Props) {
         {/* 하단 힌트 바 */}
         <div className="flex items-center justify-between border-t border-[#efefed] bg-[#fafafa] px-4 py-2 text-[11px] text-[#9b9a97]">
           <span>
-            💡 도구 선택 → 캔버스 위 드래그 · 텍스트는 클릭 후 입력 · <b>Ctrl+휠</b> 로 확대/축소 · <b>⌘Z</b> 실행 취소 · <b>⌘S</b> 저장
+
+            {tr("💡 도구 선택 → 캔버스 위 드래그 · 텍스트는 클릭 후 입력 ·")} <b>{tr("Ctrl+휠")}</b>  {tr("로 확대/축소 ·")} <b>⌘Z</b>  {tr("실행 취소 ·")} <b>⌘S</b>  {tr("저장")}
           </span>
-          <span>원본 해상도 무손실 저장</span>
+          <span>{tr("원본 해상도 무손실 저장")}</span>
         </div>
       </div>
     </div>, document.body

@@ -19,8 +19,12 @@ import { dbApi } from './dbschema'
 import { actionForEvent, type ShortcutAction } from './shortcuts'
 import { useAiStore } from './aiStore'
 import { SYSTEM_AI_TAB, SYSTEM_TERMINAL_TAB, useAppStore } from './store'
+import { useTranslation } from 'react-i18next'
+import { tr } from './i18n'
 
 export default function App() {
+  // Subscribe at the application root so source-keyed copy in all child screens refreshes on language changes.
+  useTranslation()
   const { view, root, workspaceReady, refreshTree, setPaletteOpen, openToday, openRightTab, refreshPlugins } = useAppStore()
 
   useEffect(() => {
@@ -233,8 +237,8 @@ function MissingPluginView() {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-2 text-[#9b9a97]">
       <span className="text-4xl">🧩</span>
-      <p className="text-[14px]">플러그인 화면을 불러올 수 없습니다</p>
-      <p className="text-[12px]">설정에서 플러그인 설치 상태를 확인한 뒤 다시 열어보세요</p>
+      <p className="text-[14px]">{tr("플러그인 화면을 불러올 수 없습니다")}</p>
+      <p className="text-[12px]">{tr("설정에서 플러그인 설치 상태를 확인한 뒤 다시 열어보세요")}</p>
     </div>
   )
 }

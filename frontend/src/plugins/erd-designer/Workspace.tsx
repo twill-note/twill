@@ -13,6 +13,7 @@ import {
   setErdTabSession,
   type ErdTabSession,
 } from './session'
+import { tr } from '../../i18n'
 
 function createNewDiagram(directory: string | null): ErdTabSession {
   const targetDir = directory?.replace(/\/+$/, '') ?? ''
@@ -128,7 +129,7 @@ export default function ErdWorkspace({ tab }: { tab: DocTab }) {
   }, [closeTab, tab.id])
 
   if (loading || !active) {
-    return <div className="flex h-full items-center justify-center text-[13px] text-[#9b9a97]">ERD를 불러오는 중…</div>
+    return <div className="flex h-full items-center justify-center text-[13px] text-[#9b9a97]">{tr("ERD를 불러오는 중…")}</div>
   }
 
   return (

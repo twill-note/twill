@@ -4,6 +4,7 @@ import { useAppStore } from '../store'
 import { usePluginRegistry } from '../plugins/registry'
 import type { SearchResult } from '../types'
 import { useBackdropDismiss } from '../useBackdropDismiss'
+import { tr } from '../i18n'
 
 type CommandPaletteItem = { kind: 'command'; id: string; title: string; onInvoke: () => void }
 type NotePaletteItem = { kind: 'note'; result: SearchResult }
@@ -76,7 +77,7 @@ export default function CommandPalette() {
         <input
           ref={inputRef}
           className="w-full border-b border-[#efefed] px-4 py-3 text-[15px] outline-none placeholder:text-[#c8c7c4]"
-          placeholder="노트 검색… (제목·본문)"
+          placeholder={tr("노트 검색… (제목·본문)")}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => {
@@ -95,7 +96,7 @@ export default function CommandPalette() {
         <div className="max-h-[50vh] overflow-y-auto">
           {commandItems.length > 0 && (
             <>
-              <p className="px-4 pt-3 pb-1 text-[10px] font-medium uppercase tracking-wide text-[#9b9a97]">플러그인 명령</p>
+              <p className="px-4 pt-3 pb-1 text-[10px] font-medium uppercase tracking-wide text-[#9b9a97]">{tr("플러그인 명령")}</p>
               {commandItems.map((item, i) => (
                 <button
                   key={item.id}
@@ -128,11 +129,12 @@ export default function CommandPalette() {
             </button>
           )})}
           {query.trim() && items.length === 0 && (
-            <p className="px-4 py-6 text-center text-[13px] text-[#9b9a97]">검색 결과가 없습니다</p>
+            <p className="px-4 py-6 text-center text-[13px] text-[#9b9a97]">{tr("검색 결과가 없습니다")}</p>
           )}
           {!query.trim() && commandItems.length === 0 && (
             <p className="px-4 py-6 text-center text-[13px] text-[#9b9a97]">
-              키워드를 입력하면 전체 노트에서 검색합니다
+
+              {tr("키워드를 입력하면 전체 노트에서 검색합니다")}
             </p>
           )}
         </div>

@@ -3,12 +3,11 @@ import { markdownWithoutSnapshot, preserveBlocks, restoreBlocks } from '../block
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useCreateBlockNote } from '@blocknote/react'
 import { BlockNoteView } from '@blocknote/mantine'
-import { en as defaultDictionary } from '@blocknote/core/locales'
-import { locales as multiColumnLocales } from '@blocknote/xl-multi-column'
 import { api } from '../api'
 import { isDarkTheme, useThemeStore } from '../theme'
 import type { FileContent } from '../types'
 import { fromMarkdownBlocks, ImageAnnotateButton, schema, toMarkdownBlocks } from './Editor'
+import { getBlockNoteDictionary } from '../blockNoteDictionary'
 
 /**
  * 노트 "본문만" 편집하는 경량 BlockNote 에디터 — 태스크 카드 팝업의 설명 영역 등에 임베드.
@@ -40,7 +39,7 @@ export default function NoteBodyEditor({
   const editor = useCreateBlockNote({
     schema,
     uploadFile: api.uploadAsset,
-    dictionary: { ...defaultDictionary, multi_column: multiColumnLocales.ko },
+    dictionary: getBlockNoteDictionary(),
   })
 
   useEffect(() => {

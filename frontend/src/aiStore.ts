@@ -16,6 +16,7 @@ import { setNoteProp } from './dbmodel'
 import { resolveTaskExecutionScope } from './taskExecutionScope'
 import { canStartTask } from './taskQueue'
 import type { NoteRow } from './types'
+import { currentLanguage } from './i18n'
 
 /** 전체 실행 순서 계획 세션 → 대상 카드들 (확정 시 이 순서 정보로 runTask). 런타임 전용. */
 const orderPlanRows = new Map<string, NoteRow[]>()
@@ -488,6 +489,13 @@ function friendlyDynamicToolName(value: string): string {
     list_skillbook: '스킬북 확인',
     read_skillbook: '스킬 읽기',
     search_memories: '메모리 검색',
+    list_calendar_events: '캘린더 일정 조회',
+    create_calendar_event: '캘린더 일정 등록',
+    update_calendar_event: '캘린더 일정 수정',
+    delete_calendar_event: '캘린더 일정 삭제',
+    list_todos: '할 일 조회',
+    create_todo: '할 일 등록',
+    complete_todo: '할 일 완료 처리',
     request_user_input: '사용자 입력 확인',
   }
   if (known[normalized]) return known[normalized]
@@ -1170,7 +1178,7 @@ export const useAiStore = create<AiStoreState>((set, get) => {
     const isCurrentSocket = () => sockets.get(id) === ws
     ws.onopen = () => {
       if (!isCurrentSocket()) return
-      ws.send(JSON.stringify({ ...req, session_id: id }))
+      ws.send(JSON.stringify({ ...req, session_id: id, app_language: currentLanguage() }))
       patch(id, { currentStatus: '요청을 준비하는 중' })
       // 연결이 열리기 전에 누른 중단도 첫 요청 뒤 즉시 서버에 전달한다.
       if (get().sessions.find((s) => s.id === id)?.cancelRequested) {

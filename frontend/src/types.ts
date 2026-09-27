@@ -84,6 +84,16 @@ export interface TodoGroup {
   items: TodoItem[]
 }
 
+export interface CalendarEvent {
+  id: string
+  date: string
+  time: string
+  title: string
+  description: string
+  created_at: number
+  updated_at: number
+}
+
 export interface OutgoingLink {
   target: string
   path: string | null

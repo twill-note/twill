@@ -9161,6 +9161,11 @@
 [data-theme="graphiteteal"] .twill-terminal-title { color: #ccdDe3 !important; }
 [data-theme="graphiteteal"] .twill-terminal-restart { color: #9da7ac !important; }
 [data-theme="graphiteteal"] .twill-terminal-restart:hover { background: #252a2d !important; color: #80cbc4 !important; }
+[data-theme="graphiteteal"] .chat-assistant-bubble {
+  background: #252b2e !important;
+  border: 1px solid #3c494d;
+  color: #e0eaed !important;
+}
 
 /* ═══ theme: plum ═══ */
 [data-theme="plum"], [data-theme="plum"] body { background-color: #fcf8fb; color: #382a35; }

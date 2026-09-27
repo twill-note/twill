@@ -12,6 +12,15 @@ from typing import Any, AsyncIterator
 
 from ...memories import search_memories_tool
 from ...skillbook import list_skillbook_tool, read_skillbook_tool
+from ...ai_app_tools import (
+    complete_todo_tool,
+    create_calendar_event_tool,
+    create_todo_tool,
+    delete_calendar_event_tool,
+    list_calendar_events_tool,
+    list_todos_tool,
+    update_calendar_event_tool,
+)
 from .app_server import client as app_server, AppServerError
 from .codex_cli import resolve_codex_installation
 
@@ -110,6 +119,68 @@ _SKILLBOOK_DYNAMIC_TOOLS: list[dict[str, Any]] = [
             },
             "additionalProperties": False,
         },
+    },
+]
+
+_NATIVE_APP_TOOLS: list[dict[str, Any]] = [
+    {
+        "type": "function", "name": "list_calendar_events",
+        "description": "Twill 캘린더에 등록된 일정을 조회한다. 날짜별 확인 또는 날짜 범위 확인에 사용한다.",
+        "inputSchema": {"type": "object", "properties": {
+            "date": {"type": "string", "description": "조회 날짜 YYYY-MM-DD"},
+            "start_date": {"type": "string", "description": "기간 시작일 YYYY-MM-DD"},
+            "end_date": {"type": "string", "description": "기간 종료일 YYYY-MM-DD"},
+        }, "additionalProperties": False},
+    },
+    {
+        "type": "function", "name": "create_calendar_event",
+        "description": "사용자가 일정을 등록하거나 약속을 추가해 달라고 할 때 Twill 캘린더에 일정을 만든다.",
+        "inputSchema": {"type": "object", "required": ["date", "title"], "properties": {
+            "date": {"type": "string", "description": "일정 날짜 YYYY-MM-DD"},
+            "time": {"type": "string", "description": "선택적 시각 HH:MM"},
+            "title": {"type": "string", "description": "일정 제목"},
+            "description": {"type": "string", "description": "선택적 설명"},
+        }, "additionalProperties": False},
+    },
+    {
+        "type": "function", "name": "update_calendar_event",
+        "description": "Twill 캘린더 일정의 날짜, 시각, 제목 또는 설명을 수정한다.",
+        "inputSchema": {"type": "object", "required": ["event_id"], "properties": {
+            "event_id": {"type": "string"}, "date": {"type": "string"},
+            "time": {"type": "string"}, "title": {"type": "string"},
+            "description": {"type": "string"},
+        }, "additionalProperties": False},
+    },
+    {
+        "type": "function", "name": "delete_calendar_event",
+        "description": "사용자가 요청한 Twill 캘린더 일정을 삭제한다.",
+        "inputSchema": {"type": "object", "required": ["event_id"], "properties": {
+            "event_id": {"type": "string"},
+        }, "additionalProperties": False},
+    },
+    {
+        "type": "function", "name": "list_todos",
+        "description": "Twill 할 일 화면의 Markdown 체크박스를 조회한다. 날짜 생략 시 오늘의 미완료 항목을 조회한다.",
+        "inputSchema": {"type": "object", "properties": {
+            "date": {"type": "string", "description": "조회 날짜 YYYY-MM-DD. 생략하면 오늘"},
+            "include_done": {"type": "boolean", "description": "완료 항목 포함 여부", "default": False},
+        }, "additionalProperties": False},
+    },
+    {
+        "type": "function", "name": "create_todo",
+        "description": "사용자가 할 일을 추가해 달라고 할 때 지정 날짜의 데일리 노트에 체크박스를 만들고 Twill 할 일 목록에 반영한다.",
+        "inputSchema": {"type": "object", "required": ["text"], "properties": {
+            "text": {"type": "string", "description": "할 일 한 줄"},
+            "date": {"type": "string", "description": "날짜 YYYY-MM-DD. 생략하면 오늘"},
+        }, "additionalProperties": False},
+    },
+    {
+        "type": "function", "name": "complete_todo",
+        "description": "Twill 할 일 항목을 완료 처리한다. text는 할 일 제목 일부 또는 전체이며, path/date로 대상을 좁힐 수 있다.",
+        "inputSchema": {"type": "object", "required": ["text"], "properties": {
+            "text": {"type": "string"}, "path": {"type": "string"},
+            "date": {"type": "string", "description": "날짜 YYYY-MM-DD"},
+        }, "additionalProperties": False},
     },
 ]
 
@@ -306,7 +377,7 @@ class CodexEngine:
     display_name = "Codex"
     supports_developer_instructions = True
     # thread/start에서 고정되는 동적 도구 구성이 바뀌면 기존 스레드를 한 번 교체한다.
-    toolset_version = 2
+    toolset_version = 3
 
     def __init__(self) -> None:
         # `turn/steer`는 같은 스레드 안에서 활성 턴을 새 ID로 바꿀 수 있다. 스트림
@@ -316,6 +387,16 @@ class CodexEngine:
         app_server.register_dynamic_tool("list_skillbook", list_skillbook_tool)
         app_server.register_dynamic_tool("read_skillbook", read_skillbook_tool)
         app_server.register_dynamic_tool("search_memories", search_memories_tool)
+        for name, handler in {
+            "list_calendar_events": list_calendar_events_tool,
+            "create_calendar_event": create_calendar_event_tool,
+            "update_calendar_event": update_calendar_event_tool,
+            "delete_calendar_event": delete_calendar_event_tool,
+            "list_todos": list_todos_tool,
+            "create_todo": create_todo_tool,
+            "complete_todo": complete_todo_tool,
+        }.items():
+            app_server.register_dynamic_tool(name, handler)
 
     async def start_thread(self, *, cwd: str, config: dict[str, Any] | None = None) -> str:
         merged = _merge_config(_BASE_CONFIG, config)
@@ -324,7 +405,7 @@ class CodexEngine:
             "cwd": cwd,
             "sandbox": "workspace-write",
             "config": merged,
-            "dynamicTools": _SKILLBOOK_DYNAMIC_TOOLS,
+            "dynamicTools": [*_SKILLBOOK_DYNAMIC_TOOLS, *_NATIVE_APP_TOOLS],
         }
         if approval:
             params["approvalPolicy"] = approval

@@ -1,10 +1,12 @@
 import datetime
+import re
+import uuid
 
 import frontmatter
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
-from .. import db, indexer
+from .. import db, indexer, watcher
 from ..config import notes_dir
 from .files import rel_str, resolve_path
 
@@ -18,6 +20,104 @@ DAILY_TEMPLATE_NAMES = {"daily", "데일리", "데일리 노트"}
 @router.get("/notes/calendar")
 def calendar(year: int = Query(ge=1970, le=2200), month: int = Query(ge=1, le=12)):
     return db.calendar_counts(year, month)
+
+
+@router.get("/calendar/events/counts")
+def calendar_event_count_route(year: int = Query(ge=1970, le=2200), month: int = Query(ge=1, le=12)):
+    return db.calendar_event_counts(year, month)
+
+
+@router.get("/calendar/events")
+def list_calendar_events(
+    date: str | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
+):
+    if start_date and not end_date or end_date and not start_date:
+        raise HTTPException(status_code=422, detail="start_date와 end_date를 함께 전달해야 합니다")
+    for value in (date, start_date, end_date):
+        if value:
+            _validate_iso_date(value)
+    return db.calendar_events(date=date, start_date=start_date, end_date=end_date)
+
+
+def _validate_iso_date(value: str) -> str:
+    try:
+        parsed = datetime.date.fromisoformat(value)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail="날짜는 YYYY-MM-DD 형식이어야 합니다") from exc
+    if parsed.isoformat() != value:
+        raise HTTPException(status_code=422, detail="날짜는 YYYY-MM-DD 형식이어야 합니다")
+    return value
+
+
+def _validate_event_time(value: str) -> str:
+    if not value:
+        return ""
+    if not re.fullmatch(r"\d{2}:\d{2}", value):
+        raise HTTPException(status_code=422, detail="시간은 HH:MM 형식이어야 합니다")
+    try:
+        datetime.time.fromisoformat(value)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail="시간은 HH:MM 형식이어야 합니다") from exc
+    return value[:5]
+
+
+class CalendarEventCreate(BaseModel):
+    date: str
+    time: str = ""
+    title: str
+    description: str = ""
+
+
+class CalendarEventUpdate(BaseModel):
+    date: str | None = None
+    time: str | None = None
+    title: str | None = None
+    description: str | None = None
+
+
+@router.post("/calendar/events")
+def create_calendar_event(req: CalendarEventCreate):
+    date = _validate_iso_date(req.date)
+    title = req.title.strip()
+    if not title:
+        raise HTTPException(status_code=422, detail="일정 제목이 필요합니다")
+    event = db.create_calendar_event(
+        event_id=uuid.uuid4().hex,
+        date=date,
+        time=_validate_event_time(req.time.strip()),
+        title=title,
+        description=req.description.strip(),
+    )
+    watcher.publish({"type": "calendar-changed", "date": date})
+    return event
+
+
+@router.put("/calendar/events/{event_id}")
+def update_calendar_event(event_id: str, req: CalendarEventUpdate):
+    fields = req.model_dump(exclude_unset=True, exclude_none=True)
+    if "date" in fields:
+        fields["date"] = _validate_iso_date(fields["date"])
+    if "time" in fields:
+        fields["time"] = _validate_event_time(fields["time"].strip())
+    if "title" in fields:
+        fields["title"] = fields["title"].strip()
+        if not fields["title"]:
+            raise HTTPException(status_code=422, detail="일정 제목이 필요합니다")
+    event = db.update_calendar_event(event_id, fields)
+    if event is None:
+        raise HTTPException(status_code=404, detail="일정을 찾을 수 없습니다")
+    watcher.publish({"type": "calendar-changed", "date": event["date"]})
+    return event
+
+
+@router.delete("/calendar/events/{event_id}")
+def delete_calendar_event(event_id: str):
+    if not db.delete_calendar_event(event_id):
+        raise HTTPException(status_code=404, detail="일정을 찾을 수 없습니다")
+    watcher.publish({"type": "calendar-changed"})
+    return {"deleted": True, "id": event_id}
 
 
 @router.get("/notes/db")
@@ -81,6 +181,30 @@ def list_templates():
 @router.get("/todos")
 def list_todos(include_done: bool = False):
     return db.all_todos(include_done)
+
+
+class CreateTodoRequest(BaseModel):
+    text: str
+    date: str | None = None
+
+
+@router.post("/todos")
+def create_todo(req: CreateTodoRequest):
+    text = req.text.strip()
+    if not text or "\n" in text or "\r" in text:
+        raise HTTPException(status_code=422, detail="할 일은 한 줄의 텍스트로 입력해야 합니다")
+    date = _validate_iso_date(req.date or datetime.date.today().isoformat())
+    path = f"{DAILY_DIR}/{date}.md"
+    resolved = resolve_path(path)
+    if not resolved.is_file():
+        open_daily(DailyRequest(date=date))
+    raw = resolved.read_text(encoding="utf-8")
+    checkbox = f"- [ ] {text}"
+    if checkbox not in raw.splitlines():
+        resolved.write_text(raw.rstrip() + "\n\n" + checkbox + "\n", encoding="utf-8")
+        indexer.index_file(rel_str(resolved))
+        watcher.publish({"type": "todos-changed", "path": rel_str(resolved)})
+    return {"path": rel_str(resolved), "date": date, "text": text, "created": checkbox not in raw.splitlines()}
 
 
 class ToggleRequest(BaseModel):

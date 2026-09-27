@@ -23,6 +23,10 @@ class SkillContentUpdateRequest(BaseModel):
     mtime: float | None = None
 
 
+class LanguageRequest(BaseModel):
+    language: Literal["ko", "en"]
+
+
 def _raise_http(exc: Exception) -> None:
     if isinstance(exc, skillbook.SkillBookNotFound):
         raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -40,11 +44,19 @@ def storage_info():
     return {"path": str(skillbook.SKILLBOOK_ROOT)}
 
 
+@router.post("/language")
+def set_language(request: LanguageRequest):
+    return {"language": skillbook.set_skillbook_language(request.language)}
+
+
 @router.get("")
 async def list_entries(
     query: str | None = Query(default=None),
     source: Literal["all", "app_skill", "system_manual"] = Query(default="all"),
+    language: Literal["ko", "en"] | None = Query(default=None),
 ) -> list[dict[str, Any]]:
+    if language:
+        skillbook.set_skillbook_language(language)
     return skillbook.list_skillbook(query=query, source=source)
 
 

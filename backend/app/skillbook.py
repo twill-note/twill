@@ -25,6 +25,7 @@ SKILL_ID_PREFIX = "skillbook:"
 MANUAL_ID_PREFIX = "system-manual:"
 READ_ONLY_SKILL_NAMES = frozenset({"create-system-skill"})
 SKILL_NAME_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+_SKILLBOOK_LANGUAGE = "ko"
 SEARCH_TERM_RE = re.compile(r"[^\W_]+", re.UNICODE)
 STRONG_SEARCH_MATCH_MIN = 7_000
 MAX_TEXT_BYTES = 1_000_000
@@ -61,6 +62,13 @@ class SkillBookValidationError(SkillBookError):
 def ensure_skillbook_dirs() -> None:
     APP_SKILLS_DIR.mkdir(parents=True, exist_ok=True)
     TRASH_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def set_skillbook_language(language: str) -> str:
+    """Set the app's active locale for localized skillbook catalog entries and reads."""
+    global _SKILLBOOK_LANGUAGE
+    _SKILLBOOK_LANGUAGE = "en" if language == "en" else "ko"
+    return _SKILLBOOK_LANGUAGE
 
 
 def initialize_skillbook(legacy_roots: list[Path] | None = None) -> dict[str, Any]:
@@ -132,6 +140,22 @@ def _markdown_title_and_description(path: Path) -> tuple[str, str]:
     return title or path.stem, description or "시스템 매뉴얼"
 
 
+def _markdown_search_terms(path: Path) -> list[str]:
+    try:
+        values = frontmatter.load(path).metadata.get("keywords", [])
+    except Exception:
+        return []
+    return _normalize_search_terms(values)
+
+
+def _normalize_search_terms(values: Any) -> list[str]:
+    if isinstance(values, str):
+        values = [values]
+    if not isinstance(values, list):
+        return []
+    return [str(value).strip() for value in values if str(value).strip()]
+
+
 def _validate_skill_dir(skill_dir: Path) -> tuple[dict[str, Any], list[str]]:
     errors: list[str] = []
     skill_file = skill_dir / "SKILL.md"
@@ -151,7 +175,7 @@ def _validate_skill_dir(skill_dir: Path) -> tuple[dict[str, Any], list[str]]:
     except Exception as exc:
         errors.append(f"SKILL.md frontmatter를 읽을 수 없습니다: {exc}")
 
-    allowed_keys = {"name", "description"}
+    allowed_keys = {"name", "description", "keywords"}
     extra_keys = sorted(set(metadata) - allowed_keys)
     missing_keys = sorted(allowed_keys - set(metadata))
     if missing_keys:
@@ -168,7 +192,11 @@ def _validate_skill_dir(skill_dir: Path) -> tuple[dict[str, Any], list[str]]:
     if not description:
         errors.append("description은 비어 있을 수 없습니다.")
 
-    return {"name": name, "description": description or "설명이 없습니다."}, errors
+    return {
+        "name": name,
+        "description": description or "설명이 없습니다.",
+        "keywords": _normalize_search_terms(metadata.get("keywords", [])),
+    }, errors
 
 
 def _app_skill_summaries() -> list[dict[str, Any]]:
@@ -184,6 +212,7 @@ def _app_skill_summaries() -> list[dict[str, Any]]:
                 "id": f"{SKILL_ID_PREFIX}{skill_dir.name}",
                 "name": metadata["name"],
                 "description": metadata["description"],
+                "search_terms": metadata.get("keywords", []),
                 "source": "app_skill",
                 "read_only": read_only,
                 "entry_file": "SKILL.md",
@@ -200,15 +229,22 @@ def _manual_summaries() -> list[dict[str, Any]]:
     for manual_file in sorted(SYSTEM_MANUAL_DIR.glob("*.md"), key=lambda path: path.name.lower()):
         if not manual_file.is_file() or manual_file.is_symlink():
             continue
-        title, description = _markdown_title_and_description(manual_file)
+        if manual_file.stem.endswith(".en"):
+            continue
+        entry_file = manual_file
+        localized_english = manual_file.with_name(f"{manual_file.stem}.en.md")
+        if _SKILLBOOK_LANGUAGE == "en" and localized_english.is_file() and not localized_english.is_symlink():
+            entry_file = localized_english
+        title, description = _markdown_title_and_description(entry_file)
         summaries.append(
             {
                 "id": f"{MANUAL_ID_PREFIX}{manual_file.stem}",
                 "name": title,
                 "description": description,
+                "search_terms": _markdown_search_terms(entry_file),
                 "source": "system_manual",
                 "read_only": True,
-                "entry_file": manual_file.name,
+                "entry_file": entry_file.name,
                 "valid": True,
             }
         )
@@ -234,6 +270,11 @@ def _skillbook_search_score(entry: dict[str, Any], query: str) -> int:
     description = _normalized_search_text(entry.get("description"))
     entry_id = _normalized_search_text(entry.get("id"))
     score = 0
+
+    for search_term in entry.get("search_terms", []):
+        alias = _normalized_search_text(search_term)
+        if alias and (alias in needle or needle in alias):
+            score = max(score, 8_500 + len(alias))
 
     if needle == name:
         score = max(score, 10_000)
@@ -606,7 +647,7 @@ def list_skillbook_tool(arguments: Any) -> str:
         "skills": [
             {
                 key: summary[key]
-                for key in ("id", "name", "description", "source", "read_only")
+                for key in ("id", "name", "description", "source", "read_only", "search_terms")
             }
             for summary in summaries
         ],

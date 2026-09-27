@@ -39,12 +39,23 @@ void i18n.use(initReactI18next).init({
   returnEmptyString: false,
 })
 
+function syncSkillbookLanguage(language: AppLanguage): void {
+  void fetch('/api/skillbook/language', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ language }),
+  }).catch(() => {})
+}
+
+syncSkillbookLanguage(loadLanguage())
+
 document.documentElement.lang = loadLanguage()
 
 export function setLanguage(lang: AppLanguage): void {
   localStorage.setItem(STORAGE_KEY, lang)
   document.documentElement.lang = lang
   void i18n.changeLanguage(lang)
+  syncSkillbookLanguage(lang)
 }
 
 export function currentLanguage(): AppLanguage {

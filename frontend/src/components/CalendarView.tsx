@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api'
 import { useAppStore } from '../store'
-import type { NoteMeta } from '../types'
+import type { CalendarEvent, NoteMeta } from '../types'
 import { dialog } from '../dialog'
 import { tr } from '../i18n'
 
@@ -19,16 +19,31 @@ export default function CalendarView() {
   const today = new Date()
   const [cursor, setCursor] = useState({ year: today.getFullYear(), month: today.getMonth() + 1 })
   const [counts, setCounts] = useState<Record<string, number>>({})
+  const [eventCounts, setEventCounts] = useState<Record<string, number>>({})
   const [selected, setSelected] = useState<string>(ymd(today))
   const [notes, setNotes] = useState<NoteMeta[]>([])
+  const [events, setEvents] = useState<CalendarEvent[]>([])
 
   useEffect(() => {
     api.calendar(cursor.year, cursor.month).then(setCounts)
+    api.calendarEventCounts(cursor.year, cursor.month).then(setEventCounts)
   }, [cursor])
 
   useEffect(() => {
     api.notesByDate(selected).then(setNotes)
+    api.calendarEvents(selected).then(setEvents)
   }, [selected])
+
+  useEffect(() => {
+    const onDataChanged = (event: Event) => {
+      const type = (event as CustomEvent<{ type?: string }>).detail?.type
+      if (type !== 'calendar-changed') return
+      api.calendarEvents(selected).then(setEvents)
+      api.calendarEventCounts(cursor.year, cursor.month).then(setEventCounts)
+    }
+    window.addEventListener('twill:data-changed', onDataChanged)
+    return () => window.removeEventListener('twill:data-changed', onDataChanged)
+  }, [cursor, selected])
 
   const moveMonth = (delta: number) => {
     setCursor(({ year, month }) => {
@@ -46,6 +61,43 @@ export default function CalendarView() {
       openFile(res.path)
     } catch (e) {
       dialog.alert((e as Error).message)
+    }
+  }
+
+  const createCalendarEvent = async () => {
+    const title = await dialog.prompt(tr('일정 제목'), { placeholder: tr('예: 팀 주간 회의'), confirmLabel: tr('다음') })
+    if (!title?.trim()) return
+    const time = await dialog.prompt(tr('일정 시간 (선택)'), { placeholder: 'HH:MM', confirmLabel: tr('등록') })
+    try {
+      await api.createCalendarEvent({ date: selected, time: time?.trim() ?? '', title: title.trim(), description: '' })
+      setEvents(await api.calendarEvents(selected))
+      setEventCounts(await api.calendarEventCounts(cursor.year, cursor.month))
+    } catch (error) {
+      await dialog.alert((error as Error).message)
+    }
+  }
+
+  const deleteCalendarEvent = async (event: CalendarEvent) => {
+    if (!await dialog.confirm(tr('일정을 삭제할까요?'), { detail: event.title, danger: true })) return
+    try {
+      await api.deleteCalendarEvent(event.id)
+      setEvents(await api.calendarEvents(selected))
+      setEventCounts(await api.calendarEventCounts(cursor.year, cursor.month))
+    } catch (error) {
+      await dialog.alert((error as Error).message)
+    }
+  }
+
+  const editCalendarEvent = async (event: CalendarEvent) => {
+    const title = await dialog.prompt(tr('일정 제목'), { defaultValue: event.title, confirmLabel: tr('저장') })
+    if (!title?.trim()) return
+    const time = await dialog.prompt(tr('일정 시간 (선택)'), { defaultValue: event.time, placeholder: 'HH:MM', confirmLabel: tr('저장') })
+    if (time === null) return
+    try {
+      await api.updateCalendarEvent(event.id, { title: title.trim(), time: time.trim() })
+      setEvents(await api.calendarEvents(selected))
+    } catch (error) {
+      await dialog.alert((error as Error).message)
     }
   }
 
@@ -101,6 +153,7 @@ export default function CalendarView() {
               if (day === null) return <div key={`b${i}`} className="min-h-20 bg-white" />
               const dateStr = `${cursor.year}-${String(cursor.month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
               const count = counts[dateStr] ?? 0
+              const eventCount = eventCounts[dateStr] ?? 0
               const isToday = dateStr === todayStr
               const isSelected = dateStr === selected
               return (
@@ -124,6 +177,11 @@ export default function CalendarView() {
                       {tr("노트")} {count}
                     </div>
                   )}
+                  {eventCount > 0 && (
+                    <div className="mt-1 inline-block rounded bg-teal-50 px-1.5 py-0.5 text-[11px] text-teal-700">
+                      {tr('일정')} {eventCount}
+                    </div>
+                  )}
                 </button>
               )
             })}
@@ -134,15 +192,34 @@ export default function CalendarView() {
       <div className="flex w-72 shrink-0 flex-col border-l border-[#e9e9e7] bg-[#fbfbfa]">
         <div className="flex items-center justify-between border-b border-[#efefed] px-4 py-3">
           <h3 className="text-[14px] font-semibold text-[#37352f]">{selected}</h3>
-          <button
-            className="rounded bg-[#37352f] px-2 py-1 text-[12px] text-white hover:bg-[#565452]"
-            onClick={createDailyNote}
-          >
-
-            {tr("+ 새 노트")}
-          </button>
+          <div className="flex gap-1">
+            <button className="rounded border border-[#e3e2e0] px-2 py-1 text-[11px] hover:bg-[#f1f1ef]" onClick={createCalendarEvent}>
+              {tr('+ 일정')}
+            </button>
+            <button className="rounded bg-[#37352f] px-2 py-1 text-[11px] text-white hover:bg-[#565452]" onClick={createDailyNote}>
+              {tr('+ 새 노트')}
+            </button>
+          </div>
         </div>
         <div className="flex-1 overflow-y-auto p-2">
+          {events.map((event) => (
+            <div key={event.id} className="mb-1 rounded-md border border-teal-200 bg-teal-50 px-3 py-2">
+              <div className="flex items-start gap-2">
+                <span className="min-w-0 flex-1 text-[13px] font-medium text-teal-950">
+                  {event.time && <span className="mr-1.5 text-[11px] text-teal-700">{event.time}</span>}{event.title}
+                </span>
+                <div className="flex shrink-0 gap-1">
+                  <button className="rounded px-1 text-[11px] text-teal-700 hover:bg-teal-100" onClick={() => void editCalendarEvent(event)} aria-label={tr('일정 수정')}>
+                    {tr('수정')}
+                  </button>
+                  <button className="rounded px-1 text-[11px] text-teal-700 hover:bg-teal-100" onClick={() => void deleteCalendarEvent(event)} aria-label={tr('일정 삭제')}>
+                    {tr('삭제')}
+                  </button>
+                </div>
+              </div>
+              {event.description && <p className="mt-1 whitespace-pre-wrap text-[11px] text-teal-800">{event.description}</p>}
+            </div>
+          ))}
           {notes.map((n) => (
             <button
               key={n.path}
@@ -162,7 +239,7 @@ export default function CalendarView() {
               )}
             </button>
           ))}
-          {notes.length === 0 && (
+          {notes.length === 0 && events.length === 0 && (
             <p className="px-2 py-4 text-center text-[12px] text-[#9b9a97]">{tr("이 날짜에 작성된 노트가 없습니다")}</p>
           )}
         </div>

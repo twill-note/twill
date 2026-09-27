@@ -54,6 +54,12 @@ def _broadcast(msg: dict) -> None:
         q.put_nowait(msg)
 
 
+def publish(msg: dict) -> None:
+    """Publish an app-data change from sync API handlers or background tools."""
+    if _loop is not None:
+        _loop.call_soon_threadsafe(_broadcast, msg)
+
+
 async def watch_loop() -> None:
     global _loop
     _loop = asyncio.get_running_loop()

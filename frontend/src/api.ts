@@ -1,5 +1,6 @@
 import type {
   BrowseResult,
+  CalendarEvent,
   FileContent,
   Frontmatter,
   ImportResult,
@@ -54,6 +55,7 @@ export type SkillBookSummary = {
   description: string
   source: SkillBookSource
   read_only: boolean
+  search_terms?: string[]
   entry_file: string
   valid: boolean
 }
@@ -167,6 +169,21 @@ export const api = {
   calendar: (year: number, month: number) =>
     request<Record<string, number>>(`/api/notes/calendar?year=${year}&month=${month}`),
 
+  calendarEventCounts: (year: number, month: number) =>
+    request<Record<string, number>>(`/api/calendar/events/counts?year=${year}&month=${month}`),
+
+  calendarEvents: (date: string) =>
+    request<CalendarEvent[]>(`/api/calendar/events?date=${encodeURIComponent(date)}`),
+
+  createCalendarEvent: (event: Pick<CalendarEvent, 'date' | 'time' | 'title' | 'description'>) =>
+    request<CalendarEvent>('/api/calendar/events', json('POST', event)),
+
+  updateCalendarEvent: (id: string, fields: Partial<Pick<CalendarEvent, 'date' | 'time' | 'title' | 'description'>>) =>
+    request<CalendarEvent>(`/api/calendar/events/${encodeURIComponent(id)}`, json('PUT', fields)),
+
+  deleteCalendarEvent: (id: string) =>
+    request<{ deleted: boolean; id: string }>(`/api/calendar/events/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+
   notesByDate: (date: string) => request<NoteMeta[]>(`/api/notes?date=${date}`),
 
   notesByTag: (tag: string) => request<NoteMeta[]>(`/api/notes?tag=${encodeURIComponent(tag)}`),
@@ -187,6 +204,9 @@ export const api = {
   },
 
   todos: (includeDone = false) => request<TodoGroup[]>(`/api/todos?include_done=${includeDone}`),
+
+  createTodo: (text: string, date?: string) =>
+    request<{ path: string; date: string; text: string; created: boolean }>('/api/todos', json('POST', { text, date })),
 
   toggleTodo: (path: string, line: number, text: string) =>
     request<{ done: boolean; mtime: number }>('/api/todos/toggle', json('POST', { path, line, text })),
@@ -331,6 +351,7 @@ export const api = {
   skillbook: {
     list: (query = '', source: 'all' | SkillBookSource = 'all') => {
       const params = new URLSearchParams()
+      params.set('language', localStorage.getItem('app-lang') === 'en' ? 'en' : 'ko')
       if (query.trim()) params.set('query', query.trim())
       if (source !== 'all') params.set('source', source)
       const suffix = params.size ? `?${params.toString()}` : ''

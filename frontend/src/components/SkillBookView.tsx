@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { en as defaultDictionary } from '@blocknote/core/locales'
 import { BlockNoteView } from '@blocknote/mantine'
 import { useCreateBlockNote } from '@blocknote/react'
-import { locales as multiColumnLocales } from '@blocknote/xl-multi-column'
 import {
   api,
   type SkillBookContent,
@@ -17,6 +15,7 @@ import type { NoteRow } from '../types'
 import { DbTable } from './dbviews'
 import { fromMarkdownBlocks, schema, toMarkdownBlocks } from './Editor'
 import { tr } from '../i18n'
+import { getBlockNoteDictionary } from '../blockNoteDictionary'
 
 
 const SKILLBOOK_CONFIG: DbConfig = {
@@ -109,9 +108,15 @@ export default function SkillBookView() {
   )
 
   const createSkill = async () => {
-    const name = window.prompt('스킬 이름 (소문자-하이픈)')
+    const name = await dialog.prompt(tr('스킬 이름 (소문자-하이픈)'), {
+      placeholder: 'example-skill',
+      confirmLabel: tr('확인'),
+    })
     if (!name?.trim()) return
-    const description = window.prompt('스킬을 언제 사용하는지 간단히 설명하세요')
+    const description = await dialog.prompt(tr('스킬을 언제 사용하는지 간단히 설명하세요'), {
+      placeholder: tr('예: API 문서를 작성하거나 업데이트할 때 사용'),
+      confirmLabel: tr('확인'),
+    })
     if (!description?.trim()) return
     try {
       const detail = await api.skillbook.create(name.trim(), description.trim())
@@ -467,7 +472,7 @@ function SkillBookMarkdownEditor({
 
   const editor = useCreateBlockNote({
     schema,
-    dictionary: { ...defaultDictionary, multi_column: multiColumnLocales.ko },
+    dictionary: getBlockNoteDictionary(),
   })
 
   useEffect(() => {

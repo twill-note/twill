@@ -19,7 +19,7 @@ function AiDockHost() {
           event.dataTransfer.setData('application/x-twill-ai', '1')
           event.dataTransfer.effectAllowed = 'move'
         }}>
-        <button role="tab" aria-selected={tab.id === tabId} title={tab.title} className="max-w-40 truncate py-2"
+        <button role="tab" aria-selected={tab.id === tabId} title={tr(tab.title)} className="max-w-40 truncate py-2"
           onClick={() => useAppStore.getState().moveAi('right', tab.id)}>✦ {tab.title}</button>
         <button title={tr("탭 닫기")} aria-label={`${tab.title} 탭 닫기`} className="rounded px-1 text-[#9b9a97] hover:bg-[#e9e9e7]"
           onClick={() => useAppStore.getState().closeDockedAiTab(tab.id)}>×</button>
@@ -195,7 +195,7 @@ export default function RightDock() {
         id="right-tool-panel"
         className={`relative h-full shrink-0 flex-col border-l border-[#e9e9e7] bg-white ${rightDockOpen ? 'flex' : 'hidden'}`}
         style={{ width, maxWidth: '70vw' }}
-        aria-label={`${activeTool.title} 패널`}
+        aria-label={`${tr(activeTool.title)} ${tr('패널')}`}
       >
         <div
           className="absolute inset-y-0 left-0 z-10 w-1 cursor-col-resize hover:bg-[#4a9eff]/60"
@@ -209,7 +209,7 @@ export default function RightDock() {
             onDragEnd={finishByeoriDrag}
             title={activeTool.id === SYSTEM_AI_TAB ? tr("드래그하여 문서와 함께 배치") : undefined}>
             <ToolIcon tab={activeTool} compact />
-            <span className="truncate" title={dockedTitle}>{activeTool.id === SYSTEM_AI_TAB ? dockedTitle ?? activeTool.title : activeTool.title}</span>
+            <span className="truncate" title={dockedTitle}>{activeTool.id === SYSTEM_AI_TAB ? dockedTitle ?? tr(activeTool.title) : tr(activeTool.title)}</span>
             {activeTool.id === SYSTEM_AI_TAB && aiBusyCount > 0 && (
               <span className="flex shrink-0 items-center gap-1 text-[10px] font-normal text-[#2f6fd0]">
                 <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#4a9eff]" />
@@ -235,7 +235,7 @@ export default function RightDock() {
             type="button"
             className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-[#9b9a97] hover:bg-[#efefed] hover:text-[#37352f]"
             title={tr("닫기")}
-            aria-label={`${activeTool.title} 패널 닫기`}
+            aria-label={`${tr(activeTool.title)} ${tr('패널')} ${tr('닫기')}`}
             onClick={() => setRightDockOpen(false)}
           >
             ✕
@@ -290,8 +290,8 @@ export default function RightDock() {
                   ? 'bg-white text-[#37352f]'
                   : 'text-[#7d7c78] hover:bg-[#ececea] hover:text-[#37352f]'
               }`}
-              title={tab.title}
-              aria-label={tab.id === SYSTEM_AI_TAB && aiBusyCount > 0 ? `${tab.title}, ${aiBusyCount}개 실행 중` : tab.title}
+              title={tr(tab.title)}
+              aria-label={tab.id === SYSTEM_AI_TAB && aiBusyCount > 0 ? `${tr(tab.title)}, ${aiBusyCount} ${tr('개 실행 중')}` : tr(tab.title)}
               aria-pressed={selected}
               aria-controls="right-tool-panel"
               draggable={Boolean(tab.id === SYSTEM_AI_TAB && !byeoriDetached)}

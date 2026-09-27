@@ -28,6 +28,16 @@ CREATE TABLE IF NOT EXISTS todos (
     done INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_todos_path ON todos(path);
+CREATE TABLE IF NOT EXISTS calendar_events (
+    id TEXT PRIMARY KEY,
+    date TEXT NOT NULL,
+    time TEXT NOT NULL DEFAULT '',
+    title TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_calendar_events_date ON calendar_events(date, time);
 CREATE TABLE IF NOT EXISTS links (
     src TEXT NOT NULL,
     target TEXT NOT NULL
@@ -218,6 +228,67 @@ def calendar_counts(year: int, month: int) -> dict[str, int]:
         "SELECT date, COUNT(*) AS cnt FROM notes WHERE date LIKE ? GROUP BY date", (prefix,)
     ).fetchall()
     return {r["date"]: r["cnt"] for r in rows}
+
+
+def calendar_event_counts(year: int, month: int) -> dict[str, int]:
+    prefix = f"{year:04d}-{month:02d}-%"
+    rows = get_conn().execute(
+        "SELECT date, COUNT(*) AS cnt FROM calendar_events WHERE date LIKE ? GROUP BY date", (prefix,)
+    ).fetchall()
+    return {r["date"]: r["cnt"] for r in rows}
+
+
+def calendar_events(*, date: str | None = None, start_date: str | None = None, end_date: str | None = None) -> list[dict]:
+    conn = get_conn()
+    if date:
+        rows = conn.execute(
+            "SELECT * FROM calendar_events WHERE date = ? ORDER BY time, title", (date,)
+        ).fetchall()
+    elif start_date and end_date:
+        rows = conn.execute(
+            "SELECT * FROM calendar_events WHERE date BETWEEN ? AND ? ORDER BY date, time, title",
+            (start_date, end_date),
+        ).fetchall()
+    else:
+        rows = conn.execute("SELECT * FROM calendar_events ORDER BY date, time, title").fetchall()
+    return [dict(row) for row in rows]
+
+
+def create_calendar_event(*, event_id: str, date: str, time: str, title: str, description: str) -> dict:
+    import time as clock
+
+    now = clock.time()
+    with get_conn():
+        get_conn().execute(
+            "INSERT INTO calendar_events(id,date,time,title,description,created_at,updated_at) VALUES(?,?,?,?,?,?,?)",
+            (event_id, date, time, title, description, now, now),
+        )
+    return next(item for item in calendar_events(date=date) if item["id"] == event_id)
+
+
+def update_calendar_event(event_id: str, fields: dict[str, str]) -> dict | None:
+    import time as clock
+
+    allowed = {key: value for key, value in fields.items() if key in {"date", "time", "title", "description"}}
+    if not allowed:
+        rows = get_conn().execute("SELECT * FROM calendar_events WHERE id = ?", (event_id,)).fetchall()
+        return dict(rows[0]) if rows else None
+    assignments = ", ".join(f"{key} = ?" for key in allowed)
+    values = [*allowed.values(), clock.time(), event_id]
+    with get_conn():
+        cursor = get_conn().execute(
+            f"UPDATE calendar_events SET {assignments}, updated_at = ? WHERE id = ?", values
+        )
+    if cursor.rowcount == 0:
+        return None
+    rows = get_conn().execute("SELECT * FROM calendar_events WHERE id = ?", (event_id,)).fetchall()
+    return dict(rows[0])
+
+
+def delete_calendar_event(event_id: str) -> bool:
+    with get_conn():
+        cursor = get_conn().execute("DELETE FROM calendar_events WHERE id = ?", (event_id,))
+    return cursor.rowcount > 0
 
 
 def all_tags() -> list[dict]:

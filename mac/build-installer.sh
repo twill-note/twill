@@ -41,7 +41,12 @@ rm -rf "$BACKEND_OUTPUT"
 echo "[package] Building the macOS disk image..."
 (cd "$FRONTEND_DIR" && npm run dist:mac)
 
-DMG="$(find "$FRONTEND_DIR/release" -maxdepth 1 -name 'Twill-*.dmg' -print | sort | tail -n 1)"
+DMG=""
+while IFS= read -r candidate; do
+  if [[ -z "$DMG" || "$candidate" -nt "$DMG" ]]; then
+    DMG="$candidate"
+  fi
+done < <(find "$FRONTEND_DIR/release" -maxdepth 1 -type f -name 'Twill-*.dmg' -print)
 if [[ -z "$DMG" ]]; then
   echo "[error] The DMG was not created." >&2
   exit 1

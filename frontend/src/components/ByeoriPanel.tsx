@@ -455,7 +455,7 @@ const MessageBubble = memo(function MessageBubble({
       <div className="min-w-0">
         <ChatImageGallery images={m.images} variant="assistant" onPreview={onPreviewImage} />
         {(content || m.streaming) && (
-          <div className="chat-md inline-block max-w-[92%] break-words rounded-lg bg-[#f7f7f5] px-3 py-2 text-left text-[13px] text-[#37352f]">
+          <div className="chat-md chat-assistant-bubble inline-block max-w-[92%] break-words rounded-lg bg-[#f7f7f5] px-3 py-2 text-left text-[13px] text-[#37352f]">
             <ReactMarkdown
               remarkPlugins={MARKDOWN_REMARK_PLUGINS}
               components={markdownComponents}

@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 from ..ai import sessions as ai_sessions
 from ..ai.engine import registry as engine_registry
 from ..ai import git_metadata_access
+from .. import skillbook
 from ..ai.orchestrator import (
     RunRequest,
     _user_image_records,
@@ -610,6 +611,10 @@ async def run_ws(ws: WebSocket):
             await ws.send_json({"type": "error", "message": "요청 형식이 올바르지 않습니다"})
             await ws.close()
             return
+
+        app_language = data.get("app_language")
+        if app_language in {"ko", "en"}:
+            skillbook.set_skillbook_language(app_language)
 
         req = RunRequest(
             task_path=data.get("task_path") or None,

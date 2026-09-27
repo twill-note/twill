@@ -9,7 +9,6 @@ import {
   filterSuggestionItems,
   insertOrUpdateBlockForSlashMenu,
 } from '@blocknote/core'
-import { en as defaultDictionary } from '@blocknote/core/locales'
 import {
   createReactBlockSpec,
   createReactInlineContentSpec,
@@ -22,7 +21,6 @@ import '@blocknote/mantine/style.css'
 import { codeBlockOptions } from '@blocknote/code-block'
 import {
   getMultiColumnSlashMenuItems,
-  locales as multiColumnLocales,
   multiColumnDropCursor,
   withMultiColumn,
 } from '@blocknote/xl-multi-column'
@@ -45,6 +43,7 @@ import MermaidBlockView from './MermaidBlock'
 import SelectionToolbar from './SelectionToolbar'
 import DocumentTaskDialog from './DocumentTaskDialog'
 import SpellcheckToggleButton from './SpellcheckToggleButton'
+import { getBlockNoteDictionary } from '../blockNoteDictionary'
 import { tr } from '../i18n'
 
 /** 노션식 하위 노트(페이지) 블록 — 본문 안에서 일반 블록처럼 드래그로 이동 가능 */
@@ -749,7 +748,7 @@ function NoteEditor({
     dropCursor: multiColumnDropCursor,
     // xl-multi-column 의 slash 아이템은 editor.dictionary.multi_column 을 참조하므로 병합 필수.
     // 없으면 getMultiColumnDictionary() 가 throw 해서 슬래시 메뉴 전체가 안 뜬다.
-    dictionary: { ...defaultDictionary, multi_column: multiColumnLocales.ko },
+    dictionary: getBlockNoteDictionary(),
   })
 
   const loadLinks = useCallback(() => {
@@ -911,30 +910,30 @@ function NoteEditor({
       filterSuggestionItems(
         [
           {
-            title: '하위 노트',
-            subtext: '이 노트 아래에 새 노트를 만들고 링크를 넣습니다',
-            aliases: ['page', 'subnote', 'sub', '하위', '하위노트', '페이지'],
-            group: '노트',
+            title: tr('하위 노트'),
+            subtext: tr('이 노트 아래에 새 노트를 만들고 링크를 넣습니다'),
+            aliases: ['page', 'subnote', 'sub', 'subpage', '하위', '하위노트', '페이지'],
+            group: tr('노트'),
             icon: <span className="text-[18px]">🗒️</span>,
             onItemClick: () => {
               createSubNote()
             },
           },
           {
-            title: '콜아웃',
-            subtext: '이모지와 배경으로 내용을 강조합니다',
+            title: tr('콜아웃'),
+            subtext: tr('이모지와 배경으로 내용을 강조합니다'),
             aliases: ['callout', 'note', 'info', '콜아웃', '강조'],
-            group: '노트',
+            group: tr('노트'),
             icon: <span className="text-[18px]">💡</span>,
             onItemClick: () => {
               insertOrUpdateBlockForSlashMenu(editor, { type: 'callout' })
             },
           },
           {
-            title: '데이터베이스',
-            subtext: '표·보드로 여러 페이지를 관리합니다. 새 행은 이 페이지의 하위 페이지로 저장됩니다',
+            title: tr('데이터베이스'),
+            subtext: tr('표·보드로 여러 페이지를 관리합니다. 새 행은 이 페이지의 하위 페이지로 저장됩니다'),
             aliases: ['db', 'database', 'table', 'board', '데이터베이스', '테이블', '보드'],
-            group: '노트',
+            group: tr('노트'),
             icon: <span className="text-[18px]">📊</span>,
             onItemClick: () => {
               insertOrUpdateBlockForSlashMenu(editor, {
@@ -944,10 +943,10 @@ function NoteEditor({
             },
           },
           {
-            title: '다이어그램 (Mermaid)',
-            subtext: 'flowchart · sequence · gantt · state 등을 텍스트로 그리기',
+            title: tr('다이어그램 (Mermaid)'),
+            subtext: tr('flowchart · sequence · gantt · state 등을 텍스트로 그리기'),
             aliases: ['mermaid', 'diagram', '다이어그램', 'flowchart', '순서도', '시퀀스'],
-            group: '노트',
+            group: tr('노트'),
             icon: <span className="text-[18px]">🧜‍♀️</span>,
             onItemClick: () => {
               insertOrUpdateBlockForSlashMenu(editor, {
@@ -959,10 +958,10 @@ function NoteEditor({
             },
           },
           ...pluginSlashItems.map((item) => ({
-            title: item.title,
-            subtext: item.subtext,
+            title: tr(item.title),
+            subtext: item.subtext ? tr(item.subtext) : undefined,
             aliases: item.aliases,
-            group: '플러그인',
+            group: tr('플러그인'),
             icon: item.icon ? <span className="text-[18px]">{item.icon}</span> : undefined,
             onItemClick: () => item.onInvoke(),
           })),
@@ -1068,10 +1067,10 @@ function NoteEditor({
         <SpellcheckToggleButton enabled={spellcheck} onToggle={toggleSpellcheck} />
         <button
           className="rounded px-1.5 py-0.5 text-[13px] text-[#9b9a97] hover:bg-[#f1f1ef] hover:text-[#37352f]"
-          title={`에디터 너비: ${WIDTH_LABEL[editorWidth]}`}
+          title={tr('에디터 너비: {{width}}', { width: tr(WIDTH_LABEL[editorWidth]) })}
           onClick={cycleWidth}
         >
-          ↔ {WIDTH_LABEL[editorWidth]}
+          ↔ {tr(WIDTH_LABEL[editorWidth])}
         </button>
       </header>
 
@@ -1252,7 +1251,7 @@ const WIDTH_CLASS: Record<EditorWidth, string> = {
   wide: 'max-w-5xl',
   full: 'max-w-none',
 }
-const WIDTH_LABEL: Record<EditorWidth, string> = { normal: '보통', wide: '넓게', full: '전체' }
+const WIDTH_LABEL: Record<EditorWidth, string> = { normal: '보통', wide: '넓게', full: '전체 너비' }
 
 /** 노션식 커버 배너 — 호버 시 변경/제거 버튼 */
 function CoverBanner({ url, onChange }: { url: string; onChange: (cover: string | null) => void }) {

@@ -24,6 +24,15 @@ export default function TodoView() {
     load(includeDone)
   }, [load, includeDone])
 
+  useEffect(() => {
+    const onDataChanged = (event: Event) => {
+      const type = (event as CustomEvent<{ type?: string }>).detail?.type
+      if (type === 'todos-changed' || type === 'fs-changed') void load(includeDone)
+    }
+    window.addEventListener('twill:data-changed', onDataChanged)
+    return () => window.removeEventListener('twill:data-changed', onDataChanged)
+  }, [includeDone, load])
+
   const toggle = async (path: string, line: number, text: string) => {
     try {
       await api.toggleTodo(path, line, text)

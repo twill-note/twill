@@ -1,3 +1,18 @@
+---
+title: ERD 설계 파일 도구
+description: 데이터베이스 설계, DB 구조 그리기, 데이터 모델링, 테이블 관계 설계 요청을 전용 ERD 디자이너 파일로 작성하는 방법
+keywords:
+  - 데이터베이스 설계
+  - 데이터베이스 구조
+  - DB 설계
+  - DB 구조
+  - 테이블 관계 설계
+  - 데이터 모델 설계
+  - database design
+  - database schema
+  - draw database
+---
+
 # ERD 설계 파일 도구
 
 ERD(테이블 설계) 파일은 일반 노트와 달리 Markdown이 아니라 워크스페이스 안의

@@ -97,7 +97,12 @@ export default function App() {
     const connect = () => {
       const proto = window.location.protocol === 'https:' ? 'wss' : 'ws'
       ws = new WebSocket(`${proto}://${window.location.host}/api/events/ws`)
-      ws.onmessage = () => {
+      ws.onmessage = (message) => {
+        try {
+          window.dispatchEvent(new CustomEvent('twill:data-changed', { detail: JSON.parse(message.data) }))
+        } catch {
+          // Older backends may send a non-JSON ping; filesystem refresh below remains safe.
+        }
         window.clearTimeout(debounce)
         debounce = window.setTimeout(() => {
           const { refreshTree, refreshTags } = useAppStore.getState()

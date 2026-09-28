@@ -67,7 +67,9 @@ class DynamicSkillBookToolTests(unittest.TestCase):
         self.assertEqual(call.args[0], "thread/start")
         self.assertEqual(
             [tool["name"] for tool in call.args[1]["dynamicTools"]],
-            ["list_skillbook", "read_skillbook", "search_memories"],
+            ["list_skillbook", "read_skillbook", "search_memories",
+             "list_calendar_events", "create_calendar_event", "update_calendar_event", "delete_calendar_event",
+             "list_todos", "create_todo", "complete_todo"],
         )
         self.assertEqual(call.args[1]["developerInstructions"], "짧은 공통 지시")
 

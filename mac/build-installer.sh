@@ -8,6 +8,10 @@ FRONTEND_DIR="$ROOT_DIR/frontend"
 BACKEND_DIR="$ROOT_DIR/backend"
 VENV_PYTHON="$BACKEND_DIR/.venv/bin/python"
 BACKEND_OUTPUT="$FRONTEND_DIR/build/backend"
+export ELECTRON_BUILDER_CACHE="${ELECTRON_BUILDER_CACHE:-$ROOT_DIR/.build-cache/electron-builder}"
+export npm_config_cache="${npm_config_cache:-$ROOT_DIR/.build-cache/npm}"
+export electron_config_cache="${electron_config_cache:-$ROOT_DIR/.build-cache/electron}"
+export PYINSTALLER_CONFIG_DIR="${PYINSTALLER_CONFIG_DIR:-$ROOT_DIR/.build-cache/pyinstaller}"
 
 echo "[package] Preparing development dependencies..."
 "$SCRIPT_DIR/setup.sh"
@@ -16,7 +20,11 @@ echo "[package] Installing the backend packager..."
 "$VENV_PYTHON" -m pip install --requirement "$BACKEND_DIR/requirements-build.txt"
 
 echo "[package] Downloading the latest official Codex CLI runtime..."
-"$VENV_PYTHON" "$ROOT_DIR/scripts/prepare_codex_runtime.py"
+if [[ "${TWILL_REUSE_CODEX_RUNTIME:-0}" == "1" ]]; then
+  "$VENV_PYTHON" "$ROOT_DIR/scripts/prepare_codex_runtime.py" --reuse-existing
+else
+  "$VENV_PYTHON" "$ROOT_DIR/scripts/prepare_codex_runtime.py"
+fi
 
 echo "[package] Building the frontend..."
 (cd "$FRONTEND_DIR" && npm run build)

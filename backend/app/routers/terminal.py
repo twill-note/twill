@@ -16,12 +16,14 @@ if os.name != "nt":
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from .. import config
+from ..plugins.codex_assistant.cli import stop_codex_process
 
 router = APIRouter(prefix="/api/terminal", tags=["terminal"])
 
 
 def terminal_environment() -> dict[str, str]:
     env = dict(os.environ, TERM="xterm-256color", COLORTERM="truecolor", PYTHONIOENCODING="utf-8", PYTHONUTF8="1")
+    env.pop("TWILL_DESKTOP_SHUTDOWN_TOKEN", None)
     # Finder-launched apps often inherit no locale (or LC_ALL=C).
     locale = env.get("LC_ALL") or env.get("LC_CTYPE") or env.get("LANG", "")
     if "utf8" not in locale.lower().replace("-", ""):
@@ -73,13 +75,8 @@ async def _terminal_ws_windows(ws: WebSocket) -> None:
         pass
     finally:
         pump.cancel()
-        if process.returncode is None:
-            process.terminate()
-        try:
-            await asyncio.wait_for(process.wait(), timeout=2)
-        except asyncio.TimeoutError:
-            process.kill()
-            await process.wait()
+        await asyncio.gather(pump, return_exceptions=True)
+        await stop_codex_process(process, timeout=2)
 
 
 def _spawn_shell() -> tuple[int, int]:
@@ -146,6 +143,7 @@ async def terminal_ws(ws: WebSocket):
         pass
     finally:
         pump.cancel()
+        await asyncio.gather(pump, return_exceptions=True)
         loop.remove_reader(fd)
         # 실제 터미널이 닫힐 때처럼: 포그라운드 프로세스 그룹(실행 중인 명령)에 먼저 HUP
         try:
@@ -159,8 +157,8 @@ async def terminal_ws(ws: WebSocket):
         except OSError:
             pass
         try:
-            os.kill(pid, signal.SIGHUP)
-            os.kill(pid, signal.SIGKILL)
+            os.killpg(pid, signal.SIGHUP)
+            os.killpg(pid, signal.SIGKILL)
         except ProcessLookupError:
             pass
         try:

@@ -31,11 +31,6 @@
   --ui-scrollbar-thumb-active: #3f887f;
 }
 
-[data-theme='sunset'] {
-  --ui-scrollbar-thumb: #dec0ad;
-  --ui-scrollbar-thumb-hover: #bf8b6d;
-  --ui-scrollbar-thumb-active: #9c6548;
-}
 
 [data-theme='paper'] {
   --ui-scrollbar-thumb: #c8bda6;
@@ -43,11 +38,6 @@
   --ui-scrollbar-thumb-active: #6f624c;
 }
 
-[data-theme='nord'] {
-  --ui-scrollbar-thumb: #4c566a;
-  --ui-scrollbar-thumb-hover: #67758c;
-  --ui-scrollbar-thumb-active: #88c0d0;
-}
 
 [data-theme='dracula'] {
   --ui-scrollbar-thumb: #44475a;
@@ -55,29 +45,9 @@
   --ui-scrollbar-thumb-active: #bd93f9;
 }
 
-[data-theme='rosepine'] {
-  --ui-scrollbar-thumb: #403d52;
-  --ui-scrollbar-thumb-hover: #625d78;
-  --ui-scrollbar-thumb-active: #c4a7e7;
-}
 
-[data-theme='midnight'] {
-  --ui-scrollbar-thumb: #283653;
-  --ui-scrollbar-thumb-hover: #405779;
-  --ui-scrollbar-thumb-active: #60a5fa;
-}
 
-[data-theme='irisdark'] {
-  --ui-scrollbar-thumb: #3c3152;
-  --ui-scrollbar-thumb-hover: #665684;
-  --ui-scrollbar-thumb-active: #a78bfa;
-}
 
-[data-theme='plum'] {
-  --ui-scrollbar-thumb: #cfb4c3;
-  --ui-scrollbar-thumb-hover: #a7738d;
-  --ui-scrollbar-thumb-active: #7a284e;
-}
 
 [data-theme='graphiteteal'] {
   --ui-scrollbar-thumb: #30363a;
@@ -441,16 +411,6 @@ body {
 }
 
 /* Mermaid SVG는 자체 색상을 사용하므로 채팅 카드와 함께 명시적으로 팔레트를 맞춘다. */
-[data-theme='nord'] .chat-mermaid {
-  --chat-mermaid-bg: #2e3440;
-  --chat-mermaid-header-bg: #3b4252;
-  --chat-mermaid-border: #4c566a;
-  --chat-mermaid-text: #eceff4;
-  --chat-mermaid-muted: #d8dee9;
-  --chat-mermaid-accent: #88c0d0;
-  --chat-mermaid-source-bg: #242933;
-  --chat-mermaid-source-text: #eceff4;
-}
 [data-theme='dracula'] .chat-mermaid {
   --chat-mermaid-bg: #282a36;
   --chat-mermaid-header-bg: #343746;
@@ -461,33 +421,14 @@ body {
   --chat-mermaid-source-bg: #1f2029;
   --chat-mermaid-source-text: #f8f8f2;
 }
-[data-theme='rosepine'] .chat-mermaid {
-  --chat-mermaid-bg: #191724;
-  --chat-mermaid-header-bg: #26233a;
-  --chat-mermaid-border: #524f67;
-  --chat-mermaid-text: #e0def4;
-  --chat-mermaid-muted: #c4bcd3;
-  --chat-mermaid-accent: #ebbcba;
-  --chat-mermaid-source-bg: #15131e;
-  --chat-mermaid-source-text: #e0def4;
-}
-[data-theme='midnight'] .chat-mermaid {
-  --chat-mermaid-bg: #0b1020;
-  --chat-mermaid-header-bg: #121a2d;
-  --chat-mermaid-border: #283653;
-  --chat-mermaid-text: #e6edf7;
-  --chat-mermaid-muted: #b9c5d6;
-  --chat-mermaid-accent: #60a5fa;
-  --chat-mermaid-source-bg: #080c18;
-  --chat-mermaid-source-text: #e6edf7;
-}
-[data-theme='irisdark'] .chat-mermaid {
-  --chat-mermaid-bg: #12101c;
-  --chat-mermaid-header-bg: #1b1729;
-  --chat-mermaid-border: #3c3152;
-  --chat-mermaid-text: #f2ecfa;
-  --chat-mermaid-muted: #b8acc8;
-  --chat-mermaid-accent: #a78bfa;
-  --chat-mermaid-source-bg: #0e0c16;
-  --chat-mermaid-source-text: #f2ecfa;
+
+[data-theme='graphiteteal'] .chat-mermaid {
+  --chat-mermaid-bg: #1b1f21;
+  --chat-mermaid-header-bg: #252a2d;
+  --chat-mermaid-border: #3c494d;
+  --chat-mermaid-text: #ccdde3;
+  --chat-mermaid-muted: #9da7ac;
+  --chat-mermaid-accent: #80cbc4;
+  --chat-mermaid-source-bg: #151719;
+  --chat-mermaid-source-text: #ccdde3;
 }

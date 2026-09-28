@@ -70,7 +70,7 @@ class MaintenanceTests(unittest.IsolatedAsyncioTestCase):
         ws = SimpleNamespace(accept=AsyncMock(), close=AsyncMock(), send_json=send, receive_text=receive)
         proc = SimpleNamespace(stdout=SimpleNamespace(readline=AsyncMock(return_value=b'')),
                                wait=AsyncMock(return_value=0), returncode=0)
-        with patch.object(ai, 'codex_command', return_value=['codex', 'login']), patch.object(ai.asyncio, 'create_subprocess_exec', AsyncMock(return_value=proc)):
+        with patch.object(ai, 'codex_command', return_value=['codex', 'login']), patch.object(ai.asyncio, 'create_subprocess_exec', AsyncMock(return_value=proc)), patch.object(ai, 'stop_codex_process', AsyncMock()):
             await ai.login_ws(ws)
         self.assertEqual(messages, [{'type': 'success', 'restart_recommended': True}])
 

@@ -21,7 +21,7 @@ import json
 import logging
 from typing import Any, Callable
 
-from .cli import codex_command, stop_codex_process
+from .cli import codex_command, codex_process_options, stop_codex_process
 
 log = logging.getLogger("plugins.codex_assistant.app_server")
 
@@ -104,6 +104,7 @@ class AppServerClient:
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             limit=_STREAM_LIMIT,
+            **codex_process_options(),
         )
         self._proc = proc
         self._next_id = 1
@@ -131,12 +132,14 @@ class AppServerClient:
             await self._stop()
 
     async def _stop(self) -> None:
+        if self._proc:
+            await stop_codex_process(self._proc)
+        tasks = [task for task in (self._reader_task, self._stderr_task) if task]
         if self._reader_task:
             self._reader_task.cancel()
         if self._stderr_task:
             self._stderr_task.cancel()
-        if self._proc:
-            await stop_codex_process(self._proc)
+        await asyncio.gather(*tasks, return_exceptions=True)
         self._proc = None
         self._reader_task = None
         self._stderr_task = None

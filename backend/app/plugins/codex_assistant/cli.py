@@ -2,6 +2,13 @@
 import os
 from pathlib import Path
 import shutil
+import signal
+
+
+def codex_process_options() -> dict:
+    env = dict(os.environ)
+    env.pop("TWILL_DESKTOP_SHUTDOWN_TOKEN", None)
+    return {"env": env, **({"creationflags": 0x08000200} if os.name == "nt" else {"start_new_session": True})}
 
 
 def codex_command(*args: str) -> list[str]:
@@ -28,24 +35,35 @@ async def stop_codex_process(proc, timeout: float = 3) -> None:
     """Windows npm launches a Node parent and Rust child; terminate both."""
     import asyncio
 
-    if proc.returncode is not None:
-        return
     if os.name == 'nt':
+        if proc.returncode is not None:
+            return
         killer = await asyncio.create_subprocess_exec(
             'taskkill.exe', '/PID', str(proc.pid), '/T', '/F',
             stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL,
             creationflags=0x08000000,
         )
-        await asyncio.wait_for(killer.wait(), timeout=10)
+        try:
+            await asyncio.wait_for(killer.wait(), timeout=10)
+        except asyncio.TimeoutError:
+            killer.kill()
+            await killer.wait()
+            raise
         if killer.returncode != 0 and proc.returncode is None:
             raise RuntimeError('Codex 프로세스를 종료하지 못했습니다.')
         await asyncio.wait_for(proc.wait(), timeout=timeout)
         return
+    # Every managed Codex command starts a new session. Reap that session even
+    # if the npm parent has exited while its Rust child still owns a pipe.
     try:
-        proc.terminate()
+        os.killpg(proc.pid, signal.SIGTERM)
+    except ProcessLookupError:
+        return
+    try:
         await asyncio.wait_for(proc.wait(), timeout=timeout)
     except asyncio.TimeoutError:
-        proc.kill()
-        await proc.wait()
-    except ProcessLookupError:
-        pass
+        try:
+            os.killpg(proc.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        await asyncio.wait_for(proc.wait(), timeout=timeout)

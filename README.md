@@ -1,260 +1,88 @@
 # Twill
 
-Twill은 로컬에서 실행되는 노트 애플리케이션입니다. Python 기반 백엔드와 React/Electron 기반 데스크톱 화면으로 구성되어 있습니다.
+**프로젝트에서 나온 문서와 결정을 한곳에 모아두는 작업 공간.**
 
-## 공통 개발 설정과 Git 관리
+프로젝트마다 흩어져 있는 기획, 설계, 회의 기록과 할 일을 하나의 문서 공간에서 관리합니다. 실제 프로젝트 폴더를 연결해 두면 문서를 읽고 쓰는 일과 Codex AI 작업도 같은 흐름에서 이어갈 수 있습니다.
 
-- 권장 런타임: Node.js 24 (`.node-version`), Python 3.12 (`.python-version`).
-- 최소 런타임: Node.js 22.12, Python 3.11. npm은 Node.js와 함께 설치합니다.
-- `frontend/package-lock.json`을 커밋하고 각 OS에서 `npm ci`로 의존성을 설치합니다.
-- `backend/requirements.txt`는 실행 의존성, `backend/requirements-build.txt`는 설치 프로그램 빌드 의존성입니다.
-- `.gitattributes`와 `.editorconfig`가 소스와 Windows 스크립트의 줄바꿈을 관리합니다.
+옵시디언의 파일 기반 노트, 노션의 데이터베이스와 보드, ChatGPT 데스크톱의 대화 방식에서 영감을 받아 만들었습니다. 문서는 Markdown 파일로 남기고, 프로젝트별 기록과 AI 대화는 필요한 자리에서 바로 찾아 쓸 수 있게 구성했습니다.
 
-Windows와 Mac 사이에는 Git으로 소스를 공유하세요. `node_modules`, `.venv`, `dist`,
-`build`, `release`는 OS별로 생성되므로 복사하지 말고 각 환경의 설정 스크립트로 다시 만듭니다.
-개인 노트(`notes/`), 사용자 스킬, `.env`와 인증서, 에디터 설정, 캐시와 로그는
-`.gitignore`로 제외합니다. 앱 소스, 테스트, 내장 스킬 2종, 아이콘, 잠금 파일은 커밋합니다.
-사용자 노트와 스킬은 Git에 올라가지 않으므로 별도로 백업하세요.
+## 주요 기능
 
-## 자동 검증과 설치 프로그램 빌드
+| 기능 | 설명 | 화면 자료 제안 |
+| --- | --- | --- |
+| 프로젝트별 문서 공간 | 문서 보관 폴더 안에서 프로젝트를 나누고, 각 프로젝트의 실제 작업 디렉토리를 연결합니다. 코드 저장소와 문서 공간은 각자 자리에 두고 함께 열어볼 수 있습니다. | 왼쪽에 프로젝트 목록과 문서 트리가 펼쳐지고, 오른쪽에 선택한 문서가 열린 전체 화면 |
+| Markdown 문서 편집 | 글쓰기 화면에서 제목, 목록, 표, 인용, 코드, 이미지와 여러 단 구성 문서를 편집합니다. `[[문서 이름]]` 링크와 백링크, 태그, 날짜별 노트도 지원합니다. | 서식이 적용된 문서와 문서 링크, 옆으로 나뉜 이미지와 텍스트가 함께 보이는 편집 화면 |
+| 프로젝트 태스크 보드 | 태스크를 카드로 만들고 보류, 대기, 실행, 확인 필요, 완료 단계로 관리합니다. 카드에서 Codex 작업을 시작하고 실행 기록을 확인할 수 있습니다. | 다섯 상태 열과 카드가 보이고, 실행 기록이 포함된 태스크 카드가 열린 보드 화면 |
+| Twill AI 채팅 | Codex 계정으로 로그인해 대화하고 프로젝트 문서를 바탕으로 작업을 요청합니다. 프로젝트별 AI 작업과 대화 목록은 왼쪽 탐색 영역의 `[AI 작업]`에 모입니다. | 왼쪽 프로젝트 아래 대화 목록과 오른쪽 AI 채팅 내용이 함께 보이는 화면 |
+| 대화와 문서를 나란히 | 여러 AI 대화와 문서를 탭으로 열고, 끌어 놓아 화면을 나눕니다. 문서와 대화의 배치 상태는 앱을 다시 열어도 복원됩니다. | 한쪽에는 Markdown 문서, 다른 쪽에는 AI 대화가 열린 분할 화면과 위쪽 탭 |
+| 그림과 다이어그램 | 문서 공간에서 Mermaid 다이어그램과 ERD를 만들고, 문서에 넣은 이미지에는 사각형·화살표·자유선·텍스트로 주석을 답니다. | 흐름도 탭과 주석이 표시된 이미지 문서가 함께 보이는 화면 |
+| PDF와 일상 기록 | 현재 문서를 한글 글꼴과 다이어그램을 포함해 PDF로 내보냅니다. 날짜별 노트, 전체 할 일 보기, 문서 템플릿도 함께 사용할 수 있습니다. | 달력에서 날짜를 고르고 해당 날짜의 노트와 할 일을 확인하는 화면 |
+| 작업 환경 설정 | 라이트·다크 테마, 터미널, 재사용할 지침을 관리하는 스킬북, 검색과 키보드 단축키를 제공합니다. | 설정 창에서 테마를 고르고, 옆에 터미널과 스킬 목록이 보이는 화면 |
 
-`.github/workflows/desktop.yml`은 `main` 푸시와 PR에서 Windows·macOS 각각의
-의존성 설치, 백엔드·프런트엔드 테스트, lint, 프런트엔드 빌드와 Electron 시작 검증을 실행합니다.
-GitHub **Actions → Desktop CI → Run workflow**에서 `build_installers`를 켜면 검증 후
-각 runner 아키텍처의 서명되지 않은 EXE·DMG를 빌드하고 Artifacts에 14일간 보관합니다.
-GitHub Release에는 자동 게시하지 않습니다. Intel Mac용 DMG가 필요하면 Intel Mac에서
-아래 로컬 빌드 스크립트를 실행하세요.
+## AI 로그인
 
-로컬 검증 명령은 다음과 같습니다. 백엔드 명령은 `backend` 폴더에서 실행합니다.
+Twill AI는 Codex CLI를 사용합니다. 앱에서 OpenAI Codex 계정으로 OAuth 로그인하면 Codex 계정의 인증과 사용 한도를 따라 대화와 작업을 실행합니다. 별도의 API 키를 발급하거나 코드 저장소마다 Codex CLI를 설치할 필요가 없습니다.
 
-```bash
-# macOS
-.venv/bin/python -m unittest discover -s tests
-```
+AI가 프로젝트 문맥을 참고하거나 파일을 수정할 때는 Twill에 연결한 프로젝트 디렉토리를 기준으로 작업합니다. AI를 사용하면 요청과 선택된 문맥이 Codex 서비스로 전송됩니다. Markdown 문서와 첨부 파일은 사용자의 문서 폴더에 저장됩니다.
 
-```powershell
-# Windows
-.\.venv\Scripts\python.exe -m unittest discover -s tests
-```
+## 설치 및 실행
 
-프런트엔드 명령은 두 OS 모두 `frontend` 폴더에서 실행합니다.
+### 설치 프로그램으로 실행
 
-```text
-npm test
-npm run desktop:check
-npm run lint
-npm run build
-npm run desktop:smoke
-```
+macOS와 Windows용 설치 프로그램은 각 운영체제에서 빌드할 수 있습니다. 설치형 앱에는 프런트엔드, 백엔드, Codex CLI가 포함되어 있어 Python이나 Node.js를 별도로 설치하지 않아도 됩니다.
 
-Mac·Windows 데스크톱 앱의 기본 로컬 주소는 `http://127.0.0.1:52023`입니다.
-`52023`은 Twill의 글자 수(5)와 T·W의 알파벳 순서(20·23)를 조합한 번호입니다.
-사용 중이면 `52024`부터 `52042`까지 순서대로 확인해 앱과 백엔드를 같은 포트에 연결합니다.
-HTTP 서버가 아닌 프로그램의 포트 점유도 확인하며, 시작 직전 발생한 포트 충돌은 다음 후보로 재시도합니다.
-20개 후보를 모두 사용할 수 없으면 오류를 표시합니다. `NOTE_APP_BACKEND_PORT` 환경변수로 시작 포트를 지정할 수도 있습니다.
-브라우저 개발 모드의 백엔드 기본 포트는 기존 `8000`을 사용합니다.
+### 저장소에서 실행
 
-## Windows에서 빠르게 시작하기
+처음 실행할 때 Python 3.11 이상, Node.js 22.12 이상과 인터넷 연결이 필요합니다. 설정 스크립트가 백엔드와 프런트엔드 의존성을 준비합니다.
 
-저장소를 내려받은 뒤 PowerShell에서 다음 명령을 실행합니다.
-
-```powershell
-cd C:\Users\사용자이름\Desktop\twill\window
-.\run-desktop.bat
-```
-
-첫 실행 시 스크립트가 다음 작업을 자동으로 수행합니다.
-
-1. Python 3.11 이상과 Node.js 22.12 이상을 확인합니다.
-2. 필요한 프로그램이 없으면 `winget`으로 설치합니다.
-3. `backend\.venv` Python 가상환경을 만듭니다.
-4. 백엔드 및 프런트엔드 패키지를 설치합니다.
-5. 프런트엔드를 빌드하고 Electron 데스크톱 앱을 실행합니다.
-
-최초 실행에는 패키지 다운로드와 빌드 때문에 몇 분이 걸릴 수 있습니다. 이후에는 설치 상태를 재사용하므로 더 빠르게 실행됩니다.
-
-### 필수 구성요소만 먼저 설치하기
-
-앱을 실행하지 않고 Python과 Node.js만 먼저 확인하거나 설치하려면 다음 명령을 사용합니다.
-
-```powershell
-cd C:\Users\사용자이름\Desktop\twill\window
-.\install-prerequisites.bat
-```
-
-필수 프로그램이 없는 경우 현재 Windows 사용자 계정에 다음 버전이 설치됩니다.
-
-- Python 3.12
-- Node.js LTS
-
-자동 설치에는 Windows 패키지 관리자인 `winget`이 필요합니다. `winget`을 찾을 수 없다는 메시지가 나오면 Microsoft Store에서 **앱 설치 관리자(App Installer)**를 설치하거나 업데이트한 뒤 다시 실행합니다.
-
-### 브라우저 개발 모드로 실행하기
-
-Electron 대신 백엔드와 Vite 개발 서버를 실행하려면 다음 명령을 사용합니다.
-
-```powershell
-cd C:\Users\사용자이름\Desktop\twill\window
-.\run.bat
-```
-
-기본 접속 주소는 `http://127.0.0.1:5173`입니다. 종료하려면 실행한 터미널에서 `Ctrl+C`를 누릅니다.
-
-## macOS 및 Linux
-
-macOS/Linux용 스크립트는 Python 3.11 이상, Node.js 22.12 이상 및 npm이 이미 설치되어 있다고 가정합니다. 공통 개발·CI 기준은 Python 3.12와 Node.js 24입니다. 버전 관리 도구에서는 저장소의 `.python-version`과 `.node-version`을 사용하세요.
+macOS:
 
 ```bash
-cd /path/to/twill
 ./mac/run-desktop.sh
 ```
 
-의존성만 구성하려면 다음을 실행합니다.
-
-```bash
-./mac/setup.sh
-```
-
-브라우저 개발 모드는 다음 명령으로 실행합니다.
-
-```bash
-./mac/run.sh
-```
-
-## 수동 설치 요구 사항
-
-자동 설치를 사용하지 않는 경우 다음 프로그램이 필요합니다.
-
-- Python 3.11 이상
-- Node.js 22.12 이상과 npm
-- 인터넷 연결: 최초 Python 및 npm 패키지 설치에 필요
-
-Windows에서는 Microsoft Store의 Python 실행 별칭보다 [python.org](https://www.python.org/downloads/windows/) 설치본 사용을 권장합니다.
-
-## 자주 발생하는 문제
-
-### `winget`을 찾을 수 없음
-
-Microsoft Store에서 **앱 설치 관리자(App Installer)**를 설치 또는 업데이트하고 새 PowerShell 창에서 다시 실행합니다.
-
-### Python 가상환경 생성이 중단됨
-
-열려 있는 Twill 프로세스를 모두 종료한 뒤 `window\install-prerequisites.bat`를 먼저 실행하고 다시 시도합니다. 설치 스크립트는 Microsoft Store 실행 별칭을 제외하고 실제 Python 설치 경로를 선택합니다.
-
-### 패키지 설치가 실패함
-
-인터넷 연결과 방화벽 또는 프록시 설정을 확인한 뒤 같은 실행 스크립트를 다시 실행합니다. 완료된 설치 단계는 재사용됩니다.
-
-### Twill AI에서 401 또는 Codex 호환 오류가 발생함
-
-배포용 Twill에는 빌드 시점의 최신 공식 Codex CLI가 포함되므로 별도의 Node.js 또는 전역 npm 설치가 필요하지 않습니다. Twill AI의 오류 안내에서 **Codex CLI 업데이트 및 재시작**을 누르면 공식 OpenAI 릴리스의 최신 패키지를 Twill 전용 사용자 폴더에 설치하고 앱을 재시작합니다. 로그인 정보와 문서는 유지됩니다.
-
-Codex CLI의 공식 설치 방식은 [OpenAI Codex CLI 문서](https://learn.chatgpt.com/docs/codex/cli)를 참고하세요.
-
-### 환경을 처음부터 다시 구성하고 싶음
-
-Twill을 모두 종료한 뒤 다음 폴더를 삭제하고 실행 스크립트를 다시 실행합니다.
-
-```text
-backend\.venv
-frontend\node_modules
-frontend\dist
-```
-
-이 폴더에는 자동 생성된 파일만 들어 있으며 다음 실행에서 다시 만들어집니다.
-
-## 주요 실행 스크립트
-
-| 경로 | 용도 |
-| --- | --- |
-| `window\run-desktop.bat` | Windows Electron 앱 구성 및 실행 |
-| `window\install-prerequisites.bat` | Windows 필수 프로그램 확인 및 자동 설치 |
-| `window\setup.bat` | Windows 프로젝트 의존성 구성 |
-| `window\run.bat` | Windows 브라우저 개발 모드 실행 |
-| `mac/run-desktop.sh` | macOS/Linux Electron 앱 구성 및 실행 |
-| `mac/setup.sh` | macOS/Linux 프로젝트 의존성 구성 |
-| `mac/run.sh` | macOS/Linux 브라우저 개발 모드 실행 |
-| `mac/build-installer.sh` | macOS DMG 설치 이미지 생성 |
-
-## Windows 설치 프로그램 만들기
-
-배포 담당자는 Windows PC에서 다음 명령을 실행해 독립 실행형 설치 프로그램을 만들 수 있습니다.
+Windows PowerShell:
 
 ```powershell
-cd C:\Users\사용자이름\Desktop\twill\window
-.\build-installer.bat
+.\window\run-desktop.bat
 ```
 
-빌드 과정은 공식 OpenAI 릴리스에서 현재 Windows 아키텍처용 최신 Codex CLI 패키지를 내려받아 SHA-256을 검증하고, 프런트엔드와 Python 백엔드를 Electron/NSIS 설치 프로그램으로 패키징합니다. 최초 빌드에는 필요한 도구와 Electron·Codex 다운로드 때문에 시간이 걸릴 수 있습니다.
+브라우저에서 개발하려면 macOS에서는 `./mac/run.sh`, Windows에서는 `window\run.bat`를 실행합니다.
 
-완성된 파일은 다음 위치에 생성됩니다.
+## 문서와 설정은 어디에 저장되나요?
+
+처음 실행할 때 선택한 문서 폴더가 작업 공간이 됩니다. 설치형 앱의 기본 위치는 다음과 같습니다.
+
+- macOS: `~/Documents/Twill`
+- Windows: `%USERPROFILE%\Documents\Twill`
+
+Markdown 노트와 첨부 파일은 이 폴더 안에 보관됩니다. 검색과 문서 연결에 쓰는 색인은 폴더 안의 숨김 데이터로 관리하며, 원본 노트는 일반 Markdown 파일이라 다른 편집기에서도 열 수 있습니다. 앱 설정과 Codex 인증은 문서와 별도로 사용자 계정에 저장됩니다.
+
+## 개발
+
+Twill은 Electron 데스크톱 화면, React·TypeScript 프런트엔드, Python·FastAPI 백엔드로 구성됩니다. 데스크톱 앱을 실행하면 백엔드가 사용자 컴퓨터에서 로컬로 시작됩니다.
 
 ```text
-frontend\release\Twill-Setup-<버전>.exe
+frontend/   Electron 앱과 React 화면
+backend/    FastAPI, 파일 인덱싱, 작업 관리, Codex 연결
+mac/        macOS 실행·설정·설치 프로그램 스크립트
+window/     Windows 실행·설정·설치 프로그램 스크립트
 ```
 
-이 Setup 파일 하나만 배포하면 됩니다. 최종 사용자의 PC에는 Python, Node.js, 전역 Codex CLI 또는 개발 도구가 설치되어 있지 않아도 됩니다. 설치 마법사에서 설치 위치를 선택할 수 있으며 바탕화면과 시작 메뉴에 Twill 바로가기가 생성됩니다.
-
-설치형 앱의 기본 노트 저장 위치는 사용자의 문서 폴더 아래입니다.
-
-```text
-C:\Users\사용자이름\Documents\Twill
-```
-
-새 버전을 배포하기 전에는 `frontend/package.json`의 `version` 값을 변경한 뒤 설치 프로그램을 다시 빌드합니다.
-
-> 현재 GitHub Release용 설치 프로그램은 코드 서명되지 않습니다. Windows에서는 SmartScreen의 알 수 없는 게시자 경고가 표시될 수 있으며, macOS에서는 처음 실행할 때 개인정보 보호 및 보안 설정에서 실행을 허용해야 할 수 있습니다. 코드 서명과 공증은 상업적 공개 배포 단계에서 적용합니다.
-
-## macOS 설치 프로그램 만들기
-
-macOS 설치 이미지는 대상 Mac에서 직접 빌드해야 합니다. Python 3.11 이상, Node.js 22.12 이상과 npm을 설치한 뒤 다음 명령을 실행합니다.
+일반적인 개발 실행 방법은 다음과 같습니다.
 
 ```bash
-cd /path/to/twill
-chmod +x mac/build-installer.sh
-./mac/build-installer.sh
+# 프런트엔드 의존성 설치
+cd frontend && npm ci
+
+# 프런트엔드 빌드
+npm run build
+
+# Electron 구문 확인과 린트
+npm run desktop:check
+npm run lint
 ```
 
-스크립트는 현재 Mac의 아키텍처에 맞는 최신 공식 Codex CLI와 Python 백엔드를 준비하고 Electron 앱과 함께 DMG로 패키징합니다. Apple Silicon용 설치본은 Apple Silicon Mac에서, Intel용 설치본은 Intel Mac에서 각각 빌드하는 것이 가장 안전합니다.
+백엔드 의존성은 저장소 루트에서 OS별 설정 스크립트로 준비할 수 있습니다. 설치 프로그램은 macOS에서 `./mac/build-installer.sh`, Windows에서 `window\build-installer.bat`로 만듭니다.
 
-완성된 파일은 다음 위치에 생성됩니다.
-
-```text
-frontend/release/Twill-<버전>-<아키텍처>.dmg
-```
-
-DMG 파일 하나를 GitHub Releases에 올리면 됩니다. 사용자는 DMG를 연 뒤 Twill을 Applications 폴더로 끌어 놓아 설치할 수 있으며, 별도의 Codex CLI 설치는 필요하지 않습니다.
-
-## Codex 업데이트와 재로그인
-
-macOS와 Windows에서 앱을 시작하면 설치된 Codex CLI의 최신 버전을 확인합니다.
-업데이트가 있으면 상단 안내의 **지금 업데이트**를 누르세요. 설정의 **AI 설정 →
-Codex 업데이트 확인**에서도 다시 확인할 수 있습니다. 내장·관리형 CLI는 Twill 전용
-폴더에 업데이트하고, 시스템 CLI는 npm, Homebrew 등 설치 방식에 맞게 업데이트합니다.
-완료 후 실행 버전을 검증하고 모델 목록을
-새로 조회합니다. 모델 사용 가능 여부는 로그인한 계정의 Codex 목록에 따릅니다.
-네트워크·설치 권한 문제는 안내에 표시되며 다시 시도할 수 있습니다.
-
-로그아웃과 로그인 시 기존 Codex 프로세스를 종료해 이전 인증 상태를 비웁니다.
-로그인 완료 후 편집 중인 문서 저장을 확인하고 모든 Twill 창과 앱이 시작한 백엔드를
-종료한 뒤 자동으로 다시 실행합니다. 저장하지 않은 ERD·빠른 메모나 저장 오류가 있으면
-자동 종료하지 않고 저장 후 앱을 완전히 종료·재실행하라는 안내를 표시합니다.
-진행 중인 AI 작업이 있으면 업데이트·계정 변경·재시작은 완료 또는 중단 후 가능합니다.
-브라우저 개발 모드에서는 계정 변경 시 엔진 초기화가 적용됩니다.
-
-## 스킬북 보존과 복구
-
-스킬북은 앱 설치 경로와 분리해 다음 사용자 폴더에 저장합니다.
-
-- macOS: `~/.config/note-app/skillbook`
-- Windows: `%USERPROFILE%\.config\note-app\skillbook`
-
-`NOTE_APP_SKILLBOOK_DIR` 환경변수로 별도 위치를 지정할 수 있습니다. 실제 위치는
-스킬북 화면 하단에 표시합니다. 앱 삭제·재설치 시 이 폴더를 삭제하지 마세요.
-폴더 전체를 복사해 별도 백업할 수도 있습니다.
-
-처음 실행할 때 남아 있는 이전 설치본의 스킬과 스킬 휴지통을 복사합니다. 같은
-이름의 사용자 스킬은 덮어쓰지 않으며, 이전한 스킬을 삭제하거나 이름을 바꿔도 다음
-실행에 다시 나타나지 않습니다. 이전 설치 폴더가 이미 삭제되었다면 해당 원본이나
-백업이 있어야 복구할 수 있습니다. 앱 업데이트 전 이전본의 `skillbook` 폴더를
-보존하고, 새 사용자 폴더의 `skills` 아래로 필요한 스킬 폴더를 복사하세요.
+Mac과 Windows 사이에 소스를 공유할 때는 Git을 사용하세요. `node_modules`, `.venv`, `dist`, `build`, `release`는 운영체제별로 다시 생성합니다. 개인 노트 폴더, 사용자 스킬, 환경 변수 파일과 인증서는 저장소에 커밋하지 않습니다.

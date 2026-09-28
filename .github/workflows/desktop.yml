@@ -83,10 +83,10 @@ jobs:
       - name: Smoke test desktop
         working-directory: frontend
         timeout-minutes: 3
-        run: npm run desktop:smoke
+        run: npm run test:desktop-shutdown
 
   installers:
-    if: github.event_name == 'workflow_dispatch' && inputs.build_installers
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.build_installers)
     needs: verify
     strategy:
       fail-fast: false
@@ -116,6 +116,21 @@ jobs:
       - name: Build macOS installer
         if: runner.os == 'macOS'
         run: /bin/bash mac/build-installer.sh
+      - name: Select packaged executable
+        shell: python {0}
+        run: |
+          import os
+          from pathlib import Path
+          pattern = 'win-unpacked/Twill.exe' if os.name == 'nt' else 'mac*/Twill.app/Contents/MacOS/Twill'
+          binaries = list(Path('frontend/release').glob(pattern))
+          if len(binaries) != 1:
+              raise RuntimeError(f'Expected one packaged executable, found {binaries}')
+          with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as output:
+              print(f'TWILL_QA_DESKTOP_EXECUTABLE={binaries[0].resolve()}', file=output)
+      - name: Verify packaged app releases all processes
+        working-directory: frontend
+        timeout-minutes: 3
+        run: npm run test:desktop-shutdown
       - uses: actions/upload-artifact@v7
         with:
           name: Twill-${{ runner.os }}-${{ runner.arch }}

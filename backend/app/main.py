@@ -9,6 +9,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import config, indexer, watcher
+from .desktop_lifecycle import router as desktop_router
 from .skillbook import initialize_skillbook
 from .ai.engine import registry as engine_registry
 from .ai import sessions as ai_sessions
@@ -52,6 +53,7 @@ app.add_middleware(
 )
 
 app.include_router(files.router)
+app.include_router(desktop_router)
 app.include_router(notes.router)
 app.include_router(quick_memos.router)
 app.include_router(assets.router)

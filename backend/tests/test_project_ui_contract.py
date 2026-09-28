@@ -12,7 +12,7 @@ class ProjectUiContractTests(unittest.TestCase):
             encoding="utf-8"
         )
 
-        self.assertLess(source.index("'선택 안함'"), source.index("'경로 선택'"))
+        self.assertLess(source.index('tr("선택 안함")'), source.index('tr("경로 선택")'))
         self.assertIn('className="flex items-center justify-between"', source)
 
     def test_desktop_project_path_uses_native_picker_and_keeps_custom_fallback(self):
@@ -81,7 +81,7 @@ class ProjectUiContractTests(unittest.TestCase):
         )
 
         self.assertIn("groupValue === 'running'", source)
-        self.assertIn("label: '전체 실행'", source)
+        self.assertIn('label: tr("전체 실행")', source)
 
     def test_sidebar_exposes_project_terms_and_late_path_action(self):
         source = (self.root / "frontend" / "src" / "components" / "FileTree.tsx").read_text(

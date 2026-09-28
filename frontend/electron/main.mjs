@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process'
+import { randomBytes } from 'node:crypto'
 import { desktopRelaunchArgs, stopDesktopBackend } from './lifecycle.mjs'
 import fs from 'node:fs'
 import os from 'node:os'
@@ -79,7 +80,7 @@ const packagedCodex = path.join(process.resourcesPath, 'codex-runtime', 'bin', p
 const frontendDist = path.resolve(process.env.NOTE_APP_FRONTEND_DIST || (
   app.isPackaged ? path.join(process.resourcesPath, 'frontend-dist') : path.join(frontendRoot, 'dist')
 ))
-const appIconPath = path.join(electronDir, 'assets', 'twill-icon.png')
+const appIconPath = path.join(electronDir, 'assets', process.platform === 'win32' ? 'twill-icon.ico' : 'twill-icon.png')
 const options = parseDesktopOptions(process.argv.slice(2))
 const smokeTest = process.argv.includes('--smoke-test')
 const smokeUserData = smokeTest ? process.env.NOTE_APP_SMOKE_USER_DATA?.trim() : ''
@@ -89,6 +90,9 @@ let appUrl = options.uiUrl
 let backendProcess = null
 let backendOwned = false
 let backendReady = false
+let backendShutdownUrl = null
+const backendShutdownToken = randomBytes(32).toString('hex')
+let backendStopPromise = null
 let quitting = false
 let shutdownComplete = false
 let restartRequested = false
@@ -246,7 +250,7 @@ async function startBackendAtPort(baseUrl, port) {
   const command = app.isPackaged ? packagedBackend : resolvePython()
   const commandArgs = app.isPackaged
     ? ['--host', options.backendHost, '--port', String(port)]
-    : ['-m', 'uvicorn', 'app.main:app', '--host', options.backendHost, '--port', String(port)]
+    : [path.join(backendRoot, 'desktop_main.py'), '--host', options.backendHost, '--port', String(port)]
   if (app.isPackaged && !fs.existsSync(command)) {
     throw new Error(`패키지에 백엔드 실행 파일이 없습니다: ${command}`)
   }
@@ -273,6 +277,7 @@ async function startBackendAtPort(baseUrl, port) {
         TWILL_CODEX_MANAGED_DIR: path.join(app.getPath('userData'), 'codex-runtime'),
         NOTE_APP_FRONTEND_DIST: frontendDist,
         NOTE_APP_DESKTOP: '1',
+        TWILL_DESKTOP_SHUTDOWN_TOKEN: backendShutdownToken,
         PYTHONUNBUFFERED: '1',
       },
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -281,6 +286,8 @@ async function startBackendAtPort(baseUrl, port) {
     },
   )
   backendOwned = true
+  backendShutdownUrl = new URL('/api/desktop/shutdown', baseUrl)
+  backendStopPromise = null
   backendProcess.stdout.on('data', appendBackendLog)
   backendProcess.stderr.on('data', appendBackendLog)
   backendProcess.once('error', (error) => appendBackendLog(error.stack || error.message))
@@ -300,10 +307,22 @@ async function startBackendAtPort(baseUrl, port) {
 }
 
 async function stopBackend() {
-  await stopDesktopBackend({
+  backendStopPromise ??= stopDesktopBackend({
     child: backendProcess, owned: backendOwned, platform: process.platform,
     runCommand: readProcessOutput, killGroup: (pid, signal) => process.kill(pid, signal),
+    killProcess: (pid, signal) => process.kill(pid, signal),
+    requestShutdown: async () => {
+      const response = await fetch(backendShutdownUrl, {
+        method: 'POST', headers: { Authorization: `Bearer ${backendShutdownToken}` },
+        signal: AbortSignal.timeout(2000),
+      })
+      if (!response.ok) throw new Error(`정상 종료 요청 오류: HTTP ${response.status}`)
+    },
   })
+  try { await backendStopPromise } catch (error) {
+    backendStopPromise = null
+    throw error
+  }
 }
 
 function readProcessOutput(command, args, timeoutMs = 3_000) {
@@ -470,6 +489,12 @@ function saveWindowBounds(window) {
 }
 
 function installNavigationPolicy(window) {
+  window.on('close', (event) => {
+    if (!quitting && BrowserWindow.getAllWindows().length === 1) {
+      event.preventDefault()
+      app.quit()
+    }
+  })
   const localOrigin = new URL(appUrl).origin
   window.webContents.setWindowOpenHandler(({ url }) => {
     if (isSafeExternalUrl(url)) void shell.openExternal(url)
@@ -491,7 +516,7 @@ function installNavigationPolicy(window) {
 
 function commonWindowOptions() {
   return {
-    backgroundColor: '#282a36',
+    backgroundColor: '#151719',
     icon: appIconPath,
     show: false,
     webPreferences: {
@@ -1393,6 +1418,30 @@ async function runSmokeTest() {
   app.quit()
 }
 
+async function saveOpenEditors() {
+  return new Promise((resolve, reject) => {
+    const requestId = `${Date.now()}-${Math.random()}`
+    const windows = BrowserWindow.getAllWindows().filter((win) => !win.isDestroyed())
+    const pending = new Set(windows.map((win) => win.webContents.id))
+    const finish = (error) => {
+      clearTimeout(timer)
+      ipcMain.removeListener('desktop:restart-ready', onReady)
+      if (error) reject(error)
+      else resolve()
+    }
+    const onReady = (reply, id, error) => {
+      if (id !== requestId || !pending.has(reply.sender.id)) return
+      pending.delete(reply.sender.id)
+      if (error) finish(new Error(String(error)))
+      else if (!pending.size) finish()
+    }
+    const timer = setTimeout(() => finish(new Error('문서 저장 확인 시간이 초과되었습니다. 편집 내용을 저장한 뒤 다시 실행해 주세요.')), 15000)
+    ipcMain.on('desktop:restart-ready', onReady)
+    for (const win of windows) win.webContents.send('desktop:prepare-restart', requestId)
+    if (!pending.size) finish()
+  })
+}
+
 function installMenu() {
   const template = [
     ...(process.platform === 'darwin' ? [{ role: 'appMenu' }] : []),
@@ -1425,7 +1474,7 @@ if (!hasSingleInstanceLock) {
 
   app.whenReady().then(async () => {
     try {
-      app.setAppUserModelId('local.note.desktop')
+      app.setAppUserModelId(app.isPackaged ? 'com.twillnote.twill' : 'com.twillnote.twill.dev')
       if (process.platform === 'darwin' && app.dock && fs.existsSync(appIconPath)) {
         app.dock.setIcon(appIconPath)
       }
@@ -1495,27 +1544,7 @@ if (!hasSingleInstanceLock) {
         if (restartPreparing) throw new Error('앱 재시작을 준비하고 있습니다.')
         restartPreparing = true
         try {
-          await new Promise((resolve, reject) => {
-            const requestId = `${Date.now()}-${Math.random()}`
-            const windows = BrowserWindow.getAllWindows().filter((win) => !win.isDestroyed())
-            const pending = new Set(windows.map((win) => win.webContents.id))
-            const finish = (error) => {
-              clearTimeout(timer)
-              ipcMain.removeListener('desktop:restart-ready', onReady)
-              if (error) reject(error)
-              else resolve()
-            }
-            const onReady = (reply, id, error) => {
-              if (id !== requestId || !pending.has(reply.sender.id)) return
-              pending.delete(reply.sender.id)
-              if (error) finish(new Error(String(error)))
-              else if (!pending.size) finish()
-            }
-            const timer = setTimeout(() => finish(new Error('문서 저장 확인 시간이 초과되었습니다. 편집 내용을 저장한 뒤 다시 실행해 주세요.')), 15000)
-            ipcMain.on('desktop:restart-ready', onReady)
-            for (const win of windows) win.webContents.send('desktop:prepare-restart', requestId)
-            if (!pending.size) finish()
-          })
+          await saveOpenEditors()
           // The API refuses while AI work or an update is active, including work
           // started from a detached window.
           const response = await fetch(new URL('/api/ai/restart-engine', appUrl), { method: 'POST' })
@@ -1577,7 +1606,7 @@ app.on('activate', () => {
 })
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit()
+  app.quit()
 })
 
 app.on('before-quit', (event) => {
@@ -1585,7 +1614,10 @@ app.on('before-quit', (event) => {
   event.preventDefault()
   if (quitting) return
   quitting = true
-  void stopBackend().then(() => {
+  void (async () => {
+    if (backendReady && !restartRequested) await saveOpenEditors()
+    await stopBackend()
+  })().then(() => {
     shutdownComplete = true
     if (restartRequested) {
       app.relaunch({ args: desktopRelaunchArgs(process.argv) })
@@ -1594,6 +1626,6 @@ app.on('before-quit', (event) => {
   }).catch((error) => {
     quitting = false
     restartRequested = false
-    dialog.showErrorBox('Twill 종료 실패', `백엔드를 종료하지 못했습니다. 다시 시도해 주세요.\n${error.message}`)
+    dialog.showErrorBox('Twill 종료 실패', `앱을 종료하지 못했습니다.\n${error.message}`)
   })
 })

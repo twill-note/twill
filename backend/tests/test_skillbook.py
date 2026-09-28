@@ -136,7 +136,7 @@ class SkillBookTests(unittest.TestCase):
         self.assertIn("본문", body)
         self.assertEqual(
             set(json.loads(listed)["skills"][0]),
-            {"id", "name", "description", "source", "read_only"},
+            {"id", "name", "description", "source", "read_only", "search_terms"},
         )
 
     def test_natural_language_query_finds_embedded_manual_name(self):

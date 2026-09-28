@@ -24,7 +24,7 @@ from ..ai.orchestrator import (
 from ..plugins.codex_assistant.app_server import client as codex_app_server
 from ..plugins.codex_assistant.codex_cli import download_latest_codex_runtime, managed_runtime_dir
 
-from ..plugins.codex_assistant.cli import codex_command, stop_codex_process
+from ..plugins.codex_assistant.cli import codex_command, codex_process_options, stop_codex_process
 from ..plugins.codex_assistant import updates
 
 log = logging.getLogger("ai_router")
@@ -145,6 +145,7 @@ async def _login(ws: WebSocket):
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.STDOUT,
             stdin=asyncio.subprocess.DEVNULL,
+            **codex_process_options(),
         )
     except FileNotFoundError:
         await ws.send_json({"type": "error", "message": "codex CLI가 설치되어 있지 않습니다"})

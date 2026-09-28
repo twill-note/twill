@@ -177,7 +177,7 @@ def _validate_skill_dir(skill_dir: Path) -> tuple[dict[str, Any], list[str]]:
 
     allowed_keys = {"name", "description", "keywords"}
     extra_keys = sorted(set(metadata) - allowed_keys)
-    missing_keys = sorted(allowed_keys - set(metadata))
+    missing_keys = sorted({"name", "description"} - set(metadata))
     if missing_keys:
         errors.append(f"필수 frontmatter가 없습니다: {', '.join(missing_keys)}")
     if extra_keys:

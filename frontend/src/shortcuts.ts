@@ -12,6 +12,8 @@ export function isShortcutEnabled(action: ShortcutAction): boolean {
   return action !== 'terminal' || TERMINAL_ENABLED
 }
 
+export const AI_ICON = '🤖'
+
 export const SHORTCUT_ACTIONS: Array<{ id: ShortcutAction; label: string; icon: string }> = [
   { id: 'search', label: '검색', icon: '🔍' },
   { id: 'taskBoard', label: '태스크 보드', icon: '📋' },
@@ -19,7 +21,7 @@ export const SHORTCUT_ACTIONS: Array<{ id: ShortcutAction; label: string; icon: 
   { id: 'todayNote', label: '오늘의 노트', icon: '☀️' },
   { id: 'calendar', label: '캘린더', icon: '📅' },
   { id: 'todos', label: '할 일', icon: '✅' },
-  { id: 'ai', label: 'Twill AI 패널', icon: '🤖' },
+  { id: 'ai', label: 'Twill AI 패널', icon: AI_ICON },
   { id: 'terminal', label: '터미널', icon: '>_' },
 ]
 

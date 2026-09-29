@@ -7,6 +7,7 @@ import { isRepeatedClick } from '../useBackdropDismiss'
 import { AiPanelHost } from './AiPlacement'
 import { isAiTab, sessionIdFromAiTab } from '../aiTabs'
 import { TERMINAL_ENABLED } from '../features'
+import { AI_ICON } from '../shortcuts'
 function AiDockHost() {
   const tabId = useAppStore((s) => s.dockedAiTabId)
   const tabs = useAppStore((s) => s.dockedAiTabs)
@@ -44,7 +45,6 @@ type TabSpec = {
   title: string
   icon?: string
   component: ComponentType
-  disabled?: boolean
 }
 
 const TERMINAL_TAB: TabSpec = {
@@ -52,27 +52,18 @@ const TERMINAL_TAB: TabSpec = {
   title: '터미널',
   icon: '>_',
   component: TerminalPanel,
-  disabled: !TERMINAL_ENABLED,
 }
 
 // Twill AI = 구 '실행' 탭 + 챗 탭 통합. 세션(대화·태스크 실행)이 패널 안 탭으로 관리됨.
 const AI_TAB: TabSpec = {
   id: SYSTEM_AI_TAB,
   title: 'Twill AI',
-  icon: '✦',
+  icon: AI_ICON,
   component: AiDockHost,
 }
 
 function ToolIcon({ tab, compact = false }: { tab: TabSpec; compact?: boolean }) {
   const size = compact ? 'h-4 w-4' : 'h-[18px] w-[18px]'
-  if (tab.id === SYSTEM_AI_TAB) {
-    return (
-      <svg viewBox="0 0 20 20" className={size} fill="none" stroke="currentColor" strokeWidth="1.45" aria-hidden="true">
-        <path d="M3.5 5.25A2.75 2.75 0 0 1 6.25 2.5h7.5a2.75 2.75 0 0 1 2.75 2.75v5.5a2.75 2.75 0 0 1-2.75 2.75H9l-3.75 3v-3.2a2.75 2.75 0 0 1-1.75-2.55z" strokeLinejoin="round" />
-        <path d="m10 5 .8 2.2 2.2.8-2.2.8L10 11l-.8-2.2L7 8l2.2-.8z" strokeLinejoin="round" />
-      </svg>
-    )
-  }
   if (tab.id === SYSTEM_TERMINAL_TAB) {
     return (
       <svg viewBox="0 0 20 20" className={size} fill="none" stroke="currentColor" strokeWidth="1.45" aria-hidden="true">
@@ -104,11 +95,11 @@ export default function RightDock() {
   // 닫았다 다시 열어도 터미널 세션 등 이미 사용한 도구의 컴포넌트는 유지한다.
   const [activated, setActivated] = useState<Set<string>>(() => new Set([SYSTEM_AI_TAB]))
 
-  const tabs = useMemo<TabSpec[]>(() => [AI_TAB, TERMINAL_TAB, ...pluginTabs], [pluginTabs])
-  const activeTool = tabs.find((tab) => tab.id === activeRightTab && !tab.disabled) ?? AI_TAB
+  const tabs = useMemo<TabSpec[]>(() => [AI_TAB, ...(TERMINAL_ENABLED ? [TERMINAL_TAB] : []), ...pluginTabs], [pluginTabs])
+  const activeTool = tabs.find((tab) => tab.id === activeRightTab) ?? AI_TAB
 
   useEffect(() => {
-    if (!tabs.some((tab) => tab.id === activeRightTab && !tab.disabled)) setActiveRightTab(SYSTEM_AI_TAB)
+    if (!tabs.some((tab) => tab.id === activeRightTab)) setActiveRightTab(SYSTEM_AI_TAB)
   }, [tabs, activeRightTab, setActiveRightTab])
 
   useEffect(() => {
@@ -251,7 +242,7 @@ export default function RightDock() {
         )}
         <div className="min-h-0 flex-1 overflow-hidden">
           {tabs.map((tab) => {
-            if (tab.disabled || !activated.has(tab.id)) return null
+            if (!activated.has(tab.id)) return null
             const Component = tab.component
             return (
               <div key={tab.id} className={tab.id === activeRightTab ? 'h-full' : 'hidden'}>
@@ -281,20 +272,19 @@ export default function RightDock() {
         aria-label={tr("우측 도구")}
       >
         {tabs.map((tab) => {
-          const selected = !tab.disabled && rightDockOpen && activeRightTab === tab.id
+          const selected = rightDockOpen && activeRightTab === tab.id
           const aiStatusCount = aiBusyCount > 0 ? aiBusyCount : aiQueuedCount
           return (
             <button
               key={tab.id}
               type="button"
-              disabled={tab.disabled}
               className={`relative m-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-md outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#4a9eff] ${
-                tab.disabled ? 'cursor-default text-[#9b9a97] opacity-40' : selected
+                selected
                   ? 'bg-white text-[#37352f]'
                   : 'text-[#7d7c78] hover:bg-[#ececea] hover:text-[#37352f]'
               }`}
-              title={tab.disabled ? tr('터미널 (임시 비활성화)') : tr(tab.title)}
-              aria-label={tab.disabled ? tr('터미널 (임시 비활성화)') : tab.id === SYSTEM_AI_TAB && aiBusyCount > 0 ? `${tr(tab.title)}, ${aiBusyCount} ${tr('개 실행 중')}` : tr(tab.title)}
+              title={tr(tab.title)}
+              aria-label={tab.id === SYSTEM_AI_TAB && aiBusyCount > 0 ? `${tr(tab.title)}, ${aiBusyCount} ${tr('개 실행 중')}` : tr(tab.title)}
               aria-pressed={selected}
               aria-controls="right-tool-panel"
               draggable={Boolean(tab.id === SYSTEM_AI_TAB && !byeoriDetached)}

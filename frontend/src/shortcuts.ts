@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { TERMINAL_ENABLED } from './features'
 
 /**
  * 앱 전역 단축키 — 설정(⚙) 팝업에서 사용자가 재지정 가능.
@@ -6,6 +7,10 @@ import { create } from 'zustand'
  * localStorage 에 저장되며, 없는 항목은 기본값을 쓴다.
  */
 export type ShortcutAction = 'search' | 'taskBoard' | 'scopes' | 'todayNote' | 'calendar' | 'todos' | 'ai' | 'terminal'
+
+export function isShortcutEnabled(action: ShortcutAction): boolean {
+  return action !== 'terminal' || TERMINAL_ENABLED
+}
 
 export const SHORTCUT_ACTIONS: Array<{ id: ShortcutAction; label: string; icon: string }> = [
   { id: 'search', label: '검색', icon: '🔍' },
@@ -122,7 +127,7 @@ export const useShortcutStore = create<ShortcutState>((set, get) => ({
   setBinding: (action, combo) => {
     const bindings = get().bindings
     const conflict = (Object.entries(bindings) as Array<[ShortcutAction, string]>).find(
-      ([other, c]) => other !== action && c === combo,
+      ([other, c]) => other !== action && isShortcutEnabled(other) && c === combo,
     )
     if (conflict) {
       return SHORTCUT_ACTIONS.find((a) => a.id === conflict[0])?.label ?? conflict[0]
@@ -144,7 +149,7 @@ export function actionForEvent(e: KeyboardEvent): ShortcutAction | null {
   if (['Control', 'Alt', 'Shift', 'Meta'].includes(e.key)) return null
   const bindings = useShortcutStore.getState().bindings
   for (const [action, combo] of Object.entries(bindings) as Array<[ShortcutAction, string]>) {
-    if (eventMatchesCombo(e, combo)) return action
+    if (isShortcutEnabled(action) && eventMatchesCombo(e, combo)) return action
   }
   return null
 }

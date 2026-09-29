@@ -272,7 +272,7 @@ async function startBackendAtPort(baseUrl, port) {
       cwd: app.isPackaged ? path.dirname(packagedBackend) : backendRoot,
       env: {
         ...backendEnvironment,
-        ...(app.isPackaged && !process.env.NOTES_DIR ? { NOTES_DIR: path.join(app.getPath('documents'), 'Twill') } : {}),
+        ...(app.isPackaged ? { TWILL_DEFAULT_NOTES_DIR: path.join(app.getPath('documents'), 'Twill') } : {}),
         ...(app.isPackaged && fs.existsSync(packagedCodex) ? { TWILL_BUNDLED_CODEX_BINARY: packagedCodex } : {}),
         TWILL_CODEX_MANAGED_DIR: path.join(app.getPath('userData'), 'codex-runtime'),
         NOTE_APP_FRONTEND_DIST: frontendDist,
@@ -529,6 +529,20 @@ function commonWindowOptions() {
 }
 
 function attachWindowStateEvents(window) {
+  if (process.platform === 'win32') {
+    const preferredMinimum = window.getMinimumSize()
+    const fitMinimumToDisplay = () => {
+      if (window.isDestroyed()) return
+      const { workArea } = screen.getDisplayMatching(window.getBounds())
+      const minimum = [Math.min(preferredMinimum[0], workArea.width), Math.min(preferredMinimum[1], workArea.height)]
+      const current = window.getMinimumSize()
+      if (minimum[0] !== current[0] || minimum[1] !== current[1]) window.setMinimumSize(...minimum)
+    }
+    window.on('move', fitMinimumToDisplay)
+    screen.on('display-metrics-changed', fitMinimumToDisplay)
+    window.once('closed', () => screen.removeListener('display-metrics-changed', fitMinimumToDisplay))
+    fitMinimumToDisplay()
+  }
   window.on('maximize', () => notifyWindowMaximized(window))
   window.on('unmaximize', () => notifyWindowMaximized(window))
   window.on('blur', () => {
@@ -543,6 +557,11 @@ async function toggleWindowMaximize(window) {
   stopWindowResize(window)
   windowMaximizeTransitions.add(window)
   try {
+    if (process.platform === 'win32') {
+      if (window.isMaximized()) window.unmaximize()
+      else window.maximize()
+      return true
+    }
     if (manuallyMaximizedWindows.has(window)) {
       const restoreBounds = normalWindowBounds.get(window)
       manuallyMaximizedWindows.delete(window)
@@ -643,6 +662,9 @@ function stopWindowMove(window, applyFinalPosition = false) {
 }
 
 function beginWindowMove(event) {
+  // Windows uses app-region: drag so the OS owns DPI changes and snap/restore.
+  // Repeated setPosition calls can change a frameless window's size at fractional scaling.
+  if (process.platform === 'win32') return
   const window = BrowserWindow.fromWebContents(event.sender)
   if (!window || window.isDestroyed()) return
   stopWindowResize(window)
@@ -769,6 +791,7 @@ function validScreenPoint(point) {
 }
 
 function beginWindowResize(event, direction, rendererPoint) {
+  if (process.platform === 'win32') return
   const window = BrowserWindow.fromWebContents(event.sender)
   if (!window || window.isDestroyed() || isWindowMaximized(window) || !window.isResizable()) return
   const minimum = window.getMinimumSize()
@@ -1137,7 +1160,8 @@ async function runSmokeTest() {
       scaleFactor: display.scaleFactor,
     })),
   }
-  await mainWindow.webContents.executeJavaScript(`document.querySelector('.desktop-titlebar__drag-area')
+  if (process.platform === 'win32') await toggleWindowMaximize(mainWindow)
+  else await mainWindow.webContents.executeJavaScript(`document.querySelector('.desktop-titlebar__drag-area')
     ?.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, button: 0 }))`)
   await new Promise((resolve) => setTimeout(resolve, 500))
   const toggledBounds = mainWindow.getBounds()
@@ -1163,11 +1187,12 @@ async function runSmokeTest() {
   }
   const holdMaximizedMs = Math.min(Math.max(Number.parseInt(process.env.NOTE_APP_SMOKE_HOLD_MAXIMIZED_MS || '0', 10) || 0, 0), 30_000)
   if (holdMaximizedMs) await new Promise((resolve) => setTimeout(resolve, holdMaximizedMs))
-  await mainWindow.webContents.executeJavaScript(`document.querySelector('.desktop-titlebar__drag-area')
+  if (process.platform === 'win32') await toggleWindowMaximize(mainWindow)
+  else await mainWindow.webContents.executeJavaScript(`document.querySelector('.desktop-titlebar__drag-area')
     ?.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, button: 0 }))`)
   await new Promise((resolve) => setTimeout(resolve, 500))
   windowControlsResult.restored = { maximized: isWindowMaximized(mainWindow), bounds: mainWindow.getBounds() }
-  if (process.env.NOTE_APP_SMOKE_TEST_RESIZE === '1') {
+  if (process.env.NOTE_APP_SMOKE_TEST_RESIZE === '1' && process.platform !== 'win32') {
     await mainWindow.webContents.executeJavaScript(`new Promise((resolve) => {
       const deadline = Date.now() + 2000
       const ready = () => {

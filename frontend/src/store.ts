@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { useAiStore } from './aiStore'
 import { aiDocumentTab, aiDocumentTabId, sessionIdFromAiTab } from './aiTabs'
 import { api } from './api'
+import { TERMINAL_ENABLED } from './features'
 import type { PluginInfo } from './api'
 import type { SaveStatus, Section, TagCount, TreeNode, ViewMode } from './types'
 import { parseWorkspaceSession, serializeWorkspaceSession, workspaceSessionKey, type SplitLayout } from './workspaceSession'
@@ -149,7 +150,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   sidebarCollapsed: false,
   recent: [],
   rightDockOpen: false,
-  activeRightTab: SYSTEM_TERMINAL_TAB,
+  activeRightTab: SYSTEM_AI_TAB,
   byeoriDetached: false,
   aiTabId: null,
   dockedAiTabId: SYSTEM_AI_TAB,
@@ -215,7 +216,9 @@ export const useAppStore = create<AppState>((set, get) => ({
       openTabs: [], dockedAiTabs: [aiDocumentTab(SYSTEM_AI_TAB)], dockedAiTabId: SYSTEM_AI_TAB, aiTabId: null,
       splitLayout: null, rightDockOpen: false, activeRightTab: SYSTEM_AI_TAB, rightDockWidth: 480, sidebarWidth: 256, sidebarCollapsed: false,
       view: 'editor', currentPath: null, erdTabId: null, erdPath: null, erdDirectory: null, dbDir: null, pluginViewId: null,
-      ...restored, workspaceReady: true })
+      ...restored,
+      ...(!TERMINAL_ENABLED && restored?.activeRightTab === SYSTEM_TERMINAL_TAB ? { activeRightTab: SYSTEM_AI_TAB, rightDockOpen: false } : {}),
+      workspaceReady: true })
     if (firstWorkspace && !restored && window.location.hash) get().restoreFromHistory(decodeURIComponent(window.location.hash.slice(1)))
   },
   pinnedNotes: [],
@@ -345,9 +348,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   setTagFilter: (tagFilter) => set({ tagFilter }),
   setRightDockOpen: (rightDockOpen) => set({ rightDockOpen }),
   toggleRightDock: () => set({ rightDockOpen: !get().rightDockOpen }),
-  setActiveRightTab: (activeRightTab) => set({ activeRightTab }),
+  setActiveRightTab: (activeRightTab) => set({ activeRightTab: !TERMINAL_ENABLED && activeRightTab === SYSTEM_TERMINAL_TAB ? SYSTEM_AI_TAB : activeRightTab }),
   setByeoriDetached: (byeoriDetached) => set({ byeoriDetached }),
   openRightTab: (id) => {
+    if (id === SYSTEM_TERMINAL_TAB && !TERMINAL_ENABLED) return
     const selectedSessionId = useAiStore.getState().activeSessionId
     const selectedAiTabId = selectedSessionId ? aiDocumentTabId(selectedSessionId) : SYSTEM_AI_TAB
     if (id === SYSTEM_AI_TAB && get().byeoriDetached && get().dockedAiTabId === selectedAiTabId && window.noteDesktop) {

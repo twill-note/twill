@@ -5,6 +5,7 @@ import { tr } from '../i18n'
 export default function DesktopTitleBar({ title = 'Twill' }: { title?: string }) {
   const desktop = window.noteDesktop
   const isMac = desktop?.platform === 'darwin'
+  const nativeDrag = desktop?.platform === 'win32'
   const [maximized, setMaximized] = useState(false)
   const dragPointerRef = useRef<number | null>(null)
 
@@ -22,7 +23,7 @@ export default function DesktopTitleBar({ title = 'Twill' }: { title?: string })
 
   return (
     <>
-      <DesktopResizeHandles disabled={maximized || isMac} />
+      <DesktopResizeHandles disabled={maximized || isMac || nativeDrag} />
       <header
         className={`desktop-titlebar flex h-9 shrink-0 items-center border-b border-[#e9e9e7] bg-[#f7f7f5] text-[#5f5e5b] ${
           isMac ? 'desktop-titlebar--mac' : ''
@@ -30,10 +31,9 @@ export default function DesktopTitleBar({ title = 'Twill' }: { title?: string })
       >
         {isMac && <div className="h-full w-[78px] shrink-0" aria-hidden="true" />}
         <div
-          className={`desktop-titlebar__drag-area flex min-w-0 flex-1 items-center justify-center text-[12px] font-medium ${
-            isMac ? '' : 'pl-36'
-          }`}
+          className={`desktop-titlebar__drag-area flex min-w-0 flex-1 items-center justify-center text-[12px] font-medium ${isMac ? '' : 'pl-36'} ${nativeDrag ? 'desktop-titlebar__drag-area--native' : ''}`}
           onPointerDown={(event) => {
+            if (nativeDrag) return
             if (event.button !== 0 || dragPointerRef.current !== null) return
             dragPointerRef.current = event.pointerId
             event.currentTarget.setPointerCapture(event.pointerId)
@@ -56,6 +56,7 @@ export default function DesktopTitleBar({ title = 'Twill' }: { title?: string })
             desktop.windowControls.endMove()
           }}
           onDoubleClick={() => {
+            if (nativeDrag) return
             dragPointerRef.current = null
             desktop.windowControls.endMove()
             void desktop.windowControls.toggleMaximize()

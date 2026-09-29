@@ -18,11 +18,10 @@ test('an existing valid theme choice is preserved', () => {
 })
 
 test('retired themes migrate to the closest representative palette', () => {
-  assert.equal(resolveTheme('notion'), 'mint')
+  assert.equal(resolveTheme('mint'), 'notion')
   assert.equal(resolveTheme('rosepine'), 'dracula')
   assert.equal(resolveTheme('irisdark'), 'dracula')
   assert.equal(resolveTheme('midnight'), 'graphiteteal')
-  assert.equal(resolveTheme('nord'), 'graphiteteal')
   assert.equal(resolveTheme('plum'), 'paper')
   assert.equal(resolveTheme('sunset'), 'paper')
 })
@@ -30,13 +29,15 @@ test('retired themes migrate to the closest representative palette', () => {
 test('dark theme metadata matches editor rendering mode', () => {
   assert.equal(THEMES.find((theme) => theme.id === 'graphiteteal')?.dark, true)
   assert.equal(THEMES.find((theme) => theme.id === 'dracula')?.dark, true)
+  assert.equal(THEMES.find((theme) => theme.id === 'nord')?.dark, true)
+  assert.equal(THEMES.find((theme) => theme.id === 'notion')?.dark ?? false, false)
   assert.equal(THEMES.find((theme) => theme.id === 'paper')?.dark ?? false, false)
-  assert.equal(THEMES.length, 4)
+  assert.equal(THEMES.length, 5)
 })
 
 test('generated theme CSS includes every selectable custom theme', () => {
   const css = readFileSync(new URL('../src/themes.css', import.meta.url), 'utf8')
-  const customThemes = THEMES
+  const customThemes = THEMES.filter((theme) => theme.id !== 'notion')
 
   for (const theme of customThemes) {
     assert.match(css, new RegExp(`theme: ${theme.id} ═`))

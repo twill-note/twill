@@ -25,12 +25,11 @@
   font-variant-emoji: emoji;
 }
 
-[data-theme='mint'] {
-  --ui-scrollbar-thumb: #a9c9c3;
-  --ui-scrollbar-thumb-hover: #6daaa0;
-  --ui-scrollbar-thumb-active: #3f887f;
+[data-theme='nord'] {
+  --ui-scrollbar-thumb: #4c566a;
+  --ui-scrollbar-thumb-hover: #67758c;
+  --ui-scrollbar-thumb-active: #88c0d0;
 }
-
 
 [data-theme='paper'] {
   --ui-scrollbar-thumb: #c8bda6;
@@ -38,16 +37,11 @@
   --ui-scrollbar-thumb-active: #6f624c;
 }
 
-
 [data-theme='dracula'] {
   --ui-scrollbar-thumb: #44475a;
   --ui-scrollbar-thumb-hover: #62657a;
   --ui-scrollbar-thumb-active: #bd93f9;
 }
-
-
-
-
 
 [data-theme='graphiteteal'] {
   --ui-scrollbar-thumb: #30363a;
@@ -113,6 +107,11 @@ body {
   app-region: no-drag;
   -webkit-app-region: no-drag;
   touch-action: none;
+}
+
+.desktop-titlebar__drag-area--native {
+  app-region: drag;
+  -webkit-app-region: drag;
 }
 
 .desktop-titlebar__control,
@@ -411,6 +410,17 @@ body {
 }
 
 /* Mermaid SVG는 자체 색상을 사용하므로 채팅 카드와 함께 명시적으로 팔레트를 맞춘다. */
+[data-theme='nord'] .chat-mermaid {
+  --chat-mermaid-bg: #2e3440;
+  --chat-mermaid-header-bg: #3b4252;
+  --chat-mermaid-border: #4c566a;
+  --chat-mermaid-text: #eceff4;
+  --chat-mermaid-muted: #d8dee9;
+  --chat-mermaid-accent: #88c0d0;
+  --chat-mermaid-source-bg: #242933;
+  --chat-mermaid-source-text: #eceff4;
+}
+
 [data-theme='dracula'] .chat-mermaid {
   --chat-mermaid-bg: #282a36;
   --chat-mermaid-header-bg: #343746;

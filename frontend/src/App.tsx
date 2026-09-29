@@ -18,7 +18,7 @@ import { initPlugins } from './plugins/manager'
 import { dbApi } from './dbschema'
 import { actionForEvent, type ShortcutAction } from './shortcuts'
 import { useAiStore } from './aiStore'
-import { SYSTEM_AI_TAB, SYSTEM_TERMINAL_TAB, useAppStore } from './store'
+import { SYSTEM_AI_TAB, useAppStore } from './store'
 import { useTranslation } from 'react-i18next'
 import { tr } from './i18n'
 
@@ -171,7 +171,6 @@ export default function App() {
           toggleDock(SYSTEM_AI_TAB)
           return
         case 'terminal':
-          toggleDock(SYSTEM_TERMINAL_TAB)
           return
       }
     }

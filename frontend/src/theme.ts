@@ -17,7 +17,8 @@ function loadTheme(): ThemeId {
 }
 
 function applyTheme(theme: ThemeId) {
-  document.documentElement.dataset.theme = theme
+  if (theme === 'notion') delete document.documentElement.dataset.theme
+  else document.documentElement.dataset.theme = theme
   const background = THEMES.find((item) => item.id === theme)?.dots[0]
     ?? THEMES.find((item) => item.id === DEFAULT_THEME)?.dots[0]
     ?? '#151719'

@@ -150,6 +150,7 @@
   "기본 창에서 열기": "Open in main window",
   "새 창에서 열기": "Open in new window",
   "터미널": "Terminal",
+  "터미널 (임시 비활성화)": "Terminal (temporarily disabled)",
   "+ 일정": "+ Event",
   "일정": "Event",
   "일정 제목": "Event title",

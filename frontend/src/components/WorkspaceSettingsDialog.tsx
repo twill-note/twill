@@ -9,6 +9,7 @@ import {
   DEFAULT_BINDINGS,
   displayCombo,
   IS_MAC,
+  isShortcutEnabled,
   SHORTCUT_ACTIONS,
   useShortcutStore,
   type ShortcutAction,
@@ -58,7 +59,7 @@ function ShortcutsSection() {
 
   return (
     <div className="rounded-md border border-[#e9e9e7]">
-      {SHORTCUT_ACTIONS.map((a) => {
+      {SHORTCUT_ACTIONS.filter((a) => isShortcutEnabled(a.id)).map((a) => {
         const isRecording = recording === a.id
         const isDefault = bindings[a.id] === DEFAULT_BINDINGS[a.id]
         return (

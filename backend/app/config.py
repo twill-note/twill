@@ -4,7 +4,9 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parents[2]))
-DEFAULT_NOTES_DIR = Path(os.environ.get("NOTES_DIR", REPO_ROOT / "notes")).resolve()
+# Packaged apps supply a first-run default separately from an explicit workspace override.
+# NOTES_DIR remains an override for development and isolated runs.
+DEFAULT_NOTES_DIR = Path(os.environ.get("NOTES_DIR") or os.environ.get("TWILL_DEFAULT_NOTES_DIR") or REPO_ROOT / "notes").resolve()
 
 CONFIG_PATH = Path.home() / ".config" / "note-app" / "config.json"
 

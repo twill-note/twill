@@ -37,7 +37,7 @@ export default function ByeoriWindowApp() {
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-white">
-      <DesktopTitleBar title="Twill AI · Twill" />
+      <DesktopTitleBar />
       {windowError && (
         <div role="alert" className="shrink-0 border-b border-[#fbcaca] bg-[#fdf2f2] px-3 py-1.5 text-[11px] text-[#c92a2a]">
           {windowError}

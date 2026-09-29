@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import DesktopResizeHandles from './DesktopResizeHandles'
 import { tr } from '../i18n'
 
-export default function DesktopTitleBar({ title = 'Twill' }: { title?: string }) {
+export default function DesktopTitleBar() {
   const desktop = window.noteDesktop
   const isMac = desktop?.platform === 'darwin'
   const nativeDrag = desktop?.platform === 'win32'
@@ -31,7 +31,7 @@ export default function DesktopTitleBar({ title = 'Twill' }: { title?: string })
       >
         {isMac && <div className="h-full w-[78px] shrink-0" aria-hidden="true" />}
         <div
-          className={`desktop-titlebar__drag-area flex min-w-0 flex-1 items-center justify-center text-[12px] font-medium ${isMac ? '' : 'pl-36'} ${nativeDrag ? 'desktop-titlebar__drag-area--native' : ''}`}
+          className={`desktop-titlebar__drag-area h-full min-w-0 flex-1 ${nativeDrag ? 'desktop-titlebar__drag-area--native' : ''}`}
           onPointerDown={(event) => {
             if (nativeDrag) return
             if (event.button !== 0 || dragPointerRef.current !== null) return
@@ -61,17 +61,8 @@ export default function DesktopTitleBar({ title = 'Twill' }: { title?: string })
             desktop.windowControls.endMove()
             void desktop.windowControls.toggleMaximize()
           }}
-        >
-          <div className="desktop-titlebar__title flex min-w-0 items-center gap-1.5">
-            <svg viewBox="0 0 18 18" className="h-4 w-4 text-[#7c5ce5]" aria-hidden="true">
-              <path d="M4.25 2.75h7.2l2.3 2.35v10.15H4.25z" fill="none" stroke="currentColor" strokeWidth="1.35" strokeLinejoin="round" />
-              <path d="M11.3 2.9v2.45h2.25M6.5 8h5M6.5 10.5h5M6.5 13h3.5" fill="none" stroke="currentColor" strokeWidth="1.15" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            <span className="truncate">{title}</span>
-          </div>
-        </div>
+        />
 
-        {isMac && <div className="h-full w-[78px] shrink-0" aria-hidden="true" />}
         {!isMac && <div className="desktop-titlebar__controls flex h-full shrink-0">
           <button
             type="button"

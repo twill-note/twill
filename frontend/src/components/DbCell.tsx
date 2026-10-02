@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { api } from '../api'
+import ProjectPathDialog from './ProjectPathDialog'
 import {
   badgeClasses,
   ensureOption,
@@ -11,7 +11,6 @@ import {
   type SelectColor,
   type SelectOption,
 } from '../dbschema'
-import type { BrowseResult } from '../types'
 import { tr } from '../i18n'
 
 interface Props {
@@ -218,7 +217,7 @@ function CellEditor({
   value: unknown
   anchor: HTMLDivElement | null
   onClose: () => void
-  onCommit: (v: unknown) => void
+  onCommit: (v: unknown) => void | Promise<void>
   onColumnChange?: (c: ColumnDef) => void
 }) {
   const popRef = useRef<HTMLDivElement>(null)
@@ -287,9 +286,12 @@ function CellEditor({
 
   if (column.type === 'path') {
     return (
-      <div ref={popRef} style={style} onClick={(e) => e.stopPropagation()}>
-        <PathPicker current={String(value ?? '')} onPick={(v) => onCommit(v)} onCancel={() => onCommit(String(value ?? ''))} />
-      </div>
+      <ProjectPathDialog
+        projectName={tr('프로젝트')}
+        initialPath={String(value ?? '')}
+        onClose={onClose}
+        onSelect={async (path) => { await onCommit(path) }}
+      />
     )
   }
 
@@ -328,7 +330,7 @@ function InlineInput({
 }: {
   column: ColumnDef
   value: unknown
-  onCommit: (v: unknown) => void
+  onCommit: (v: unknown) => void | Promise<void>
   onCancel: () => void
 }) {
   const [v, setV] = useState<string>(value == null ? '' : String(value))
@@ -532,103 +534,3 @@ function OptionPicker({
   )
 }
 
-// ─────────────────────────────────────────────────────────
-// PathPicker — path 타입 셀 편집 시 뜨는 폴더 탐색기
-// ─────────────────────────────────────────────────────────
-function PathPicker({
-  current,
-  onPick,
-  onCancel,
-}: {
-  current: string
-  onPick: (path: string) => void
-  onCancel: () => void
-}) {
-  const [browse, setBrowse] = useState<BrowseResult | null>(null)
-  const [input, setInput] = useState(current)
-  const [error, setError] = useState<string | null>(null)
-
-  const navigate = async (path?: string) => {
-    setError(null)
-    try {
-      const r = await api.browse(path)
-      setBrowse(r)
-      setInput(r.path)
-    } catch (e) {
-      setError((e as Error).message)
-    }
-  }
-
-  useEffect(() => {
-    navigate(current || undefined)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  return (
-    <div className="rounded-md border border-[#e3e2e0] bg-white shadow-lg">
-      <div className="flex items-center gap-1 border-b border-[#e9e9e7] p-1.5">
-        <button
-          className="rounded px-1.5 py-0.5 text-[11px] text-[#9b9a97] hover:bg-[#efefed] disabled:opacity-40"
-          onClick={() => browse?.parent && navigate(browse.parent)}
-          disabled={!browse?.parent}
-          title={tr("상위 폴더")}
-        >
-          ↑
-        </button>
-        <input
-          className="flex-1 rounded border border-[#e3e2e0] px-2 py-0.5 font-mono text-[11px] outline-none focus:border-[#8a8886]"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') navigate(input)
-          }}
-          placeholder={tr("/Users/... 경로 입력 또는 아래에서 선택")}
-        />
-        <button
-          className="rounded bg-[#37352f] px-2 py-0.5 text-[11px] font-medium text-white hover:bg-[#2b2925]"
-          onClick={() => onPick(input)}
-          title={tr("이 경로 사용")}
-        >
-
-          {tr("선택")}
-        </button>
-        <button
-          className="rounded px-1.5 py-0.5 text-[11px] text-[#9b9a97] hover:bg-[#efefed]"
-          onClick={onCancel}
-          title={tr("취소")}
-        >
-          ✕
-        </button>
-      </div>
-      <div className="max-h-64 overflow-y-auto p-1 text-[12px]">
-        {error && <p className="px-2 py-2 text-[#c92a2a]">{error}</p>}
-        {browse?.dirs.map((d) => (
-          <button
-            key={d.path}
-            className="flex w-full items-center gap-1.5 rounded px-2 py-1 text-left hover:bg-[#f7f7f5]"
-            onClick={() => navigate(d.path)}
-            onDoubleClick={() => onPick(d.path)}
-            title={tr("더블클릭으로 선택")}
-          >
-            <span className="text-[13px]">📁</span>
-            <span className="truncate text-[#37352f]">{d.name}</span>
-          </button>
-        ))}
-        {browse && browse.dirs.length === 0 && (
-          <p className="px-2 py-3 text-center text-[11px] text-[#9b9a97]">{tr("하위 폴더 없음")}</p>
-        )}
-      </div>
-      {browse?.home && (
-        <div className="border-t border-[#e9e9e7] p-1">
-          <button
-            className="rounded px-2 py-0.5 text-[10px] text-[#5f5e5b] hover:bg-[#efefed]"
-            onClick={() => navigate(browse.home)}
-          >
-
-            {tr("🏠 홈")}
-          </button>
-        </div>
-      )}
-    </div>
-  )
-}

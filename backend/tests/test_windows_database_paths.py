@@ -35,7 +35,7 @@ class WindowsDatabasePathTests(unittest.TestCase):
         relative = watcher._relevant(self.root, str(target))
 
         self.assertEqual("scopes/새 프로젝트.md", relative)
-        with patch("app.watcher.indexer.index_file") as index_file:
+        with patch("app.watcher.config.notes_dir", return_value=self.root), patch("app.watcher.indexer.index_file") as index_file:
             watcher._apply_to_index(Change.added, relative, self.root)
         index_file.assert_called_once_with("scopes/새 프로젝트.md")
 

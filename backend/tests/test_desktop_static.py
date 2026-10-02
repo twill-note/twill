@@ -35,6 +35,7 @@ class DesktopLifecycleTests(unittest.IsolatedAsyncioTestCase):
         watch_loop = AsyncMock()
         with (
             patch("app.main.config.ensure_dirs"),
+            patch("app.main.initialize_skillbook"),
             patch("app.main.ai_sessions.reconcile_stale_active_runs"),
             patch("app.main.indexer.full_scan"),
             patch("app.main.engine_registry.register"),

@@ -29,7 +29,7 @@ export default function Sidebar() {
     loadWorkspace().catch(() => {})
   }, [refreshTags, loadWorkspace])
 
-  const rootName = root ? root.split('/').filter(Boolean).pop() : null
+  const rootName = root ? root.split(/[\\/]/).filter(Boolean).pop() : null
 
   useEffect(() => {
     if (tagFilter) api.notesByTag(tagFilter).then(setTagNotes)

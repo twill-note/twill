@@ -1,3 +1,4 @@
+import { chatUrlTransform, remarkDocumentPaths } from '../chatDocumentLinks'
 import { AiApprovalMode, AiApprovalRequests } from './AiApprovalControls'
 import { notifyAiEngineChanged, offerAppRestart, subscribeAiEngineChanged } from '../aiMaintenance'
 import {
@@ -37,7 +38,7 @@ import { subscribeWorkspaceScopesChanged } from '../workspaceScopeEvents'
 import { tr } from '../i18n'
 
 // 배열을 렌더 때마다 새로 만들면 ReactMarkdown도 매번 새 플러그인 설정으로 판단한다.
-const MARKDOWN_REMARK_PLUGINS = [remarkGfm]
+const MARKDOWN_REMARK_PLUGINS = [remarkGfm, remarkDocumentPaths]
 
 /**
  * 벼리 패널 — 구 '실행' 탭(RunPanel)과 '벼리' 챗(codex 플러그인 RightPanel)을 통합한 시스템 탭.
@@ -459,6 +460,7 @@ const MessageBubble = memo(function MessageBubble({
           <div className="chat-md chat-assistant-bubble inline-block max-w-[92%] break-words rounded-lg bg-[#f7f7f5] px-3 py-2 text-left text-[13px] text-[#37352f]">
             <ReactMarkdown
               remarkPlugins={MARKDOWN_REMARK_PLUGINS}
+              urlTransform={chatUrlTransform}
               components={markdownComponents}
             >
               {m.streaming ? deferredContent : content}

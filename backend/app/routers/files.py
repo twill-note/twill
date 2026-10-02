@@ -6,7 +6,7 @@ import shutil
 import tempfile
 import time
 from pathlib import Path
-from urllib.parse import unquote
+from urllib.parse import unquote, urlsplit, parse_qs
 
 import frontmatter
 from fastapi import APIRouter, Form, HTTPException, UploadFile
@@ -48,7 +48,18 @@ def resolve_document_link_target(href: str | None) -> dict[str, str] | None:
     # URL 디코딩 뒤에도 다시 확인해 우회를 막는다.
     if raw.lower().startswith("file:"):
         return None
-    candidate = unquote(raw).replace("\\", "/")
+    canonical = raw.lower().startswith("twill:")
+    if canonical:
+        try:
+            url = urlsplit(raw)
+            values = parse_qs(url.query).get("path", [])
+            if url.netloc != "open" or url.path not in {"", "/"} or len(values) != 1:
+                return None
+            candidate = values[0].replace("\\", "/")
+        except ValueError:
+            return None
+    else:
+        candidate = unquote(raw).replace("\\", "/")
     if candidate.lower().startswith("file:"):
         return None
 
@@ -58,7 +69,8 @@ def resolve_document_link_target(href: str | None) -> dict[str, str] | None:
         return None
 
     # 헤딩 fragment/query는 파일 이름에 포함하지 않고, Codex의 줄/열 접미사는 제거한다.
-    candidate = re.split(r"[?#]", candidate, maxsplit=1)[0]
+    if not canonical:
+        candidate = re.split(r"[?#]", candidate, maxsplit=1)[0]
     candidate = _CODEX_LINE_REFERENCE_RE.sub(r"\1", candidate)
     if not candidate or "\x00" in candidate:
         return None

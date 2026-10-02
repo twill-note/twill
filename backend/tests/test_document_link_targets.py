@@ -46,6 +46,14 @@ class DocumentLinkTargetTests(unittest.TestCase):
             get_document_link_target("회의록/결정.md"),
         )
 
+    def test_canonical_twill_links_and_encoded_special_characters(self):
+        from urllib.parse import quote
+        for name, kind in [("회의록/결정.md", "note"), ("설계.erd.json", "erd"), ("설계 #1 (초안).md", "note")]:
+            (self.root / name).write_text("document", encoding="utf-8")
+            self.assertEqual({"kind": kind, "path": name}, resolve_document_link_target("twill://open?path=" + quote(name, safe="")))
+        for value in ["twill://open?path=../outside.md", "twill://wrong?path=설계.erd.json", "twill://open?path=.trash/삭제됨.md", "twill://open?path=file:///etc/note.md"]:
+            self.assertIsNone(resolve_document_link_target(value))
+
     def test_external_local_escape_and_missing_paths_are_never_targets(self):
         blocked = [
             f"file://{self.root / '회의록' / '결정.md'}",

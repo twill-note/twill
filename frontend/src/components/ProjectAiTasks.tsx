@@ -1,18 +1,19 @@
+import type { ProjectSession } from '../aiProjectGroups'
 import { useState } from 'react'
-import { useAiStore, type AiSession } from '../aiStore'
+import { useAiStore } from '../aiStore'
 import { SYSTEM_AI_TAB, useAppStore } from '../store'
 import { dialog } from '../dialog'
 import { tr } from '../i18n'
 
-export default function ProjectAiTasks({ projectId, sessions, error }: { projectId: string; sessions: AiSession[]; error: string }) {
+export default function ProjectAiTasks({ projectId, sessions, error }: { projectId: string; sessions: ProjectSession[]; error: string }) {
   const activeId = useAiStore((s) => s.activeSessionId)
   const root = useAppStore((s) => s.root)
   const storageKey = `ai-tasks-expanded:${root}:${projectId}`
   const [expanded, setExpanded] = useState(() => localStorage.getItem(storageKey) !== '0')
-  const [menu, setMenu] = useState<{ session: AiSession; x: number; y: number } | null>(null)
+  const [menu, setMenu] = useState<{ session: ProjectSession; x: number; y: number } | null>(null)
   const [deleting, setDeleting] = useState<string | null>(null)
   const [deleteError, setDeleteError] = useState('')
-  const deleteSession = async (session: AiSession) => {
+  const deleteSession = async (session: ProjectSession) => {
     setMenu(null)
     const confirmed = await dialog.confirm(`“${session.title}” 대화를 삭제할까요?`, {
       detail: `${session.busy || session.queued ? '진행 중이거나 대기 중인 AI 작업도 중단됩니다. ' : ''}대화 기록은 복구할 수 없습니다. 연결된 문서와 태스크 카드는 유지됩니다.`,

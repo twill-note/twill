@@ -97,7 +97,7 @@ class AppServerClient:
             log.warning("terminating stale app-server (pid=%s) before respawn", self._proc.pid)
             await self._stop()
         # stdio is the default transport; newer Codex versions no longer accept --stdio.
-        command, options, shell = codex_app_server_launch()
+        command, options, shell = await asyncio.to_thread(codex_app_server_launch)
         if shell:
             version_proc = await asyncio.create_subprocess_exec(
                 shell, "-NoLogo", "-NoProfile", "-NonInteractive", "-Command",
@@ -248,7 +248,8 @@ class AppServerClient:
                 }
             else:
                 try:
-                    output = handler(params.get("arguments"))
+                    output = (handler(params.get("arguments")) if inspect.iscoroutinefunction(handler)
+                              else await asyncio.to_thread(handler, params.get("arguments")))
                     if inspect.isawaitable(output):
                         output = await output
                     text = output if isinstance(output, str) else json.dumps(output, ensure_ascii=False)

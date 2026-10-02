@@ -1,3 +1,4 @@
+import type { AiSession } from '../src/aiStore.ts'
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { sessionProjectId } from '../src/aiProjectGroups.ts'
@@ -15,4 +16,13 @@ test('deleted projects and unassigned conversations remain at Root', () => {
   assert.equal(sessionProjectId({ sectionId: 'deleted', scopeId: 'shared' }, sections), null)
   assert.equal(sessionProjectId({ sectionId: null, scopeId: 'deleted' }, sections), null)
   assert.equal(sessionProjectId({ sectionId: null, scopeId: null }, sections), null)
+})
+
+test('project navigation does not rerender on AI message chunks', async () => {
+  const { createProjectSessionSelector } = await import('../src/aiProjectGroups.ts')
+  const select = createProjectSessionSelector()
+  const session = { id: 'one', title: 'Test', busy: true, queued: false, scopeId: null, sectionId: null } as AiSession
+  const first = select({ sessions: [session] })
+  assert.equal(select({ sessions: [{ ...session, messages: [{ role: 'assistant', content: 'new chunk' }] }] }), first)
+  assert.notEqual(select({ sessions: [{ ...session, busy: false }] }), first)
 })

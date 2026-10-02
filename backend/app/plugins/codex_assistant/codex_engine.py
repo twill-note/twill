@@ -24,7 +24,7 @@ from ...ai_app_tools import (
 from .app_server import client as app_server, AppServerError
 from .codex_cli import resolve_codex_installation
 
-from .cli import codex_command
+from .cli import command_for_binary, codex_process_options, stop_codex_process
 
 log = logging.getLogger("codex_engine")
 
@@ -606,15 +606,20 @@ class CodexEngine:
         return next_turn_id
 
     async def status(self) -> dict[str, Any]:
-        installation = resolve_codex_installation()
+        installation = await asyncio.to_thread(resolve_codex_installation)
         if not installation:
             return {"available": False, "logged_in": False, "detail": "codex CLI가 설치되어 있지 않습니다"}
         try:
             proc = await asyncio.create_subprocess_exec(
-                *codex_command("login", "status"),
+                *command_for_binary(installation.binary, "login", "status"),
                 stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+                **codex_process_options(),
             )
-            out, err = await proc.communicate()
+            try:
+                out, err = await asyncio.wait_for(proc.communicate(), timeout=15)
+            except asyncio.TimeoutError:
+                await stop_codex_process(proc)
+                raise AppServerError("Codex 로그인 상태 조회 시간이 초과되었습니다.")
         except FileNotFoundError:
             return {"available": False, "logged_in": False, "detail": "codex CLI를 실행할 수 없습니다"}
         text = (out.decode(errors="ignore") + err.decode(errors="ignore")).strip()

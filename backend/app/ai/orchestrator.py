@@ -1984,7 +1984,7 @@ class Orchestrator:
         # (챗 모드는 run log 를 만들지 않음 — 대화는 세션에 영속화된다.)
         if is_task:
             try:
-                log_path_partial = _write_run_log(
+                log_path_partial = await asyncio.to_thread(_write_run_log,
                     run_id=run_id,
                     task_path=req.task_path,
                     engine_id=engine.id,
@@ -2188,7 +2188,7 @@ class Orchestrator:
             ) and (now - last_incremental_write) > 0.5
             if should_flush and log_path_partial:
                 try:
-                    _write_run_log(
+                    await asyncio.to_thread(_write_run_log,
                         run_id=run_id,
                         task_path=req.task_path,
                         engine_id=engine.id,
@@ -2273,7 +2273,7 @@ class Orchestrator:
 
         if is_task:
             try:
-                log_path = _write_run_log(
+                log_path = await asyncio.to_thread(_write_run_log,
                     run_id=run_id,
                     task_path=req.task_path,
                     engine_id=engine.id,

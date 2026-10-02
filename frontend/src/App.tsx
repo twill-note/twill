@@ -1,3 +1,4 @@
+import { useShallow } from 'zustand/react/shallow'
 import AiPlacement from './components/AiPlacement'
 import CodexUpdateNotice from './components/CodexUpdateNotice'
 import { useEffect } from 'react'
@@ -25,7 +26,10 @@ import { tr } from './i18n'
 export default function App() {
   // Subscribe at the application root so source-keyed copy in all child screens refreshes on language changes.
   useTranslation()
-  const { view, root, workspaceReady, refreshTree, setPaletteOpen, openToday, openRightTab, refreshPlugins } = useAppStore()
+  const { view, root, workspaceReady, refreshTree, setPaletteOpen, openToday, openRightTab, refreshPlugins } = useAppStore(useShallow(s => ({
+    view: s.view, root: s.root, workspaceReady: s.workspaceReady, refreshTree: s.refreshTree,
+    setPaletteOpen: s.setPaletteOpen, openToday: s.openToday, openRightTab: s.openRightTab, refreshPlugins: s.refreshPlugins,
+  })))
 
   useEffect(() => {
     refreshTree().catch(() => {
@@ -93,6 +97,18 @@ export default function App() {
     let debounce: number | undefined
     let retry: number | undefined
     let disposed = false
+    let refreshing = false
+    let dirty = false
+    const refresh = async () => {
+      debounce = undefined
+      if (disposed || refreshing) return
+      refreshing = true
+      dirty = false
+      const { refreshTree, refreshTags } = useAppStore.getState()
+      await Promise.allSettled([refreshTree(), refreshTags()])
+      refreshing = false
+      if (dirty && !disposed) debounce = window.setTimeout(() => void refresh(), 500)
+    }
 
     const connect = () => {
       const proto = window.location.protocol === 'https:' ? 'wss' : 'ws'
@@ -103,12 +119,9 @@ export default function App() {
         } catch {
           // Older backends may send a non-JSON ping; filesystem refresh below remains safe.
         }
-        window.clearTimeout(debounce)
-        debounce = window.setTimeout(() => {
-          const { refreshTree, refreshTags } = useAppStore.getState()
-          refreshTree().catch(() => {})
-          refreshTags().catch(() => {})
-        }, 250)
+        // Continuous AI writes must not postpone refresh forever or overlap requests.
+        dirty = true
+        if (debounce === undefined && !refreshing) debounce = window.setTimeout(() => void refresh(), 500)
       }
       ws.onclose = () => {
         if (!disposed) retry = window.setTimeout(connect, 3000)

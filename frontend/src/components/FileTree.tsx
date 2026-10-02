@@ -1,4 +1,5 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useShallow } from 'zustand/react/shallow'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../api'
 import { useAppStore } from '../store'
 import type { Section, TreeNode } from '../types'
@@ -9,7 +10,7 @@ import { useAiStore } from '../aiStore'
 import { notifyWorkspaceScopesChanged } from '../workspaceScopeEvents'
 import { useBackdropDismiss } from '../useBackdropDismiss'
 import ProjectAiTasks from './ProjectAiTasks'
-import { sessionProjectId } from '../aiProjectGroups'
+import { createProjectSessionSelector, sessionProjectId } from '../aiProjectGroups'
 import { tr } from '../i18n'
 
 interface MenuState {
@@ -70,7 +71,12 @@ export default function FileTree() {
     saveSections,
     closeFile,
     openDatabase,
-  } = useAppStore()
+  } = useAppStore(useShallow(s => ({
+    tree: s.tree, sections: s.sections, currentPath: s.currentPath, erdPath: s.erdPath, root: s.root,
+    openFile: s.openFile, openErdDesigner: s.openErdDesigner, createErdDiagram: s.createErdDiagram,
+    refreshTree: s.refreshTree, refreshTags: s.refreshTags, refreshSections: s.refreshSections,
+    saveSections: s.saveSections, closeFile: s.closeFile, openDatabase: s.openDatabase,
+  })))
   const rootName = root?.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || root || tr('문서')
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [rootExpanded, setRootExpandedState] = useState<boolean>(() => localStorage.getItem('filetree.root-expanded') !== '0')
@@ -92,7 +98,8 @@ export default function FileTree() {
   const [templating, setTemplating] = useState<{ dir: string } | null>(null)
   const [dragOver, setDragOver] = useState<string | null>(null)
   const [dragOverSection, setDragOverSection] = useState<string | null>(null)
-  const sessions = useAiStore((s) => s.sessions)
+  const projectSessionSelector = useMemo(createProjectSessionSelector, [])
+  const sessions = useAiStore(projectSessionSelector)
   const [sessionsError, setSessionsError] = useState('')
 
   useEffect(() => {

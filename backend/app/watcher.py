@@ -42,6 +42,8 @@ def _relevant(root: Path, raw: str) -> str | None:
 
 
 def _apply_to_index(change: Change, rel: str, root: Path) -> None:
+    if config.notes_dir() != root:
+        return
     abs_path = root / rel
     if change == Change.deleted:
         indexer.remove(rel)
@@ -83,7 +85,7 @@ async def watch_loop() -> None:
                     if rel is None:
                         continue
                     try:
-                        _apply_to_index(change, rel, root)
+                        await asyncio.to_thread(_apply_to_index, change, rel, root)
                     except OSError:
                         pass
                     touched.append(rel)

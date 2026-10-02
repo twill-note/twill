@@ -1,3 +1,4 @@
+import { createStreamBatcher } from './streamBatcher'
 /**
  * 벼리(AI) 다중 세션 전역 상태 — 구 runStore(단일 실행)를 대체.
  *
@@ -979,8 +980,7 @@ export const useAiStore = create<AiStoreState>((set, get) => {
         break
       }
       case 'turn_done':
-        // steer 뒤에는 백엔드가 원래 작업을 자동으로 이어갈 다음 turn을 곧 시작할 수 있다.
-        // 그 짧은 전환 구간에는 끝난 turnId로 지시가 붙지 않도록 입력만 잠시 비활성화한다.
+        // 엔진 턴은 끝났으며 서버에서 기록 저장을 마무리한다.
         patch(id, { currentStatus: '결과를 정리하는 중', turnId: null })
         break
       case 'run_log':
@@ -1186,6 +1186,7 @@ export const useAiStore = create<AiStoreState>((set, get) => {
         ws.send(JSON.stringify({ type: 'cancel' }))
       }
     }
+    const eventBatcher = createStreamBatcher(msg => { if (isCurrentSocket()) handleEvent(id, msg) })
     ws.onmessage = (ev) => {
       if (!isCurrentSocket()) return
       let msg: RunEvent
@@ -1194,13 +1195,14 @@ export const useAiStore = create<AiStoreState>((set, get) => {
       } catch {
         return
       }
-      handleEvent(id, msg)
+      eventBatcher.push(msg)
     }
     ws.onerror = () => {
       if (!isCurrentSocket()) return
       patch(id, { currentStatus: '연결 상태를 확인하는 중' })
     }
     ws.onclose = () => {
+      eventBatcher.flush()
       if (!isCurrentSocket()) return
       flushAssistantDeltas(id)
       sockets.delete(id)
@@ -1220,6 +1222,8 @@ export const useAiStore = create<AiStoreState>((set, get) => {
     }
   }
 
+  let sessionsLoading: Promise<void> | null = null
+
   // ── 스토어 본체 ─────────────────────────────────────────
   return {
     sessions: [],
@@ -1232,6 +1236,8 @@ export const useAiStore = create<AiStoreState>((set, get) => {
     runLogVersion: 0,
 
     loadSessions: async () => {
+      if (sessionsLoading) return sessionsLoading
+      sessionsLoading = (async () => {
       try {
         const { sessions: metas } = await api.ai.listSessions()
         const savedRuntime = readPersistedTaskRuntime()
@@ -1400,6 +1406,8 @@ export const useAiStore = create<AiStoreState>((set, get) => {
         // A failed list request is not evidence that restored conversations were deleted.
         set({ sessionsLoaded: false })
       }
+      })()
+      try { await sessionsLoading } finally { sessionsLoading = null }
     },
 
     newChatSession: async (opts) => {

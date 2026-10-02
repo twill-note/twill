@@ -50,6 +50,30 @@ class DynamicSkillBookToolTests(unittest.TestCase):
         self.assertTrue(payload["result"]["success"])
         self.assertIn('"query": "노트"', payload["result"]["contentItems"][0]["text"])
 
+    def test_blocking_tool_does_not_block_event_loop(self):
+        import threading
+        async def exercise():
+            client = AppServerClient()
+            client._proc = _FakeProcess()
+            entered, release = threading.Event(), threading.Event()
+            def slow_tool(arguments):
+                entered.set()
+                release.wait(2)
+                return "ok"
+            client.register_dynamic_tool("slow", slow_tool)
+            task = asyncio.create_task(client._respond_to_server_request(8, "item/tool/call", {"tool": "slow"}))
+            try:
+                for _ in range(100):
+                    if entered.is_set():
+                        break
+                    await asyncio.sleep(.001)
+                self.assertTrue(entered.is_set())
+                self.assertFalse(task.done(), "A blocking handler must run outside the event loop")
+            finally:
+                release.set()
+                await task
+        asyncio.run(exercise())
+
     def test_new_codex_thread_registers_dynamic_tools(self):
         async def run():
             with patch(

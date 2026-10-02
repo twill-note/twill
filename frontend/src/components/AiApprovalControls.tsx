@@ -88,6 +88,10 @@ export function AiApprovalRequests({ sessionId, busy }: { sessionId: string; bus
       <p>{item.reason || tr('AI가 추가 권한을 요청했습니다.')}</p>
       {item.cwd && <p className="break-all">{item.cwd}</p>}
       {item.command && <pre className="max-h-32 overflow-auto whitespace-pre-wrap">{item.command}</pre>}
+      {item.details && Object.keys(item.details).length > 0 && <details>
+        <summary>{tr('요청 범위 상세')}</summary>
+        <pre className="max-h-40 overflow-auto whitespace-pre-wrap">{JSON.stringify(item.details, null, 2)}</pre>
+      </details>}
       <div className="mt-2 flex gap-2">
         <button disabled={answering === item.id} onClick={() => void answer(item.id, 'accept')} className="rounded border px-3 py-1">{tr('허용')}</button>
         <button disabled={answering === item.id} onClick={() => void answer(item.id, 'decline')} className="rounded border px-3 py-1">{tr('거절')}</button>

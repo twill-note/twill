@@ -695,4 +695,4 @@ export type ErdDiagramSummary = {
   relations: number
 }
 
-export type AiApprovalRequest = { id: string; thread_id: string; method: string; reason: string; command: string; cwd: string }
+export type AiApprovalRequest = { id: string; thread_id: string; method: string; reason: string; command: string; cwd: string; details?: Record<string, unknown> }

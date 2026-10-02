@@ -58,6 +58,28 @@ app.whenReady().then(async () => {
         ai.setState({activeSessionId:a})
         app.getState().openRightTab(SYSTEM_AI_TAB)
         await waitFor(()=>input(a),'restored conversation missing on first open')
+        // Fake approval requests exercise the UI without executing a live AI turn.
+        const mode = panel(a).querySelector('[aria-label="AI 실행 승인 모드"]')
+        assert(mode, 'approval mode selector missing')
+        mode.value = 'on-request'; mode.dispatchEvent(new Event('change', { bubbles:true }))
+        assert(localStorage.getItem('twill.ai.approval.'+a)==='on-request','approval mode not saved')
+        const originalApprovals = api.aiApprovals, originalAnswer = api.answerAiApproval
+        let answered = false
+        api.aiApprovals = async id => ({ requests: id === a && !answered ? [{id:'qa-approval',thread_id:'qa-thread',method:'item/commandExecution/requestApproval',reason:'QA approval',command:'git status',cwd:'/tmp'}] : [] })
+        api.answerAiApproval = async (id, decision) => { assert(id==='qa-approval'&&decision==='decline','wrong approval response');answered=true;return {ok:true} }
+        ai.setState(state=>({sessions:state.sessions.map(session=>session.id===a?{...session,busy:true,runStartedAt:Date.now()-125000,messages:[{role:'assistant',content:'[QA 문서](twill://open?path=qa-tabs.md)'}]}:session)}))
+        await waitFor(()=>panel(a)?.textContent.includes('QA approval'),'approval request missing')
+        assert(!answered,'approval auto accepted')
+        await waitFor(()=>panel(a)?.querySelector('a[title="문서 열기: qa-tabs.md"]'),'internal generated document link missing')
+        panel(a).querySelector('a[title="문서 열기: qa-tabs.md"]').click()
+        await waitFor(()=>app.getState().currentPath==='qa-tabs.md','document navigation blocked during AI run')
+        const decline=[...panel(a).querySelectorAll('button')].find(button=>button.textContent==='거절')
+        decline.click()
+        await waitFor(()=>answered,'approval decision not delivered')
+        api.aiApprovals=originalApprovals;api.answerAiApproval=originalAnswer
+        app.getState().closeTab('file:qa-tabs.md'); await pause()
+        ai.setState(state=>({sessions:state.sessions.map(session=>session.id===a?{...session,busy:false,runStartedAt:null,messages:[]}:session)}))
+
         assert(app.getState().view==='editor'&&app.getState().openTabs.length===0,'first AI open occupied the empty editor')
         assert(app.getState().dockedAiTabId==='ai:'+a&&app.getState().rightDockOpen,'first AI open must use the right dock')
         assert(document.querySelector('#right-tool-panel').contains(panel(a)),'first conversation is outside the right dock')
@@ -154,7 +176,7 @@ app.whenReady().then(async () => {
         assert(app.getState().aiTabId==='ai:'+a,'task action opened the wrong conversation')
         await runAllTasks([{path:'qa-1.md',props:{}},{path:'qa-2.md',props:{}}]);await pause()
         assert(app.getState().aiTabId==='ai:'+b,'batch plan did not open its conversation')
-        return {defaultRightDock:true,existingPlacementPreserved:true,independentMessages:true,independentDrafts:true,independentScroll:true,attachments:true,sendRouting:true,cancelRouting:true,contextRouting:true,newConversationTab:true,splitAndDock:true,renameSync:true,closeWithoutDelete:true,deleteCleanup:true,boardReturn:true,taskEntry:true}
+        return {approvalMode:true,approvalDecision:true,documentLinkDuringRun:true,defaultRightDock:true,existingPlacementPreserved:true,independentMessages:true,independentDrafts:true,independentScroll:true,attachments:true,sendRouting:true,cancelRouting:true,contextRouting:true,newConversationTab:true,splitAndDock:true,renameSync:true,closeWithoutDelete:true,deleteCleanup:true,boardReturn:true,taskEntry:true}
       } catch (error) { throw new Error(error.stack) } finally { window.__twillQaSessions=fixtureIds }
     })()`)
     console.log(JSON.stringify(result))

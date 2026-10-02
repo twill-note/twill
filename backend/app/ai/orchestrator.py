@@ -809,7 +809,7 @@ def prompt_runtime_info() -> dict[str, Any]:
                 },
                 {
                     "title": "승인 정책",
-                    "value": DEFAULT_APPROVAL,
+                    "value": codex_cfg.get("default_approval") or DEFAULT_APPROVAL,
                     "description": "실행별 선택 또는 태스크 관리의 기본 승인 모드를 사용합니다.",
                 },
             ],

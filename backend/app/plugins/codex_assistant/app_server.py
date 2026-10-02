@@ -275,7 +275,9 @@ class AppServerClient:
                         "id": request_id, "thread_id": thread_id, "method": method,
                         "reason": str(params.get("reason") or ""),
                         "command": str(params.get("command") or ""),
-                        "cwd": str(params.get("cwd") or ""), "future": future,
+                        "cwd": str(params.get("cwd") or ""),
+                        "details": {key: params[key] for key in ("commandActions", "changes", "grantRoot", "additionalPermissions", "networkApprovalContext") if params.get(key) is not None},
+                        "future": future,
                     }
                     try:
                         result = await future

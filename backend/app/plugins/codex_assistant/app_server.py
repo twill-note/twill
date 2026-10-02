@@ -21,7 +21,7 @@ import json
 import logging
 from typing import Any, Callable
 
-from .cli import codex_command, codex_process_options, stop_codex_process
+from .cli import codex_app_server_launch, stop_codex_process
 
 log = logging.getLogger("plugins.codex_assistant.app_server")
 
@@ -75,6 +75,7 @@ class AppServerClient:
         self._start_lock = asyncio.Lock()
         self._initialized = False
         self.maintenance_reason: str | None = None
+        self.shell_context = ""
 
     # ─────────────────────────────────────────────────────────
     # 프로세스 라이프사이클
@@ -98,13 +99,37 @@ class AppServerClient:
             log.warning("terminating stale app-server (pid=%s) before respawn", self._proc.pid)
             await self._stop()
         # stdio is the default transport; newer Codex versions no longer accept --stdio.
+        command, options, shell = codex_app_server_launch()
+        if shell:
+            version_proc = await asyncio.create_subprocess_exec(
+                shell, "-NoLogo", "-NoProfile", "-NonInteractive", "-Command",
+                "$PSVersionTable.PSVersion.ToString()",
+                stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL,
+                **options,
+            )
+            try:
+                output, _ = await asyncio.wait_for(version_proc.communicate(), timeout=10)
+            except asyncio.TimeoutError:
+                await stop_codex_process(version_proc)
+                raise AppServerError("PowerShell 버전 확인 시간이 초과되었습니다.")
+            version = output.decode(errors="replace").strip()
+            if version_proc.returncode != 0 or not version:
+                raise AppServerError("PowerShell 버전을 확인하지 못했습니다.")
+            self.shell_context = (
+                f"\nWindows shell: {shell}; PowerShell version: {version}. "
+                "Use this executable explicitly for shell tools. "
+                "PowerShell 5.1 does not support && or ||; preserve conditional execution "
+                "using $? or $LASTEXITCODE. For UTF-8 output use "
+                "[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new()."
+            )
+            log.info("Codex shell selected: path=%s version=%s sandbox=workspace-write", shell, version)
         proc = await asyncio.create_subprocess_exec(
-            *codex_command("app-server"),
+            *command,
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             limit=_STREAM_LIMIT,
-            **codex_process_options(),
+            **options,
         )
         self._proc = proc
         self._next_id = 1
@@ -157,6 +182,8 @@ class AppServerClient:
             await self.ensure_started()
         if not self._proc or not self._proc.stdin:
             raise AppServerError("app-server 프로세스가 실행 중이 아닙니다")
+        if method in {"thread/start", "thread/resume"} and self.shell_context:
+            params = {**(params or {}), "developerInstructions": str((params or {}).get("developerInstructions") or "") + self.shell_context}
         msg_id = self._next_id
         self._next_id += 1
         fut: asyncio.Future = asyncio.get_running_loop().create_future()

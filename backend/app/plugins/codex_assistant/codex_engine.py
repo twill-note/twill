@@ -438,7 +438,6 @@ class CodexEngine:
         config: dict[str, Any] | None = None,
     ) -> AsyncIterator[dict[str, Any]]:
         """turn/start 후 스트리밍 알림을 AIEngine 표준 이벤트로 변환해서 yield."""
-        await app_server.ensure_started()
 
         turn_done_event = asyncio.Event()
         events: asyncio.Queue[dict | None] = asyncio.Queue()
@@ -512,6 +511,7 @@ class CodexEngine:
         if (config or {}).get("output_schema"):
             turn_params["outputSchema"] = config["output_schema"]
 
+        app_server.set_approval_policy(thread_id, (config or {}).get("approval", "on-request"))
         try:
             await app_server.request("turn/start", turn_params, timeout=30)
         except AppServerError as e:
@@ -559,6 +559,7 @@ class CodexEngine:
             self._active_turn_ids.pop(thread_id, None)
 
     async def interrupt(self, *, thread_id: str, turn_id: str | None = None) -> None:
+        app_server.clear_approvals(thread_id)
         if not turn_id:
             return
         try:

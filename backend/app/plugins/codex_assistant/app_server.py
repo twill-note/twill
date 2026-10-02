@@ -19,6 +19,7 @@ from collections import deque
 import inspect
 import json
 import logging
+import uuid
 from typing import Any, Callable
 
 from .cli import codex_app_server_launch, stop_codex_process
@@ -43,16 +44,10 @@ def _app_server_command(binary: str) -> tuple[str, str]:
     return binary, "app-server"
 
 
-# codex app-server 가 클라이언트에게 보내는 승인 요청(id 있는 request) 에 대한 기본 응답.
-# sandbox="workspace-write" 로 워크스페이스 내부 파일 작업은 대부분 승인 요청 자체가 없지만,
-# 커맨드 실행/네트워크 접근 등 sandbox 밖 escalation 은 여전히 요청이 올 수 있음.
-# 응답을 안 주면 codex 가 해당 턴에서 영원히 대기 → 클라이언트 쪽 turn 타임아웃(응답 시간 초과)으로만 끝남.
-# 단일 사용자 로컬 워크스페이스이므로 자동 승인해서 턴이 멈추지 않게 한다.
-_AUTO_APPROVAL_RESULTS: dict[str, dict] = {
-    "item/commandExecution/requestApproval": {"decision": "accept"},
-    "execCommandApproval": {"decision": "accept"},
-    "item/fileChange/requestApproval": {"decision": "accept"},
-    "applyPatchApproval": {"decision": "accept"},
+# Both current and legacy command/file approval requests need an explicit answer.
+_APPROVAL_METHODS = {
+    "item/commandExecution/requestApproval", "execCommandApproval",
+    "item/fileChange/requestApproval", "applyPatchApproval",
 }
 
 
@@ -76,6 +71,9 @@ class AppServerClient:
         self._initialized = False
         self.maintenance_reason: str | None = None
         self.shell_context = ""
+        self._approval_policies: dict[str, str] = {}
+        self._approvals: dict[str, dict] = {}
+        self._server_tasks: set[asyncio.Task] = set()
 
     # ─────────────────────────────────────────────────────────
     # 프로세스 라이프사이클
@@ -159,7 +157,11 @@ class AppServerClient:
     async def _stop(self) -> None:
         if self._proc:
             await stop_codex_process(self._proc)
-        tasks = [task for task in (self._reader_task, self._stderr_task) if task]
+        tasks = [task for task in (self._reader_task, self._stderr_task) if task] + list(self._server_tasks)
+        for task in self._server_tasks:
+            task.cancel()
+        self._approvals.clear()
+        self._approval_policies.clear()
         if self._reader_task:
             self._reader_task.cancel()
         if self._stderr_task:
@@ -208,6 +210,24 @@ class AppServerClient:
         """thread/start에 노출한 동적 도구의 앱 측 실행기를 등록한다."""
         self._dynamic_tool_handlers[name] = handler
 
+    def set_approval_policy(self, thread_id: str, policy: str) -> None:
+        self._approval_policies[thread_id] = policy
+
+    def pending_approvals(self) -> list[dict]:
+        return [{k: v for k, v in item.items() if k != "future"} for item in self._approvals.values()]
+
+    def resolve_approval(self, request_id: str, decision: str) -> bool:
+        item = self._approvals.get(request_id)
+        if not item or item["future"].done():
+            return False
+        item["future"].set_result({"decision": decision})
+        return True
+
+    def clear_approvals(self, thread_id: str) -> None:
+        for item in list(self._approvals.values()):
+            if item["thread_id"] == thread_id and not item["future"].done():
+                item["future"].set_result({"decision": "cancel"})
+
     async def _respond_to_server_request(
         self,
         msg_id: Any,
@@ -215,6 +235,7 @@ class AppServerClient:
         params: dict[str, Any],
     ) -> None:
         """codex 가 보낸 승인/입력 요청(request)에 응답. 응답이 없으면 codex 가 무기한 대기한다."""
+        process = self._proc
         if method == "item/tool/call":
             tool_name = str(params.get("tool") or "")
             handler = self._dynamic_tool_handlers.get(tool_name)
@@ -242,15 +263,36 @@ class AppServerClient:
                         "contentItems": [{"type": "inputText", "text": str(exc)}],
                     }
         else:
-            result = _AUTO_APPROVAL_RESULTS.get(method)
-        if result is None:
-            log.warning("unhandled server request '%s' — 빈 결과로 자동 응답", method)
-            result = {}
-        elif method != "item/tool/call":
-            log.info("auto-approving server request '%s'", method)
-        if not self._proc or not self._proc.stdin:
+            if method in _APPROVAL_METHODS:
+                thread_id = str(params.get("threadId") or params.get("conversationId") or "")
+                if self._approval_policies.get(thread_id) == "never":
+                    result = {"decision": "decline"}
+                elif thread_id in self._approval_policies:
+                    request_id = uuid.uuid4().hex
+                    future = asyncio.get_running_loop().create_future()
+                    self._approvals[request_id] = {
+                        "id": request_id, "thread_id": thread_id, "method": method,
+                        "reason": str(params.get("reason") or ""),
+                        "command": str(params.get("command") or ""),
+                        "cwd": str(params.get("cwd") or ""), "future": future,
+                    }
+                    try:
+                        result = await future
+                    finally:
+                        self._approvals.pop(request_id, None)
+                else:
+                    result = {"decision": "decline"}
+            else:
+                result = None
+        if not self._proc or self._proc is not process or not self._proc.stdin:
             return
-        payload = {"jsonrpc": "2.0", "id": msg_id, "result": result}
+        if result is None:
+            log.warning("unsupported server request: %s", method)
+            payload = {"jsonrpc": "2.0", "id": msg_id, "error": {"code": -32601, "message": f"Twill does not support {method}"}}
+        else:
+            if method in {"execCommandApproval", "applyPatchApproval"}:
+                result = {"decision": {"accept": "approved", "decline": "denied", "cancel": "abort"}[result["decision"]]}
+            payload = {"jsonrpc": "2.0", "id": msg_id, "result": result}
         try:
             self._proc.stdin.write((json.dumps(payload) + "\n").encode())
             await self._proc.stdin.drain()
@@ -319,8 +361,12 @@ class AppServerClient:
                 if "id" in msg:
                     # 서버(codex)가 클라이언트에게 보낸 request (승인/입력 요청 등).
                     # JSON-RPC notification 은 id 가 없으므로 이 분기로 들어오지 않음.
-                    await self._respond_to_server_request(msg["id"], method, params)
+                    task = asyncio.create_task(self._respond_to_server_request(msg["id"], method, params))
+                    self._server_tasks.add(task)
+                    task.add_done_callback(self._server_tasks.discard)
                     continue
+                if method in {"turn/completed", "thread/closed"}:
+                    self.clear_approvals(str(params.get("threadId") or ""))
                 for listener in list(self._listeners):
                     try:
                         listener(method, params)
@@ -354,6 +400,10 @@ class AppServerClient:
                     fut.set_exception(AppServerError(f"app-server 프로세스가 종료됨 ({detail})"))
             self._pending.clear()
             self._initialized = False
+            for task in self._server_tasks:
+                task.cancel()
+            self._approvals.clear()
+            self._approval_policies.clear()
             # 진행 중인 턴 구독자들에게 연결 단절을 알림 — 이게 없으면 run_turn 이
             # turn/completed 를 기다리며 영원히 매달린다 (13:00 실행 33분 고착의 직접 원인).
             for listener in list(self._listeners):

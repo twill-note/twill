@@ -48,8 +48,8 @@ SYSTEM_AI_NAME = "Twill AI"
 # GPT-5.6 3티어(sol/terra/luna) 중 terra 가 가격 대비 성능 기본값으로 적합 (2026-07 기준).
 DEFAULT_MODEL = "gpt-5.6-terra"
 DEFAULT_EFFORT = "xhigh"
-# 승인 선택은 앱에 노출하지 않는다. AI 실행은 항상 사용자 승인 없이 진행한다.
-ALWAYS_ALLOW_APPROVAL = "never"
+# 요청·태스크별 설정이 없으면 사용자에게 필요한 승인을 요청한다.
+DEFAULT_APPROVAL = "on-request"
 
 def _system_identity_preamble() -> str:
     """모든 실행(챗·태스크)에 공통으로 주입되는 정체성 + 스킬북 탐색 규칙.
@@ -813,8 +813,8 @@ def prompt_runtime_info() -> dict[str, Any]:
                 },
                 {
                     "title": "승인 정책",
-                    "value": ALWAYS_ALLOW_APPROVAL,
-                    "description": "시스템 정책으로 항상 승인 없이 실행합니다.",
+                    "value": DEFAULT_APPROVAL,
+                    "description": "실행별 선택 또는 태스크 관리의 기본 승인 모드를 사용합니다.",
                 },
             ],
         },
@@ -1264,6 +1264,7 @@ class RunRequest:
         engine_id: str | None = None,
         model: str | None = None,
         effort: str | None = None,
+        approval: str | None = None,
         output_schema: dict | None = None,
         task_board_dir: str = "tasks",
         max_time_sec: int | None = None,
@@ -1289,6 +1290,9 @@ class RunRequest:
         self.engine_id = engine_id
         self.model = model
         self.effort = effort
+        if approval not in {None, "never", "on-request"}:
+            raise ValueError("지원하지 않는 승인 모드입니다.")
+        self.approval = approval
         self.output_schema = output_schema
         self.task_board_dir = task_board_dir
         self.max_time_sec = max_time_sec
@@ -1529,6 +1533,9 @@ class Orchestrator:
 
     def __init__(self) -> None:
         self._active: dict[str, _ActiveRun] = {}
+
+    def active_threads_for_session(self, session_id: str) -> set[str]:
+        return {run.thread_id for run in self._active.values() if run.session_id == session_id and run.thread_id}
 
     def has_active_runs(self) -> bool:
         """Codex 실행 서버를 재시작해선 안 되는 진행 중 실행이 있는지 반환한다."""
@@ -1791,7 +1798,9 @@ class Orchestrator:
             or codex_cfg.get("default_effort")
             or DEFAULT_EFFORT
         )
-        approval = ALWAYS_ALLOW_APPROVAL
+        approval = req.approval or (task_meta or {}).get("approval") or codex_cfg.get("default_approval") or DEFAULT_APPROVAL
+        if approval not in {"never", "on-request"}:
+            approval = DEFAULT_APPROVAL
 
         start_config: dict[str, Any] = {}
         if model:

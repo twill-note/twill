@@ -483,6 +483,7 @@ class CodexDefaults(BaseModel):
     # GPT-5.6 3티어 중 terra: gpt-5.5 동급 성능에 비용 절반 — 앱 기본값 (orchestrator.DEFAULT_MODEL 과 일치)
     default_model: str = "gpt-5.6-terra"
     default_effort: str = "xhigh"
+    default_approval: Literal["on-request", "never"] = "on-request"
 
 
 class ExplorerSettings(BaseModel):

@@ -1,3 +1,4 @@
+import { AiApprovalMode, AiApprovalRequests } from './AiApprovalControls'
 import { notifyAiEngineChanged, offerAppRestart, subscribeAiEngineChanged } from '../aiMaintenance'
 import {
   isValidElement,
@@ -1613,6 +1614,7 @@ export default function ByeoriPanel({
 
   return (
     <div className="relative flex h-full flex-col bg-white" data-ai-conversation={activeSessionId ?? 'new'}>
+      {active && <AiApprovalRequests sessionId={active.id} busy={active.busy} />}
       {/* 헤더에는 선택한 대화 하나만 두고, 목록·수정은 드롭다운에서 처리한다. */}
       <div className="relative flex h-8 shrink-0 items-center gap-2 border-b border-[#e9e9e7] bg-[#f7f7f5] px-3 text-[12px] text-[#5f5e5b]">
         <button
@@ -1630,6 +1632,7 @@ export default function ByeoriPanel({
           <span className="min-w-0 flex-1 truncate">{sessionId !== undefined ? tr("대화 목록") : active ? active.title : 'Twill AI'}</span>
           <span className="text-[9px] text-[#9b9a97]">▾</span>
         </button>
+        {active && <AiApprovalMode sessionId={active.id} disabled={active.busy || active.queued} />}
         {currentModel && (
           <button
             className="flex items-center gap-1 rounded border border-transparent px-1.5 py-0.5 text-[11px] hover:border-[#e3e2e0] hover:bg-white"

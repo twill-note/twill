@@ -1,3 +1,4 @@
+import { AiApprovalDefault } from './AiApprovalControls'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { api } from '../api'
 import { useAiStore } from '../aiStore'
@@ -625,7 +626,10 @@ export default function DatabaseView() {
           onChange={(e) => setFilter(e.target.value)}
         />
         {config.kind === 'task_board' && (
-          <ProjectFilterPicker options={projectOptions} value={projectFilter} onChange={selectProjectFilter} />
+          <>
+            <ProjectFilterPicker options={projectOptions} value={projectFilter} onChange={selectProjectFilter} />
+            <AiApprovalDefault />
+          </>
         )}
         {config.kind !== 'scopes_board' && (
           <div className="ml-2 flex rounded-md bg-[#ececea] p-0.5 text-[12px]">

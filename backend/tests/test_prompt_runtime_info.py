@@ -4,7 +4,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from app.ai.engine import registry as engine_registry
-from app.ai.orchestrator import ALWAYS_ALLOW_APPROVAL, prompt_runtime_info
+from app.ai.orchestrator import DEFAULT_APPROVAL, prompt_runtime_info
 
 
 class PromptRuntimeInfoTests(unittest.TestCase):
@@ -43,7 +43,7 @@ class PromptRuntimeInfoTests(unittest.TestCase):
         tools = next(item for item in info["tooling"]["items"] if item["title"] == "도구 목록")
         self.assertIn("search_memories", tools["value"])
         approval = next(item for item in info["tooling"]["items"] if item["title"] == "승인 정책")
-        self.assertEqual(ALWAYS_ALLOW_APPROVAL, approval["value"])
+        self.assertEqual(DEFAULT_APPROVAL, approval["value"])
         self.assertFalse(any(item["title"] == "도구 호출 한도" for item in info["tooling"]["items"]))
 
 

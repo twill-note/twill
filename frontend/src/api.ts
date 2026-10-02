@@ -232,6 +232,10 @@ export const api = {
   openWorkspace: (path: string) =>
     request<{ root: string; indexed: number }>('/api/workspace/open', json('POST', { path })),
 
+  aiApprovals: (sessionId: string) => request<{ requests: AiApprovalRequest[] }>(`/api/ai/approvals?session_id=${encodeURIComponent(sessionId)}`),
+  answerAiApproval: (id: string, decision: 'accept' | 'decline' | 'cancel') =>
+    request<{ ok: boolean }>(`/api/ai/approvals/${encodeURIComponent(id)}`, json('POST', { decision })),
+
   browse: (path?: string) =>
     request<BrowseResult>(`/api/workspace/browse${path ? `?path=${encodeURIComponent(path)}` : ''}`),
 
@@ -655,6 +659,7 @@ export type WorkspaceCodexDefaults = {
   memories_ref: string
   default_model: string
   default_effort: string
+  default_approval?: 'on-request' | 'never'
 }
 
 export type WorkspaceSettings = {
@@ -689,3 +694,5 @@ export type ErdDiagramSummary = {
   tables: number
   relations: number
 }
+
+export type AiApprovalRequest = { id: string; thread_id: string; method: string; reason: string; command: string; cwd: string }

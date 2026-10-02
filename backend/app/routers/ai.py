@@ -5,6 +5,7 @@ import json
 import logging
 import re
 import asyncio
+from typing import Literal
 from contextlib import asynccontextmanager, suppress
 
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
@@ -44,6 +45,23 @@ async def engine_maintenance(reason: str):
         yield
     finally:
         codex_app_server.maintenance_reason = None
+
+
+class ApprovalDecision(BaseModel):
+    decision: Literal["accept", "decline", "cancel"]
+
+
+@router.get("/approvals")
+async def pending_approvals(session_id: str):
+    thread_ids = orchestrator.active_threads_for_session(session_id)
+    return {"requests": [item for item in codex_app_server.pending_approvals() if item["thread_id"] in thread_ids]}
+
+
+@router.post("/approvals/{request_id}")
+async def answer_approval(request_id: str, body: ApprovalDecision):
+    if not codex_app_server.resolve_approval(request_id, body.decision):
+        raise HTTPException(status_code=409, detail="이미 처리되었거나 종료된 승인 요청입니다.")
+    return {"ok": True}
 
 
 @router.get("/updates")
@@ -502,7 +520,6 @@ async def run_ws(ws: WebSocket):
       client 가 그 run_id 에 대해 steer/cancel 할 수 있음.
     """
     await ws.accept()
-    import asyncio
 
     current_run_id: str | None = None
     cancel_requested = False
@@ -626,6 +643,7 @@ async def run_ws(ws: WebSocket):
             engine_id=data.get("engine_id") or None,
             model=data.get("model") or None,
             effort=data.get("effort") or None,
+            approval=data.get("approval") or None,
             output_schema=data.get("output_schema") or None,
             max_time_sec=data.get("max_time_sec"),
             session_id=data.get("session_id") or None,

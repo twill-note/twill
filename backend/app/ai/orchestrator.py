@@ -1509,20 +1509,7 @@ class _ActiveRun:
         self.turn_id: str | None = None
         self.cancelled = False
         self.interrupt_sent = False
-        # app-server의 turn/steer는 추가 지시를 처리할 새 turn을 만들지만, 그 turn이
-        # 끝났다고 최초 작업 전체가 끝난 것은 아니다. steer마다 세대를 올리고, 실행
-        # 루프가 해당 세대까지 한 번 자동 재개했는지를 기록한다.
-        self.steer_generation = 0
-        self.resumed_steer_generation = 0
 
-
-_CONTINUE_AFTER_STEER_PROMPT = """[진행 중 작업 자동 이어쓰기]
-직전 응답은 작업 도중 받은 추가 지시를 처리하기 위해 끝난 turn입니다. 이것은 전체 사용자 요청이 완료되었다는 뜻이 아닙니다.
-
-대화의 최초 사용자 요청과 이후 받은 모든 추가 지시를 다시 확인하세요. 아직 수행·검증·보고하지 않은 최초 요청의 작업은 계속 수행하고, 추가 지시도 그 결과에 반영하세요. 직전의 짧은 확인 답변만 반복하거나 작업을 끝내지 마세요. 모든 요구사항을 실제로 완료했을 때만 최종 결과를 보고하세요.
-
-단, 사용자가 최초 작업을 명시적으로 중단·취소·대체하라고 했다면 그 최신 명시를 따르세요.
-"""
 
 
 def _error_code(message: str) -> str:
@@ -1557,7 +1544,12 @@ class Orchestrator:
         files: list[dict] | None = None,
     ) -> bool:
         run = self._active.get(run_id)
-        if not run or not run.thread_id or not run.turn_id:
+        if not run or not run.thread_id:
+            return False
+        from .run_control import requests_pause
+        if requests_pause(guidance):
+            return await self.interrupt(run_id)
+        if not run.turn_id or run.cancelled:
             return False
         image_paths = _resolve_image_paths(images)
         file_attachments = _resolve_file_attachments(files)
@@ -1589,11 +1581,6 @@ class Orchestrator:
             # 이전 turn에 붙지 않게 갱신하되, 기존 엔진(None 반환)과도 호환한다.
             if isinstance(next_turn_id, str) and next_turn_id:
                 run.turn_id = next_turn_id
-            # turn/steer는 "추가 입력을 받은 turn"의 완료까지만 보장한다. 그 turn이
-            # 짧은 답변으로 끝나도 최초 작업을 이어갈 수 있도록 run 루프가 다음 정상
-            # turn을 시작하게 표시한다. 여러 지시가 연달아 오면 마지막 steer 뒤에 한 번만
-            # 재개한다.
-            run.steer_generation += 1
             return True
         except Exception:  # noqa: BLE001
             log.exception("steer failed")
@@ -2044,25 +2031,7 @@ class Orchestrator:
                 else:
                     ev = await anext(stream_iter)
             except StopAsyncIteration:
-                # Codex의 steer turn은 사용자의 추가 지시(예: "네라고 답해")를 처리한
-                # 뒤 종료될 수 있다. 이 종료를 전체 실행 종료로 취급하면 원래 작업이
-                # 사라진다. steer가 있었고 취소/오류가 아니라면 같은 thread에서 한 번 더
-                # 정상 turn을 열어 미완료 원래 작업을 계속한다. 이 동안 WebSocket 실행은
-                # 유지되므로 UI도 완료 상태로 바뀌지 않는다.
-                if (
-                    active.steer_generation > active.resumed_steer_generation
-                    and not active.cancelled
-                    and not error_seen
-                ):
-                    active.resumed_steer_generation = active.steer_generation
-                    active.turn_id = None
-                    stream = engine.run_turn(
-                        thread_id=thread_id,
-                        input_text=_CONTINUE_AFTER_STEER_PROMPT,
-                        config=turn_config,
-                    )
-                    stream_iter = stream.__aiter__()
-                    continue
+                # turn/completed is authoritative; steering never authorizes another turn.
                 break
             except TimeoutError:
                 budget_hit = f"응답 시간 초과 ({max_time_sec}s)"

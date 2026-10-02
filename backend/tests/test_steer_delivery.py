@@ -54,7 +54,7 @@ class SteerDeliveryTests(unittest.TestCase):
         self.assertTrue(delivered)
         self.assertEqual(["/tmp/steer-image.png"], self.engine.last_images)
 
-    def test_steer_completion_resumes_the_original_run(self):
+    def test_steer_completion_does_not_start_another_turn(self):
         class ContinuingEngine:
             id = "continuing-test"
             display_name = "Continuing test"
@@ -106,8 +106,8 @@ class SteerDeliveryTests(unittest.TestCase):
             events = asyncio.run(exercise())
 
         self.assertEqual("원래 작업", engine.inputs[0])
-        self.assertIn("진행 중 작업 자동 이어쓰기", engine.inputs[1])
-        self.assertIn("원래 작업 계속", "".join(event.get("text", "") for event in events))
+        self.assertEqual(1, len(engine.inputs))
+        self.assertNotIn("원래 작업 계속", "".join(event.get("text", "") for event in events))
 
     def test_codex_adapter_uses_current_steer_protocol_and_returns_turn_id(self):
         request = AsyncMock(return_value={"turnId": "turn-2"})
@@ -143,11 +143,11 @@ class SteerDeliveryTests(unittest.TestCase):
             timeout=5,
         )
 
-    def test_steer_input_explicitly_keeps_the_original_task_active(self):
+    def test_steer_input_prioritizes_latest_pause_and_completion(self):
         input_text = codex_engine_module._compose_continuing_steer_input("'네'라고 답해")
 
-        self.assertIn("원래 작업을 취소하거나 이 메시지로 대체하지 마세요", input_text)
-        self.assertIn("짧은 응답만으로 작업이나 턴을 마무리하지 말고", input_text)
+        self.assertIn("중단·일시 중지·취소·범위 변경 요청을 즉시 우선하세요", input_text)
+        self.assertIn("사용자 답변을 기다려야 할 때는 턴을 종료하세요", input_text)
         self.assertTrue(input_text.endswith("[사용자의 추가 지시]\n'네'라고 답해"))
 
     def test_turn_becomes_steerable_only_after_turn_started_notification(self):

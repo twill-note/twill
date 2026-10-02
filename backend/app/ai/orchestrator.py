@@ -210,15 +210,6 @@ def _write_run_log(
 
 
 # '확인 필요' 로 넘기기 전, 사용자가 검증할 수 있게 실행 결과를 구조화 보고하도록 요구하는 프롬프트.
-VERIFY_REPORT_PROMPT = """방금 완료한 태스크 실행을 사용자가 검증할 수 있도록 실행 보고서를 작성해줘.
-
-아래 JSON 형식으로만 응답해 (다른 설명·인사 금지):
-{"done": ["실제로 수행한 작업 — 파일/명령 단위로 구체적으로"],
- "verify": ["사용자가 직접 확인해야 할 사항 — 무엇을 어떻게 확인하는지"],
- "issues": ["작업 중 발생한 오류·경고·해결하지 못한 문제 (없으면 빈 배열)"]}
-
-각 항목은 한국어 한 문장씩. 실제로 하지 않은 일을 지어내지 마."""
-
 # 태스크 카드 본문에 기록하는 실행 보고 섹션의 고정 헤딩 — 재실행 시 이 헤딩부터 끝까지 교체된다.
 # 이전 이름을 포함한 헤딩도 인식해, 기존 카드가 재실행될 때 보고가 중복되지 않게 한다.
 TASK_REPORT_HEADING = "## 🤖 Twill AI 실행 보고"
@@ -751,11 +742,11 @@ def prompt_runtime_info() -> dict[str, Any]:
         },
         {
             "id": "verify-report",
-            "stage": "실행 후처리 프롬프트",
-            "title": "실행 보고서 생성 지시",
+            "stage": "실행 후처리",
+            "title": "실행 보고서 저장",
             "source": "내장 · 태스크 완료 후",
             "included": False,
-            "content": VERIFY_REPORT_PROMPT,
+            "content": "추가 AI 실행 없이 최종 답변을 태스크 실행 보고서에 저장합니다.",
         },
         {
             "id": "explicit-memory-extract",
@@ -2307,25 +2298,12 @@ class Orchestrator:
             )
             yield {"type": "task_status", "task_path": req.task_path, "status": next_status}
 
-        # '확인 필요' 검증 보고 — 수행 내용 / 확인 사항 / 오류를 카드 본문에 구조화 기록.
-        # 정상 완료면 같은 스레드에 보고 턴을 한 번 더 돌려 구체적 내용을 받고,
-        # 오류/중단이면 엔진 호출 없이 최소 보고(오류 내용)만 남긴다.
+        # 최종 답변을 그대로 보고서에 기록한다. 보고서만 만들기 위한 추가 AI 턴은
+        # 완료를 지연하고, 중단 대상과 승인 컨텍스트가 없는 숨은 실행을 만들었다.
         if is_task and req.task_path:
-            report_done: list[str] = []
-            report_verify: list[str] = []
+            report_done = [final_text] if final_text.strip() else []
+            report_verify = ["실행 로그(run_log)의 최종 답변과 변경 사항을 직접 확인하세요"]
             report_issues: list[str] = []
-            if not error_seen and not interrupted and final_text.strip():
-                try:
-                    report_data = await _run_background_json(engine, thread_id, VERIFY_REPORT_PROMPT)
-                    if isinstance(report_data, dict):
-                        report_done = [str(x).strip() for x in report_data.get("done") or [] if str(x).strip()]
-                        report_verify = [str(x).strip() for x in report_data.get("verify") or [] if str(x).strip()]
-                        report_issues = [str(x).strip() for x in report_data.get("issues") or [] if str(x).strip()]
-                except Exception as e:  # noqa: BLE001
-                    log.info("verify report turn skipped: %s", e)
-                if not report_done and not report_verify:
-                    # 보고 턴 실패 시 최소 안내 (실행 로그로 유도)
-                    report_verify = ["실행 로그(run_log)의 최종 답변과 변경 사항을 직접 확인하세요"]
             try:
                 _write_task_report(
                     req.task_path,

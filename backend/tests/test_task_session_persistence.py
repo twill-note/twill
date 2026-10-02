@@ -90,8 +90,11 @@ class TaskSessionPersistenceTests(unittest.TestCase):
         async def collect():
             return [event async for event in Orchestrator().run(RunRequest(session_id=session["id"], task_path=self.task_path))]
 
-        events = asyncio.run(collect())
+        with patch("app.ai.orchestrator._run_background_json", new_callable=AsyncMock) as background:
+            events = asyncio.run(collect())
+        background.assert_not_awaited()
         saved = sessions.get_session(session["id"])
+        self.assertIn("태스크를 완료했습니다.", (self.root / self.task_path).read_text(encoding="utf-8"))
 
         self.assertTrue(any(event.get("type") == "session_updated" for event in events))
         self.assertEqual([], [message for message in saved["messages"] if message["role"] == "user"])

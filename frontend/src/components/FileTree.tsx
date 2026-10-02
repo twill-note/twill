@@ -71,6 +71,7 @@ export default function FileTree() {
     closeFile,
     openDatabase,
   } = useAppStore()
+  const rootName = root?.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || root || tr('문서')
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [rootExpanded, setRootExpandedState] = useState<boolean>(() => localStorage.getItem('filetree.root-expanded') !== '0')
   const setRootExpanded = (v: boolean) => {
@@ -230,7 +231,7 @@ export default function FileTree() {
   const unassigned = tree.filter((n) => !assigned.has(n.path))
   if (unassigned.length > 0 || projectSessions.has(UNASSIGNED_ID) || sections.length === 0) {
     displaySections.push({
-      id: UNASSIGNED_ID, name: 'Root', expanded: rootExpanded, nodes: unassigned,
+      id: UNASSIGNED_ID, name: rootName, expanded: rootExpanded, nodes: unassigned,
       system: true,
     })
   }
@@ -378,7 +379,7 @@ export default function FileTree() {
     try {
       if (!target.scope_id) {
         const ok = await dialog.confirm(`프로젝트 "${target.name}"을(를) 삭제할까요?`, {
-          detail: '프로젝트의 폴더와 노트는 그대로 유지되며 "Root" 로 이동합니다.',
+          detail: `프로젝트의 폴더와 노트는 그대로 유지되며 "${rootName}"로 이동합니다.`,
           confirmLabel: '프로젝트 삭제',
           danger: true,
         })
@@ -868,7 +869,7 @@ export default function FileTree() {
                     )
                   })}
                   <MenuItem
-                    label={tr('Root (프로젝트에서 빼기)')}
+                    label={`${rootName} (${tr('프로젝트에서 빼기')})`}
                     onClick={() => {
                       moveToSection(menu.node!.path, null)
                       setMenu(null)

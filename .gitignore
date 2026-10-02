@@ -83,3 +83,6 @@ htmlcov/
 Thumbs.db
 Desktop.ini
 *:Zone.Identifier
+
+# 로컬 진단·Codex 비교 검토 문서 (배포 및 Git 추적 제외)
+/.local-reviews/

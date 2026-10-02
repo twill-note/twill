@@ -802,7 +802,9 @@ export const useAiStore = create<AiStoreState>((set, get) => {
         patch(id, { contextInfo: msg })
         break
       case 'run_id':
-        patch(id, { runId: String(msg.run_id ?? '') })
+        patch(id, { runId: String(msg.run_id ?? ''),
+          ...(typeof msg.started_at === 'number' && Number.isFinite(msg.started_at) ? { runStartedAt: msg.started_at * 1000 } : {}),
+        })
         {
           const session = get().sessions.find((s) => s.id === id)
           if (session?.activeTaskPath || session?.kind === 'task') {

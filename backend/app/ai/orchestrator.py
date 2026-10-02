@@ -1978,7 +1978,7 @@ class Orchestrator:
         if req.task_path:
             _update_task_frontmatter(req.task_path, {"status": "running", "current_run": run_id})
 
-        yield {"type": "run_id", "run_id": run_id}
+        yield {"type": "run_id", "run_id": run_id, "started_at": started_at}
 
         # 실행 시작 즉시 run log 파일을 만들어서 프론트가 미리 열어두고 스트리밍 감상 가능하게.
         # (챗 모드는 run log 를 만들지 않음 — 대화는 세션에 영속화된다.)

@@ -520,6 +520,8 @@ function commonWindowOptions() {
     icon: appIconPath,
     show: false,
     webPreferences: {
+      // AI stream delivery and task queue timers continue while minimized.
+      backgroundThrottling: false,
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,

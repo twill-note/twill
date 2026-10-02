@@ -1106,9 +1106,16 @@ export default function ByeoriPanel({
   // 보이지 않게, busy가 해제되면 타이머도 바로 정리한다.
   useEffect(() => {
     if (!active?.busy || !active.runStartedAt) return
-    setProgressNow(Date.now())
-    const timer = window.setInterval(() => setProgressNow(Date.now()), 1000)
-    return () => window.clearInterval(timer)
+    const refreshClock = () => setProgressNow(Date.now())
+    refreshClock()
+    const timer = window.setInterval(refreshClock, 1000)
+    window.addEventListener('focus', refreshClock)
+    document.addEventListener('visibilitychange', refreshClock)
+    return () => {
+      window.clearInterval(timer)
+      window.removeEventListener('focus', refreshClock)
+      document.removeEventListener('visibilitychange', refreshClock)
+    }
   }, [active?.busy, active?.runStartedAt])
 
   // ── 모델/강도 ──

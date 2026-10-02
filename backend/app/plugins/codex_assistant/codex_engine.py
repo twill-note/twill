@@ -206,6 +206,10 @@ def _error_event(error: object) -> dict:
     """Codex turn 오류를 프런트 공통 오류 스키마로 정규화한다."""
     data = error if isinstance(error, dict) else {}
     message = str(data.get("message") or "Codex 요청을 완료하지 못했습니다.")
+    if "CreateProcessAsUserW failed" in message:
+        return {"type": "error", "code": "shell_spawn_failed", "stage": "shell_spawn",
+                "message": "Windows에서 명령 실행 전 셸 생성에 실패했습니다. "
+                "Twill을 완전히 종료 후 다시 실행하고 진단 로그의 선택 셸 경로·버전을 확인하세요. " + message}
     code = data.get("codexErrorInfo")
     if code == "usageLimitExceeded":
         return {"type": "error", "code": "usage_limit_exceeded", "message": message}

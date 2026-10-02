@@ -1,9 +1,16 @@
 import unittest
 
-from app.plugins.codex_assistant.codex_engine import _classify
+from app.plugins.codex_assistant.codex_engine import _classify, _error_event
 
 
 class CodexEventMappingTests(unittest.TestCase):
+    def test_windows_shell_spawn_error_has_distinct_failure_stage(self):
+        event = _error_event({"message": "CreateProcessAsUserW failed: 5"})
+        self.assertEqual("shell_spawn_failed", event["code"])
+        self.assertEqual("shell_spawn", event["stage"])
+        self.assertIn("failed: 5", event["message"])
+        self.assertNotEqual("shell_spawn_failed", _error_event({"message": "command failed"}).get("code"))
+
     def test_command_events_keep_the_same_tool_item_id(self):
         started = _classify(
             "item/started",

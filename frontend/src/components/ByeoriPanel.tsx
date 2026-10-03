@@ -1623,7 +1623,6 @@ export default function ByeoriPanel({
 
   return (
     <div className="relative flex h-full flex-col bg-white" data-ai-conversation={activeSessionId ?? 'new'}>
-      {active && <AiApprovalRequests sessionId={active.id} busy={active.busy} />}
       {/* 헤더에는 선택한 대화 하나만 두고, 목록·수정은 드롭다운에서 처리한다. */}
       <div className="relative flex h-8 shrink-0 items-center gap-2 border-b border-[#e9e9e7] bg-[#f7f7f5] px-3 text-[12px] text-[#5f5e5b]">
         <button
@@ -1941,6 +1940,8 @@ export default function ByeoriPanel({
           openErdDesigner={openErdDesigner}
           onPreviewImage={setPreviewImage}
         />
+
+        {active && <AiApprovalRequests key={active.id} sessionId={active.id} busy={active.busy} />}
 
         {active && (active.busy || active.queued) && (
           <WorkingStatus session={active} now={progressNow} onCancel={() => cancel(active.id)} />

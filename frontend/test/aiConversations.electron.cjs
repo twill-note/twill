@@ -3,7 +3,7 @@
 const { app, BrowserWindow } = require('electron')
 const fs = require('node:fs')
 app.whenReady().then(async () => {
-  const win = new BrowserWindow({ show: false, width: 1600, height: 1000, webPreferences: { contextIsolation: true, nodeIntegration: false } })
+  const win = new BrowserWindow({ show: false, width: 1600, height: 1000, webPreferences: { backgroundThrottling: false, contextIsolation: true, nodeIntegration: false } })
   let failed = false
   try {
     await win.loadURL(process.env.TWILL_QA_URL || 'http://127.0.0.1:5178')
@@ -70,6 +70,18 @@ app.whenReady().then(async () => {
         ai.setState(state=>({sessions:state.sessions.map(session=>session.id===a?{...session,busy:true,runStartedAt:Date.now()-125000,messages:[{role:'assistant',content:'[QA 문서](twill://open?path=qa-tabs.md)'}]}:session)}))
         await waitFor(()=>panel(a)?.textContent.includes('QA approval'),'approval request missing')
         assert(!answered,'approval auto accepted')
+        const { useThemeStore, THEMES } = await import(url('/src/theme.ts'))
+        const previousTheme = useThemeStore.getState().theme
+        for (const theme of THEMES) {
+          useThemeStore.getState().setTheme(theme.id); await pause()
+          const card=panel(a).querySelector('[aria-label="실행 승인 요청"]')
+          const style=getComputedStyle(card)
+          assert(style.backgroundColor!==style.color, 'approval colors collide: '+theme.id)
+          assert(style.backgroundColor!=='rgb(255, 251, 235)', 'hardcoded amber background: '+theme.id)
+        }
+        useThemeStore.getState().setTheme(previousTheme)
+
+        assert(panel(a).querySelector('[data-ai-message-scroll] [aria-label="실행 승인 요청"]'), 'approval must be inside message stream')
         await waitFor(()=>panel(a)?.querySelector('a[title="문서 열기: qa-tabs.md"]'),'internal generated document link missing')
         panel(a).querySelector('a[title="문서 열기: qa-tabs.md"]').click()
         await waitFor(()=>app.getState().currentPath==='qa-tabs.md','document navigation blocked during AI run')

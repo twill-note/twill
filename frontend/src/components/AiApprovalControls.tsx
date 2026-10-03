@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { api, type AiApprovalRequest } from '../api'
 import { tr } from '../i18n'
 
@@ -52,6 +52,7 @@ export function AiApprovalDefault() {
 }
 
 export function AiApprovalRequests({ sessionId, busy }: { sessionId: string; busy: boolean }) {
+  const cardRef = useRef<HTMLDivElement>(null)
   const [requests, setRequests] = useState<AiApprovalRequest[]>([])
   const [error, setError] = useState('')
   const [answering, setAnswering] = useState<string | null>(null)
@@ -71,6 +72,14 @@ export function AiApprovalRequests({ sessionId, busy }: { sessionId: string; bus
     void refresh()
     return () => { disposed = true; clearTimeout(timer) }
   }, [sessionId, busy])
+  const requestIds = requests.map(item => item.id).join(',')
+  useEffect(() => {
+    const card = cardRef.current
+    const stream = card?.closest<HTMLElement>('[data-ai-message-scroll]')
+    if (card && stream && requestIds && stream.scrollHeight - stream.scrollTop - stream.clientHeight < card.offsetHeight + 80) {
+      stream.scrollTop = stream.scrollHeight
+    }
+  }, [requestIds])
   const answer = async (id: string, decision: 'accept' | 'decline') => {
     setAnswering(id)
     try {
@@ -81,20 +90,20 @@ export function AiApprovalRequests({ sessionId, busy }: { sessionId: string; bus
     finally { setAnswering(null) }
   }
   if (!busy) return null
-  return <div className="shrink-0 text-[12px]">
+  return <div ref={cardRef} className="space-y-2 text-[12px] text-[#37352f]">
     {error && <p role="alert" className="px-3 text-red-600">{tr('승인 요청 조회 실패')}: {error}</p>}
-    {requests.map(item => <div key={item.id} className="border-b border-amber-200 bg-amber-50 p-3" role="region" aria-label={tr('실행 승인 요청')}>
+    {requests.map(item => <div key={item.id} className="space-y-2 rounded-lg border border-[#e3e2e0] bg-[#fbfbfa] p-3" role="region" aria-label={tr('실행 승인 요청')}>
       <strong>{tr('실행 승인 요청')}</strong>
       <p>{item.reason || tr('AI가 추가 권한을 요청했습니다.')}</p>
       {item.cwd && <p className="break-all">{item.cwd}</p>}
-      {item.command && <pre className="max-h-32 overflow-auto whitespace-pre-wrap">{item.command}</pre>}
+      {item.command && <pre className="max-h-32 overflow-auto whitespace-pre-wrap break-all rounded bg-[#f1f1ef] p-2">{item.command}</pre>}
       {item.details && Object.keys(item.details).length > 0 && <details>
         <summary>{tr('요청 범위 상세')}</summary>
         <pre className="max-h-40 overflow-auto whitespace-pre-wrap">{JSON.stringify(item.details, null, 2)}</pre>
       </details>}
       <div className="mt-2 flex gap-2">
-        <button disabled={answering === item.id} onClick={() => void answer(item.id, 'accept')} className="rounded border px-3 py-1">{tr('허용')}</button>
-        <button disabled={answering === item.id} onClick={() => void answer(item.id, 'decline')} className="rounded border px-3 py-1">{tr('거절')}</button>
+        <button disabled={answering === item.id} onClick={() => void answer(item.id, 'accept')} className="rounded border border-[#e3e2e0] bg-white px-3 py-1 text-[#37352f] hover:bg-[#f1f1ef] disabled:opacity-50">{tr('허용')}</button>
+        <button disabled={answering === item.id} onClick={() => void answer(item.id, 'decline')} className="rounded border border-[#e3e2e0] bg-white px-3 py-1 text-[#37352f] hover:bg-[#f1f1ef] disabled:opacity-50">{tr('거절')}</button>
       </div>
     </div>)}
   </div>

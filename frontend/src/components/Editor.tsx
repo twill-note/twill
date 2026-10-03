@@ -1,3 +1,4 @@
+import DocumentFind from './DocumentFind'
 import { registerRestartGuard } from '../restartGuards'
 import { exportDocumentPdf } from '../exportPdf'
 import { markdownWithoutSnapshot, preserveBlocks, restoreBlocks } from '../blockPersistence'
@@ -712,6 +713,7 @@ function NoteEditor({
   const [tagInput, setTagInput] = useState('')
   const [links, setLinks] = useState<NoteLinks | null>(null)
   const [documentTaskOpen, setDocumentTaskOpen] = useState(false)
+  const findScopeRef = useRef<HTMLDivElement>(null)
   const editorWrapRef = useRef<HTMLDivElement>(null)
   const contentScrollRef = useRef<HTMLDivElement>(null)
   const [editorWidth, setEditorWidth] = useState<EditorWidth>(
@@ -1026,7 +1028,8 @@ function NoteEditor({
   )
 
   return (
-    <div className="flex h-full flex-col">
+    <div ref={findScopeRef} tabIndex={-1} className="flex h-full flex-col">
+      <DocumentFind scope={findScopeRef} body={editorWrapRef} scroll={contentScrollRef} />
       <header className="flex items-center gap-2 border-b border-[#efefed] px-4 py-2">
         <button
           className="rounded px-1.5 py-0.5 text-[14px] text-[#9b9a97] hover:bg-[#f1f1ef] hover:text-[#37352f]"

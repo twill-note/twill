@@ -649,6 +649,7 @@ function EditorPane({
       className={`relative flex min-h-0 min-w-0 flex-1 flex-col bg-white ${
         canClosePanel && isActivePanel ? 'ring-1 ring-inset ring-[#4a9eff]/45' : ''
       }`}
+      data-active-document-panel={isActivePanel || undefined}
       onMouseDown={() => onFocusPanel(panel.id)}
       aria-label={tr("편집 패널")}
       onDragOver={(event) => {

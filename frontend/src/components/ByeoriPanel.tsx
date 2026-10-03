@@ -36,6 +36,7 @@ import MentionPopover, { type MentionState } from './MentionPopover'
 import { MermaidExpandButton, MermaidPreview } from './MermaidBlock'
 import { subscribeWorkspaceScopesChanged } from '../workspaceScopeEvents'
 import { tr } from '../i18n'
+import { useTranslation } from 'react-i18next'
 
 // 배열을 렌더 때마다 새로 만들면 ReactMarkdown도 매번 새 플러그인 설정으로 판단한다.
 const MARKDOWN_REMARK_PLUGINS = [remarkGfm, remarkDocumentPaths]
@@ -714,7 +715,18 @@ function formatElapsed(startedAt: number, now: number): string {
   const totalSeconds = Math.max(0, Math.floor((now - startedAt) / 1000))
   const minutes = Math.floor(totalSeconds / 60)
   const seconds = totalSeconds % 60
-  return minutes > 0 ? `${minutes}분 ${String(seconds).padStart(2, '0')}초` : `${seconds}초`
+  return minutes > 0 ? tr('{{minutes}}분 {{seconds}}초', { minutes, seconds: String(seconds).padStart(2, '0') }) : tr('{{seconds}}초', { seconds })
+}
+
+function translateWorkingStatus(status: string | null): string {
+  if (!status) return tr('작업을 계속하는 중')
+  // Keep filenames/tool labels intact; translate the surrounding runtime copy.
+  const prefix = status.match(/^(파일 수정 중|파일 수정 완료|명령 실행 중|명령 실행 완료) · (.*)$/s)
+  if (prefix) return `${tr(prefix[1])} · ${prefix[2]}`
+  if (tr(status) !== status) return tr(status)
+  const suffix = status.match(/^(.*) (실패|완료|중)$/s)
+  if (suffix) return tr(`{{label}} ${suffix[2]}`, { label: tr(suffix[1]) })
+  return tr(status)
 }
 
 function WorkingStatus({
@@ -726,15 +738,16 @@ function WorkingStatus({
   now: number
   onCancel: () => void
 }) {
+  useTranslation()
   const waiting = session.queued
   const elapsed = session.runStartedAt ? formatElapsed(session.runStartedAt, now) : null
   return (
     <div
       className="flex min-w-0 items-center gap-2 px-1 py-1 text-[11px] text-[#5f5e5b]"
-      aria-label={waiting ? tr("실행 대기 중") : `작업 중${elapsed ? `, ${elapsed}` : ''}`}
+      aria-label={waiting ? tr("실행 대기 중") : `${tr('작업 중')}${elapsed ? `, ${elapsed}` : ''}`}
     >
       <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${waiting ? 'bg-[#c09a38]' : 'animate-pulse bg-[#4a7ccc]'}`} />
-      <span className="shrink-0 font-semibold text-[#37352f]">{waiting ? 'Waiting' : 'Working'}</span>
+      <span className="shrink-0 font-semibold text-[#37352f]">{waiting ? tr('대기 중') : tr('작업 중')}</span>
       {!waiting && (
         <span className="flex shrink-0 items-end gap-px" aria-hidden="true">
           <span className="animate-bounce" style={{ animationDelay: '0ms' }}>.</span>
@@ -744,7 +757,7 @@ function WorkingStatus({
       )}
       {elapsed && <span className="shrink-0 tabular-nums text-[#7d7c78]">({elapsed})</span>}
       <span className="min-w-0 flex-1 truncate text-[#7d7c78]">
-        {waiting ? tr("실행을 기다리는 중") : session.currentStatus || tr("작업을 계속하는 중")}
+        {waiting ? tr("실행을 기다리는 중") : translateWorkingStatus(session.currentStatus)}
       </span>
       <button
         type="button"
@@ -759,38 +772,39 @@ function WorkingStatus({
 }
 
 function formatLimitReset(resetsAt: number | null): string {
-  if (!resetsAt) return '갱신 시각 미정'
+  if (!resetsAt) return tr('갱신 시각 미정')
   const remainingMs = resetsAt * 1000 - Date.now()
-  if (remainingMs <= 0) return '곧 갱신'
+  if (remainingMs <= 0) return tr('곧 갱신')
   const totalMinutes = Math.ceil(remainingMs / 60_000)
-  if (totalMinutes < 60) return `${totalMinutes}분 후 갱신`
+  if (totalMinutes < 60) return tr('{{minutes}}분 후 갱신', { minutes: totalMinutes })
   const hours = Math.floor(totalMinutes / 60)
   const minutes = totalMinutes % 60
-  return minutes ? `${hours}시간 ${minutes}분 후 갱신` : `${hours}시간 후 갱신`
+  return minutes ? tr('{{hours}}시간 {{minutes}}분 후 갱신', { hours, minutes }) : tr('{{hours}}시간 후 갱신', { hours })
 }
 
 /** 한도 윈도우 길이로 라벨 결정 — 300분≈5시간, 10080분≈주간. 정보가 없으면 fallback. */
 function limitWindowLabel(limit: AiUsageLimitWindow | null, fallback: string): string {
   const mins = limit?.window_duration_mins
-  if (!mins) return `${fallback} 한도`
-  if (mins < 60 * 24) return `${Math.round(mins / 60)}시간 한도`
+  if (!mins) return tr('{{window}} 한도', { window: fallback })
+  if (mins < 60 * 24) return tr('{{hours}}시간 한도', { hours: Math.round(mins / 60) })
   const days = Math.round(mins / (60 * 24))
-  return days === 7 ? '주간 한도' : `${days}일 한도`
+  return days === 7 ? tr('주간 한도') : tr('{{days}}일 한도', { days })
 }
 
 function UsageLimitMeter({ label, limit }: { label: string; limit: AiUsageLimitWindow | null }) {
+  useTranslation()
   if (!limit) {
     return <span className="text-[#9b9a97]">{label}  {tr("정보를 받을 수 없음")}</span>
   }
   const remaining = Math.max(0, 100 - limit.used_percent)
   const tone = remaining === 0 ? 'bg-[#d9534f]' : remaining <= 20 ? 'bg-[#d6a33c]' : 'bg-[#4a7ccc]'
   return (
-    <span className="flex min-w-0 items-center gap-1.5" title={`${label}: ${limit.used_percent}% 사용 · ${formatLimitReset(limit.resets_at)}`}>
+    <span className="flex min-w-0 items-center gap-1.5" title={tr('{{label}}: {{percent}}% 사용 · {{reset}}', { label, percent: limit.used_percent, reset: formatLimitReset(limit.resets_at) })}>
       <span className="shrink-0">{label}</span>
       <span className="h-1 w-9 overflow-hidden rounded-full bg-[#e8e8e5]" aria-hidden="true">
         <span className={`block h-full ${tone}`} style={{ width: `${limit.used_percent}%` }} />
       </span>
-      <span className="shrink-0 tabular-nums">{remaining}% 남음</span>
+      <span className="shrink-0 tabular-nums">{tr('{{percent}}% 남음', { percent: remaining })}</span>
     </span>
   )
 }
@@ -882,6 +896,7 @@ export default function ByeoriPanel({
   sessionId,
 }: ByeoriPanelProps = {}) {
   const panelId = useId()
+  useTranslation()
   const root = useAppStore((s) => s.root)
   const workspaceTree = useAppStore((s) => s.tree)
   const currentPath = useAppStore((s) => s.currentPath)
@@ -2130,7 +2145,7 @@ export default function ByeoriPanel({
       {/* 사용량 한도 초과 — 갱신 전까지 새 요청 불가 */}
       {limitBlocked && (
         <div className="shrink-0 border-t border-[#f4dfab] bg-[#fff9eb] px-3 py-1.5 text-[11px] text-[#8a6817]">
-          ⏳ Codex 사용량 한도에 도달했습니다 — {limitResetHint}{tr(". 갱신 전까지 새 요청을 보낼 수 없습니다.")}
+          ⏳ {tr('Codex 사용량 한도에 도달했습니다 — {{reset}}. 갱신 전까지 새 요청을 보낼 수 없습니다.', { reset: limitResetHint })}
         </div>
       )}
 
@@ -2445,7 +2460,7 @@ export default function ByeoriPanel({
                     ? tr("추가 지시 보내기 (Enter)")
                     : tr("현재 작업 턴이 끝나 응답을 정리하고 있습니다. 완료 뒤 다음 질문으로 보내세요.")
                   : limitBlocked
-                    ? `사용량 한도 초과 — ${limitResetHint}`
+                    ? tr('사용량 한도 초과 — {{reset}}', { reset: limitResetHint })
                     : taskScopeMismatch
                       ? tr("카드의 프로젝트가 변경되어 새 실행이 필요합니다.")
                     : tr("전송 (Enter)")

@@ -22,7 +22,7 @@ app.whenReady().then(async () => {
       await waitFor(()=>app.getState().workspaceReady,'workspace not ready')
       api.ai.status = async () => ({ engine: 'codex', available: true, logged_in: true })
       api.ai.models = async () => ({ models: [] })
-      api.ai.usageLimits = async () => ({ available: false, blocked: false })
+      api.ai.usageLimits = async () => ({ available: true, blocked: false, primary: { used_percent: 25, window_duration_mins: 300, resets_at: Date.now()/1000+1800 }, secondary: { used_percent: 10, window_duration_mins: 10080, resets_at: Date.now()/1000+7200 } })
       const sends = [], cancellations = []
       ai.setState({ sendChat: (id, text, options) => sends.push({ id, text, options }), cancel: id => cancellations.push(id) })
       notifyAiEngineChanged()
@@ -74,6 +74,17 @@ app.whenReady().then(async () => {
         ai.setState(state=>({sessions:state.sessions.map(session=>session.id===a?{...session,busy:true,runStartedAt:Date.now()-125000,messages:[{role:'assistant',content:'[QA 문서](twill://open?path=qa-tabs.md)'}]}:session)}))
         await waitFor(()=>panel(a)?.textContent.includes('QA approval'),'approval request missing')
         assert(!answered,'approval auto accepted')
+        const { setLanguage } = await import(url('/src/i18n.ts'))
+        ai.setState(state=>({sessions:state.sessions.map(session=>session.id===a?{...session,currentStatus:'요청을 분석하는 중'}:session)}))
+        setLanguage('en')
+        await waitFor(()=>panel(a)?.textContent.includes('75% remaining'),'usage translation missing')
+        assert(panel(a).textContent.includes('Weekly limit'),'weekly label not translated')
+        assert(panel(a).textContent.includes('Analyzing the request'),'runtime status not translated')
+        assert(panel(a).textContent.includes('2m '),'elapsed time not translated')
+        assert(panel(a).querySelector('[aria-label="AI execution mode"]').textContent.includes('Approval mode'),'mode not translated')
+        assert([...panel(a).querySelectorAll('[title]')].some(item=>item.title.includes('Resets in')),'reset tooltip not translated')
+        setLanguage('ko'); await pause()
+
         const { useThemeStore, THEMES } = await import(url('/src/theme.ts'))
         const previousTheme = useThemeStore.getState().theme
         for (const theme of THEMES) {

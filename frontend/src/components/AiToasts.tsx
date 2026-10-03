@@ -1,5 +1,6 @@
 import { useAiStore } from '../aiStore'
 import { SYSTEM_AI_TAB, useAppStore } from '../store'
+import { useTranslation } from 'react-i18next'
 import { tr } from '../i18n'
 
 /**
@@ -8,6 +9,7 @@ import { tr } from '../i18n'
  * "결과 보기"로 해당 세션 탭으로 바로 이동. 성공은 12초 후 자동 소멸, 오류는 수동 닫기.
  */
 export default function AiToasts() {
+  useTranslation()
   const toasts = useAiStore((s) => s.toasts)
   const dismissToast = useAiStore((s) => s.dismissToast)
   const selectSession = useAiStore((s) => s.selectSession)
@@ -16,10 +18,11 @@ export default function AiToasts() {
   if (toasts.length === 0) return null
 
   return (
-    <div className="pointer-events-none fixed bottom-4 right-4 z-[60] flex w-80 flex-col gap-2">
+    <div className="pointer-events-none fixed bottom-4 right-4 z-[11000] flex w-80 flex-col gap-2">
       {toasts.map((t) => (
         <div
           key={t.id}
+          role={t.kind === 'error' ? 'alert' : 'status'}
           className={`pointer-events-auto rounded-lg border bg-white p-3 shadow-lg ${
             t.kind === 'error' ? 'border-[#fbcaca]' : 'border-[#e3e2e0]'
           }`}
@@ -30,9 +33,9 @@ export default function AiToasts() {
             </span>
             <div className="min-w-0 flex-1">
               <p className="truncate text-[12px] font-semibold text-[#37352f]">
-                {t.kind === 'error' ? tr("AI 작업 오류") : tr("AI 작업 완료")} — {t.title}
+                {t.category === 'save' ? (t.kind === 'error' ? tr('저장 실패') : tr('저장 완료')) : <>{t.kind === 'error' ? tr("AI 작업 오류") : tr("AI 작업 완료")} — {t.title}</>}
               </p>
-              <p className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-[#5f5e5b]">{t.message}</p>
+              <p className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-[#5f5e5b]">{t.category === 'save' ? tr(t.message) : t.message}</p>
             </div>
             <button
               className="shrink-0 rounded px-1 text-[12px] text-[#9b9a97] hover:bg-[#f1f1ef] hover:text-[#37352f]"

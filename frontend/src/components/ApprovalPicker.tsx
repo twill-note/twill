@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react'
+import { useAiStore } from '../aiStore'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 
@@ -63,8 +64,8 @@ export default function ApprovalPicker({ value, onChange, disabled, label, title
           event.stopPropagation(); setOpen(false); trigger.current?.focus()
           if (option.value === value) return
           setSaving(true)
-          try { await onChange(option.value); window.dispatchEvent(new Event('twill:approval-mode-changed')); }
-          catch { /* The caller retains the previous saved selection. */ }
+          try { await onChange(option.value); window.dispatchEvent(new Event('twill:approval-mode-changed')); useAiStore.getState().notifySave(true) }
+          catch { useAiStore.getState().notifySave(false) }
           finally { setSaving(false) }
         }}>
         <span aria-hidden="true" className="w-3">{value === option.value ? '✓' : ''}</span>{option.label}

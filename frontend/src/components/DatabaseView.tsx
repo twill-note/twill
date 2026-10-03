@@ -373,6 +373,7 @@ export default function DatabaseView() {
         }
         setReloadKey((k) => k + 1)
       } catch (e) {
+        if (key === 'approval') throw e // Shared mode picker reports failure without a success toast.
         // 경로 속성 저장은 성공하고 AGENTS.md 생성만 실패했을 수 있으므로 서버 원본을
         // 다시 읽어 표와 디스크 상태가 어긋나지 않게 한다.
         setReloadKey((k) => k + 1)

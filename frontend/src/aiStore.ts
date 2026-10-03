@@ -276,6 +276,7 @@ export type AiToast = {
   kind: 'done' | 'error'
   message: string
   taskPath?: string | null
+  category?: 'save'
 }
 
 let toastIdCounter = 0
@@ -287,6 +288,7 @@ interface AiStoreState {
   /** 세션 완료 알림 (메인 화면 토스트). */
   toasts: AiToast[]
   dismissToast: (id: number) => void
+  notifySave: (success: boolean) => void
   reportTaskStartError: (title: string, message: string) => void
 
   /** Editor 가 구독하는 run log 갱신 신호 (마지막으로 갱신된 파일). */
@@ -1234,6 +1236,15 @@ export const useAiStore = create<AiStoreState>((set, get) => {
     sessionsLoaded: false,
     toasts: [],
     dismissToast: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
+    notifySave: (success) => {
+      const toast: AiToast = {
+        id: ++toastIdCounter, sessionId: null, title: '', category: 'save',
+        kind: success ? 'done' : 'error',
+        message: success ? '모드 설정을 저장했습니다.' : '모드 설정을 저장하지 못했습니다. 다시 시도해주세요.',
+      }
+      set(state => ({ toasts: [...state.toasts.slice(-3), toast] }))
+      if (success) setTimeout(() => get().dismissToast(toast.id), 4000)
+    },
     reportTaskStartError: notifyTaskStartError,
     runLogPath: null,
     runLogVersion: 0,

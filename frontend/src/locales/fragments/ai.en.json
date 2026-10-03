@@ -218,6 +218,10 @@
     "AI가 추가 권한을 요청했습니다.": "AI requested additional permissions.",
     "요청 범위 상세": "Requested permissions",
     "허용": "Allow",
-    "거절": "Decline"
+    "거절": "Decline",
+    "저장 완료": "Saved",
+    "저장 실패": "Save failed",
+    "모드 설정을 저장했습니다.": "Mode setting saved.",
+    "모드 설정을 저장하지 못했습니다. 다시 시도해주세요.": "Could not save the mode setting. Please try again."
   }
 }

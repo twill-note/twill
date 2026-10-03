@@ -19,6 +19,18 @@ class TaskBoardConfigTests(unittest.TestCase):
         self.notes_dir.stop()
         self.temp_dir.cleanup()
 
+    def test_modes_are_restored_and_fixed_for_existing_boards(self):
+        config = {**db.TASK_BOARD_PRESET, "columns": [
+            {"key": "approval", "label": "legacy", "options": [{"value": "unsafe"}]},
+        ]}
+        normalized = db._normalize_task_board_config(config)
+        modes = [column for column in normalized["columns"] if column["key"] == "approval"]
+        self.assertEqual(1, len(modes))
+        self.assertEqual(["never", "on-request"], [item["value"] for item in modes[0]["options"]])
+        self.assertTrue(modes[0]["visible"])
+        empty = db._normalize_task_board_config({"columns": []})
+        self.assertIn("approval", [column["key"] for column in empty["columns"]])
+
     def test_ensure_task_board_repairs_blank_config(self):
         config_path = self.root / "tasks" / ".db.json"
         config_path.write_text(json.dumps(db._default_config()), encoding="utf-8")

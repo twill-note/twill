@@ -186,6 +186,10 @@ TASK_BOARD_PRESET: dict[str, Any] = {
             ],
         },
         {"key": "scope", "label": "프로젝트", "type": "select", "visible": True, "options": []},
+        {"key": "approval", "label": "모드", "type": "select", "visible": True, "options": [
+            {"value": "never", "label": "자동 모드", "color": "green"},
+            {"value": "on-request", "label": "승인 모드", "color": "blue"},
+        ]},
         {"key": "skill", "label": "skill", "type": "multi_select", "visible": True, "options": []},
         {"key": "max_time_min", "label": "시간 한도(분)", "type": "number", "visible": False, "options": []},
         # 배치 인계(전체 실행) 메타 — 표에 노출하지 않음
@@ -201,12 +205,13 @@ TASK_BOARD_PRESET: dict[str, Any] = {
 
 # 태스크 보드는 이름과 상태 흐름을 고정한다. 예전 보드 파일에는 승인 정책 열과
 # 보류가 맨 오른쪽에 있던 상태 옵션이 남아 있을 수 있으므로, 읽기·저장 양쪽에서
-# 현재 스키마로 정규화한다. 카드의 과거 frontmatter는 보존하지만 실행에는 쓰지 않는다.
+# 현재 스키마로 정규화한다. 모드 선택지는 자동·승인 두 가지로 고정한다.
 TASK_STATUS_OPTIONS = TASK_BOARD_PRESET["columns"][0]["options"]
 
 
 def _normalize_task_board_config(config: dict[str, Any]) -> dict[str, Any]:
     columns = [column for column in config.get("columns", []) if column.get("key") != "approval"]
+    columns.insert(min(3, len(columns)), json.loads(json.dumps(next(column for column in TASK_BOARD_PRESET["columns"] if column["key"] == "approval"))))
     status_index = next((i for i, column in enumerate(columns) if column.get("key") == "status"), None)
     if status_index is None:
         columns.insert(0, json.loads(json.dumps(TASK_BOARD_PRESET["columns"][0])))

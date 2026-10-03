@@ -1,53 +1,80 @@
 import { useEffect, useRef, useState } from 'react'
 import { api, type AiApprovalRequest } from '../api'
 import { tr } from '../i18n'
+import { useTranslation } from 'react-i18next'
+import { setNoteProp } from '../dbmodel'
+import { useAiStore } from '../aiStore'
+import ApprovalPicker, { approvalMode, type ApprovalMode } from './ApprovalPicker'
 
 export function AiApprovalMode({ sessionId, disabled = false }: { sessionId: string; disabled?: boolean }) {
+  const { t } = useTranslation()
   const key = `twill.ai.approval.${sessionId}`
-  const [mode, setMode] = useState(() => localStorage.getItem(key) || '')
-  useEffect(() => setMode(localStorage.getItem(key) || ''), [key])
-  return <select aria-label={tr('AI 실행 승인 모드')} title={tr('다음 실행부터 적용됩니다')} disabled={disabled}
-    className="max-w-36 rounded border border-[#e3e2e0] bg-transparent px-1 py-0.5 text-[11px]"
-    value={mode} onChange={(event) => {
-      const next = event.target.value
-      if (next) localStorage.setItem(key, next)
-      else localStorage.removeItem(key)
-      setMode(next)
-    }}>
-    <option value="">{tr('기본 승인 모드')}</option>
-    <option value="on-request">{tr('필요 시 승인 요청')}</option>
-    <option value="never">{tr('승인 없이 실행')}</option>
-  </select>
+  const taskPath = useAiStore(state => {
+    const session = state.sessions.find(item => item.id === sessionId)
+    return session?.activeTaskPath || session?.taskPath
+  })
+  const [mode, setMode] = useState<ApprovalMode>('never')
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  useEffect(() => {
+    let disposed = false
+    const load = async () => {
+      setLoading(true)
+      setError('')
+      try {
+        const saved = localStorage.getItem(key)
+        const next = taskPath
+          ? (await api.getContent(taskPath)).frontmatter.extra?.approval
+          : saved || (await api.workspaceSettings.get()).codex.default_approval
+        if (!disposed) setMode(approvalMode(next))
+      } catch (reason) { if (!disposed) setError(String(reason)) }
+      finally { if (!disposed) setLoading(false) }
+    }
+    void load()
+    const refresh = () => { void load() }
+    window.addEventListener('twill:approval-mode-changed', refresh)
+    window.addEventListener('storage', refresh)
+    return () => { disposed = true; window.removeEventListener('twill:approval-mode-changed', refresh); window.removeEventListener('storage', refresh) }
+  }, [key, taskPath, disabled])
+  return <div className="flex items-center gap-1">
+    <ApprovalPicker label={t('AI 실행 승인 모드')} title={t('다음 실행부터 적용됩니다')} disabled={disabled || loading}
+      value={mode} onChange={async next => {
+        if (!taskPath) { localStorage.setItem(key, next); setMode(next); return }
+        setLoading(true)
+        try { await setNoteProp(taskPath, 'approval', next); setMode(next); setError('') }
+        finally { setLoading(false) }
+      }} />
+    {error && <span role="alert" className="text-[11px] text-red-600">{t('모드를 불러오지 못했습니다')}</span>}
+  </div>
 }
 
 export function AiApprovalDefault() {
-  const [mode, setMode] = useState<string | null>(null)
+  const { t } = useTranslation()
+  const [mode, setMode] = useState<ApprovalMode>('never')
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   useEffect(() => {
     let disposed = false
-    api.workspaceSettings.get().then(settings => { if (!disposed) setMode(settings.codex.default_approval || 'on-request') })
+    api.workspaceSettings.get().then(settings => { if (!disposed) setMode(approvalMode(settings.codex.default_approval)) })
       .catch(reason => { if (!disposed) setError(String(reason)) })
+      .finally(() => { if (!disposed) setLoading(false) })
     return () => { disposed = true }
   }, [])
-  const save = async (next: 'on-request' | 'never') => {
+  const save = async (next: ApprovalMode) => {
     setSaving(true)
     setError('')
     try {
       const settings = await api.workspaceSettings.get()
       await api.workspaceSettings.put({ ...settings, codex: { ...settings.codex, default_approval: next } })
       setMode(next)
-    } catch (reason) { setError(String(reason)) }
+    } catch (reason) { setError(String(reason)); throw reason }
     finally { setSaving(false) }
   }
   return <div className="flex items-center gap-1 text-[11px]">
-    <label>{tr('AI 기본 모드')} <select aria-label={tr('AI 기본 승인 모드')} disabled={mode === null || saving}
-      className="rounded border border-[#e3e2e0] bg-transparent p-1" value={mode || 'on-request'}
-      onChange={event => void save(event.target.value as 'on-request' | 'never')}>
-      <option value="on-request">{tr('필요 시 승인 요청')}</option>
-      <option value="never">{tr('승인 없이 실행')}</option>
-    </select></label>
-    {error && <span role="alert" className="text-red-600">{error}</span>}
+    <span>{t('AI 기본 모드')}</span>
+    <ApprovalPicker label={t('AI 기본 승인 모드')} disabled={loading || saving} value={mode} onChange={save} />
+    {error && <span role="alert" className="text-red-600">{t('모드 설정을 저장하지 못했습니다')}: {error}</span>}
   </div>
 }
 

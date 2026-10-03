@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import ApprovalPicker, { approvalMode } from './ApprovalPicker'
 import ProjectPathDialog from './ProjectPathDialog'
 import {
   badgeClasses,
@@ -36,6 +37,8 @@ export default function DbCell({ column, raw, readOnly, onOpenDocument, onCommit
   const value = normalizeValue(column, raw)
   const [editing, setEditing] = useState(false)
   const anchorRef = useRef<HTMLDivElement>(null)
+
+  if (column.key === 'approval') return <ApprovalPicker label={tr('AI 실행 승인 모드')} value={approvalMode(raw)} disabled={readOnly} onChange={next => onCommit(next)} />
 
   const open = () => {
     if (readOnly) return

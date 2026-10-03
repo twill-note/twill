@@ -1180,7 +1180,8 @@ export const useAiStore = create<AiStoreState>((set, get) => {
     const isCurrentSocket = () => sockets.get(id) === ws
     ws.onopen = () => {
       if (!isCurrentSocket()) return
-      const approval = localStorage.getItem(`twill.ai.approval.${id}`)
+      const taskMode = req.task_path || get().sessions.find(session => session.id === id)?.taskPath
+      const approval = taskMode ? null : localStorage.getItem(`twill.ai.approval.${id}`)
       ws.send(JSON.stringify({ ...req, ...(approval === 'never' || approval === 'on-request' ? { approval } : {}), session_id: id, app_language: currentLanguage() }))
       patch(id, { currentStatus: '요청을 준비하는 중' })
       // 연결이 열리기 전에 누른 중단도 첫 요청 뒤 즉시 서버에 전달한다.

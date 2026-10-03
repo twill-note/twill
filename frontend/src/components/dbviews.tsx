@@ -95,7 +95,6 @@ function resolveColumns(config: DbConfig, rows: NoteRow[], tableView = false): C
   // 실행 파이프라인에는 필요하지만 사람이 훑는 태스크 표에는 불필요한 메타데이터.
   // 원본 frontmatter는 보존하고 표의 컬럼에서만 제외한다.
   const taskTableHiddenKeys = new Set([
-    'approval',
     'current_run',
     'priority',
     'task_template',
@@ -196,7 +195,7 @@ export function DbTable({
                   title={tr("컬럼 설정")}
                 >
                   <span className="text-[10px] text-[#9b9a97]">{typeIcon(c.type)}</span>
-                  <span>{c.label ?? c.key}</span>
+                  <span>{tr(c.label ?? c.key)}</span>
                 </button>
                 <button
                   className="ml-0.5 rounded px-0.5 text-[10px] text-[#c7c6c2] hover:text-[#37352f]"

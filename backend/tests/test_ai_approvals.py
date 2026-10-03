@@ -48,7 +48,15 @@ class ApprovalTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual({'decision': 'decline'}, payloads[0]['result'])
         self.assertEqual([], client.pending_approvals())
 
+    def test_task_mode_and_chat_default_are_resolved_consistently(self):
+        from app.ai.orchestrator import resolve_approval_mode
+        self.assertEqual('never', resolve_approval_mode(None, None, 'on-request', is_task=True))
+        self.assertEqual('on-request', resolve_approval_mode(None, 'on-request', 'never', is_task=True))
+        self.assertEqual('on-request', resolve_approval_mode(None, None, 'on-request', is_task=False))
+        self.assertEqual('never', resolve_approval_mode('never', 'on-request', 'on-request', is_task=True))
+        self.assertEqual('never', resolve_approval_mode(None, 'legacy', None, is_task=True))
+
     def test_default_and_invalid_mode(self):
-        self.assertEqual('on-request', CodexDefaults().default_approval)
+        self.assertEqual('never', CodexDefaults().default_approval)
         with self.assertRaises(ValueError):
             RunRequest(approval='danger-full-access')

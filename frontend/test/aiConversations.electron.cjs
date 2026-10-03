@@ -55,13 +55,17 @@ app.whenReady().then(async () => {
         ai.setState({activeSessionId:null})
         app.getState().openRightTab(SYSTEM_AI_TAB);await pause()
         assert(app.getState().dockedAiTabId===SYSTEM_AI_TAB&&app.getState().rightDockOpen&&app.getState().openTabs.length===0,'empty AI entry must use the right dock')
-        ai.setState({activeSessionId:a})
-        app.getState().openRightTab(SYSTEM_AI_TAB)
+        app.getState().openAiSession(a)
         await waitFor(()=>input(a),'restored conversation missing on first open')
         // Fake approval requests exercise the UI without executing a live AI turn.
         const mode = panel(a).querySelector('[aria-label="AI 실행 승인 모드"]')
         assert(mode, 'approval mode selector missing')
-        mode.value = 'on-request'; mode.dispatchEvent(new Event('change', { bubbles:true }))
+        await waitFor(()=>!mode.disabled, 'mode loading failed')
+        mode.click()
+        await waitFor(()=>document.querySelector('[role="listbox"] [role="option"]'),'custom mode menu missing')
+        assert(document.querySelectorAll('[role="listbox"] [role="option"]').length===2,'exactly two modes required')
+        assert(mode.tagName==='BUTTON','native select remains')
+        ;[...document.querySelectorAll('[role="option"]')].find(item=>item.textContent.includes('승인 모드')).click()
         assert(localStorage.getItem('twill.ai.approval.'+a)==='on-request','approval mode not saved')
         const originalApprovals = api.aiApprovals, originalAnswer = api.answerAiApproval
         let answered = false

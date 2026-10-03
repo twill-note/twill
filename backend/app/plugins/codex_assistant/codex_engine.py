@@ -515,7 +515,7 @@ class CodexEngine:
         if (config or {}).get("output_schema"):
             turn_params["outputSchema"] = config["output_schema"]
 
-        app_server.set_approval_policy(thread_id, (config or {}).get("approval", "on-request"))
+        app_server.set_approval_policy(thread_id, (config or {}).get("approval", "never"))
         try:
             await app_server.request("turn/start", turn_params, timeout=30)
         except AppServerError as e:

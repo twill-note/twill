@@ -48,8 +48,13 @@ SYSTEM_AI_NAME = "Twill AI"
 # GPT-5.6 3티어(sol/terra/luna) 중 terra 가 가격 대비 성능 기본값으로 적합 (2026-07 기준).
 DEFAULT_MODEL = "gpt-5.6-terra"
 DEFAULT_EFFORT = "xhigh"
-# 요청·태스크별 설정이 없으면 사용자에게 필요한 승인을 요청한다.
-DEFAULT_APPROVAL = "on-request"
+# 별도 설정이 없으면 자동 모드로 실행한다. 추가 권한 승인은 자동 허용하지 않는다.
+DEFAULT_APPROVAL = "never"
+
+def resolve_approval_mode(requested: str | None, task_mode: str | None, default: str | None, *, is_task: bool) -> str:
+    mode = requested or (task_mode if is_task else default) or DEFAULT_APPROVAL
+    return mode if mode in {"never", "on-request"} else DEFAULT_APPROVAL
+
 
 def _system_identity_preamble() -> str:
     """모든 실행(챗·태스크)에 공통으로 주입되는 정체성 + 스킬북 탐색 규칙.
@@ -1794,9 +1799,15 @@ class Orchestrator:
             or codex_cfg.get("default_effort")
             or DEFAULT_EFFORT
         )
-        approval = req.approval or (task_meta or {}).get("approval") or codex_cfg.get("default_approval") or DEFAULT_APPROVAL
-        if approval not in {"never", "on-request"}:
-            approval = DEFAULT_APPROVAL
+        # Task conversations retain the card's mode for follow-up chat turns too.
+        approval_task_path = req.task_path or (session or {}).get("task_path")
+        approval_meta = task_meta
+        if approval_task_path and not req.task_path:
+            _, approval_meta = _read_task_context(approval_task_path)
+        approval = resolve_approval_mode(
+            req.approval, approval_meta.get("approval"), codex_cfg.get("default_approval"),
+            is_task=bool(approval_task_path),
+        )
 
         start_config: dict[str, Any] = {}
         if model:

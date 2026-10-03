@@ -20,7 +20,7 @@ interface Props {
 }
 
 /** 팝업 메타 영역에 가로로 배치할 필드 순서. */
-const META_KEYS = ['status', 'type', 'scope'] as const
+const META_KEYS = ['status', 'type', 'scope', 'approval'] as const
 
 function taskSessionForPath(session: AiSession, taskPath: string): boolean {
   return (
@@ -259,7 +259,7 @@ export default function TaskCardPopup({ row, config, onClose, onCellChange, onRo
               return (
                 <div key={key} className="min-w-0">
                   <div className="mb-1 text-[11px] text-[#9b9a97]" title={FIELD_HINTS[key]}>
-                    {col.label ?? key}
+                    {tr(col.label ?? key)}
                   </div>
                   <DbCell column={col} raw={row.props[key]} onCommit={(v) => onCellChange(row.path, key, v)} />
                 </div>

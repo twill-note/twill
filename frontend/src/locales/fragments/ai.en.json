@@ -150,6 +150,21 @@
     "toastError": "AI task error",
     "toastDone": "AI task done",
     "dismissToast": "Dismiss notification",
-    "viewResult": "View result"
+    "viewResult": "View result",
+    "자동 모드": "Auto mode",
+    "승인 모드": "Approval mode",
+    "모드": "Mode",
+    "AI 실행 승인 모드": "AI execution mode",
+    "AI 기본 승인 모드": "Default AI mode",
+    "AI 기본 모드": "Default AI mode",
+    "다음 실행부터 적용됩니다": "Applies to the next run",
+    "모드를 불러오지 못했습니다": "Could not load the mode",
+    "모드 설정을 저장하지 못했습니다": "Could not save the mode setting",
+    "실행 승인 요청": "Approval required",
+    "승인 요청 조회 실패": "Could not retrieve approval requests",
+    "AI가 추가 권한을 요청했습니다.": "AI requested additional permissions.",
+    "요청 범위 상세": "Requested permissions",
+    "허용": "Allow",
+    "거절": "Decline"
   }
 }

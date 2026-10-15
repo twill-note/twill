@@ -236,8 +236,8 @@ export default function FileTree() {
     })
   }
   const unassigned = tree.filter((n) => !assigned.has(n.path))
-  if (unassigned.length > 0 || projectSessions.has(UNASSIGNED_ID) || sections.length === 0) {
-    displaySections.push({
+  {
+    displaySections.unshift({
       id: UNASSIGNED_ID, name: rootName, expanded: rootExpanded, nodes: unassigned,
       system: true,
     })
@@ -684,10 +684,18 @@ export default function FileTree() {
               )}
             </div>
           )}
-          {s.expanded && (
+          {(s.expanded || (s.system && creating?.dir === '')) && (
             <div>
-              {renderNodes(s.nodes, 0)}
-              {s.nodes.length === 0 && (
+              {s.system && creating?.dir === '' && (
+                <InlineInput
+                  depth={0}
+                  placeholder={creating.type === 'file' ? tr('새 노트 이름') : tr('새 폴더 이름')}
+                  onSubmit={handleCreate}
+                  onCancel={() => setCreating(null)}
+                />
+              )}
+              {s.expanded && renderNodes(s.nodes, 0)}
+              {s.nodes.length === 0 && !(s.system && creating?.dir === '') && (
                 <p className="px-3 py-1 text-[11px] text-[#c9c8c4]">
 
                   {tr("(비어있음 — 폴더/노트를 여기로 드래그)")}
@@ -700,15 +708,6 @@ export default function FileTree() {
         )
       })}
 
-      {/* 루트에서 바로 새 항목 만들기 (프로젝트 밖) */}
-      {creating && creating.dir === '' && (
-        <InlineInput
-          depth={0}
-          placeholder={creating.type === 'file' ? tr("새 노트 이름") : tr("새 폴더 이름")}
-          onSubmit={handleCreate}
-          onCancel={() => setCreating(null)}
-        />
-      )}
       {tree.length === 0 && !creating && (
         <p className="px-3 py-2 text-[12px] text-[#9b9a97]">
 
@@ -1096,9 +1095,21 @@ function InlineInput({
   onCancel: () => void
 }) {
   const ref = useRef<HTMLInputElement>(null)
+  const submitted = useRef(false)
+  const submit = (value: string) => {
+    if (submitted.current) return
+    submitted.current = true
+    onSubmit(value)
+  }
+  const cancel = () => {
+    if (submitted.current) return
+    submitted.current = true
+    onCancel()
+  }
   useEffect(() => {
     ref.current?.focus()
     ref.current?.select()
+    ref.current?.scrollIntoView({ block: 'nearest' })
   }, [])
   return (
     <input
@@ -1108,13 +1119,15 @@ function InlineInput({
       className="my-0.5 w-[calc(100%-16px)] rounded border border-blue-400 bg-white px-2 py-[2px] text-[13px] outline-none"
       style={{ marginLeft: 8 + depth * 14 }}
       onKeyDown={(e) => {
-        if (e.key === 'Enter') onSubmit((e.target as HTMLInputElement).value)
-        if (e.key === 'Escape') onCancel()
+        e.stopPropagation()
+        if (e.nativeEvent.isComposing || e.keyCode === 229) return
+        if (e.key === 'Enter') { e.preventDefault(); submit((e.target as HTMLInputElement).value) }
+        if (e.key === 'Escape') { e.preventDefault(); cancel() }
       }}
       onBlur={(e) => {
         // 값이 있으면 제출, 없으면 취소
-        if (e.target.value.trim() && e.target.value.trim() !== defaultValue) onSubmit(e.target.value)
-        else onCancel()
+        if (e.target.value.trim() && e.target.value.trim() !== defaultValue) submit(e.target.value)
+        else cancel()
       }}
     />
   )

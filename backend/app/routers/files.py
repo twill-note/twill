@@ -426,13 +426,29 @@ def _companion_dir(p: Path) -> Path | None:
     return None
 
 
+def _relocate_section_items(old: str, new: str) -> None:
+    """Keep project membership consistent with filesystem moves and renames."""
+    from .workspace import _read_workspace_json, _write_workspace_json
+
+    data = _read_workspace_json()
+    changed = False
+    for section in data.get("sections", []):
+        items = section.get("items", [])
+        if old in items:
+            section["items"] = [new if item == old else item for item in items
+                                if item != old or "/" not in new]
+            changed = True
+    if changed:
+        _write_workspace_json(data)
+
+
 @router.post("/rename")
 def rename_entry(req: RenameRequest):
     src = resolve_path(req.path)
     if not src.exists():
         raise HTTPException(status_code=404, detail="대상을 찾을 수 없습니다")
     new_name = req.new_name.strip()
-    if not new_name or "/" in new_name:
+    if not new_name or new_name in {".", ".."} or re.search(r'[<>:"/\\|?*\x00-\x1f]', new_name):
         raise HTTPException(status_code=400, detail="올바르지 않은 이름입니다")
     if src.is_file() and src.name.endswith(".erd.json"):
         if not new_name.endswith(".erd.json"):
@@ -443,11 +459,13 @@ def rename_entry(req: RenameRequest):
         # 기타 문서는 사용자가 새 확장자를 명시하지 않았을 때만 기존 확장자를 보존한다.
         new_name += src.suffix
     dst = src.with_name(new_name)
-    if dst.exists():
+    if dst == src:
+        return {"path": rel_str(src)}
+    if dst.exists() and not dst.samefile(src):
         raise HTTPException(status_code=409, detail="같은 이름이 이미 존재합니다")
     comp_src = _companion_dir(src)
     comp_dst = dst.with_suffix("") if comp_src else None
-    if comp_dst is not None and comp_dst.exists():
+    if comp_dst is not None and comp_dst.exists() and not comp_dst.samefile(comp_src):
         raise HTTPException(status_code=409, detail="하위 노트 폴더와 같은 이름이 이미 존재합니다")
     indexer.remove(rel_str(src))
     src.rename(dst)
@@ -456,6 +474,7 @@ def rename_entry(req: RenameRequest):
         comp_src.rename(comp_dst)
         _reindex_moved(comp_dst)
     _reindex_moved(dst)
+    _relocate_section_items(req.path, rel_str(dst))
     return {"path": rel_str(dst)}
 
 
@@ -493,6 +512,7 @@ def move_entry(req: MoveRequest):
         shutil.move(str(comp_src), str(comp_dst))
         _reindex_moved(comp_dst)
     _reindex_moved(dst)
+    _relocate_section_items(req.path, rel_str(dst))
     return {"path": rel_str(dst)}
 
 

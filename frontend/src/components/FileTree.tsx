@@ -12,6 +12,7 @@ import { useBackdropDismiss } from '../useBackdropDismiss'
 import ProjectAiTasks from './ProjectAiTasks'
 import { createProjectSessionSelector, sessionProjectId } from '../aiProjectGroups'
 import { tr } from '../i18n'
+import { remapDocumentPath, saveDocumentsBeforeMove } from '../documentPaths'
 
 interface MenuState {
   x: number
@@ -264,22 +265,13 @@ export default function FileTree() {
     const trimmed = name.trim()
     if (!trimmed || trimmed === node.name) return
     try {
-      const res = await api.rename(node.path, trimmed)
-      // 프로젝트에 등록된 문서 경로도 갱신
-      const oldPath = node.path
-      const newPath = res.path.endsWith('.md') && node.type === 'dir' ? res.path.replace(/\.md$/, '') : res.path
-      const updated = sections.map((s) => ({
-        ...s,
-        items: s.items.map((p) => (p === oldPath ? newPath : p)),
-      }))
-      if (updated.some((s, i) => s.items.some((p, j) => p !== sections[i].items[j]))) {
-        await saveSections(updated)
-      }
+      const source = await saveDocumentsBeforeMove(node.path)
+      const res = await api.rename(source, trimmed)
+      useAppStore.getState().relocateDocuments({ from: source, to: res.path })
+      await refreshSections()
       await refreshTree()
       await refreshTags()
-      if (selectedPath === oldPath) setSelectedPath(res.path)
-      if (currentPath === node.path) openFile(res.path)
-      else if (currentPath?.startsWith(node.path + '/')) closeFile()
+      if (selectedPath === node.path) setSelectedPath(res.path)
     } catch (e) {
       dialog.alert((e as Error).message)
     }
@@ -336,11 +328,13 @@ export default function FileTree() {
     const srcParent = src.includes('/') ? src.slice(0, src.lastIndexOf('/')) : ''
     if (srcParent === destDir || src === destDir || destDir.startsWith(src + '/')) return
     try {
-      const res = await api.move(src, destDir)
+      const source = await saveDocumentsBeforeMove(src)
+      const res = await api.move(source, destDir)
+      const move = { from: source, to: res.path }
+      useAppStore.getState().relocateDocuments(move)
       await refreshTree()
-      if (selectedPath === src) setSelectedPath(res.path)
-      if (currentPath === src) openFile(res.path)
-      else if (currentPath?.startsWith(src + '/')) closeFile()
+      await refreshSections()
+      if (selectedPath) setSelectedPath(remapDocumentPath(selectedPath, move))
     } catch (e2) {
       dialog.alert((e2 as Error).message)
     }
@@ -452,14 +446,24 @@ export default function FileTree() {
     setDragOverSection(null)
     const src = e.dataTransfer.getData('text/note-path')
     if (!src) return
-    // 루트 직계만 프로젝트에 배정 가능
-    const isRootItem = !src.includes('/')
-    if (!isRootItem) {
-      // 서브 항목: 이동 후 프로젝트 배정은 다음 refreshTree 사이클에서
-      // 여기서는 무시 (프로젝트 경계로 드롭한 경우엔 이동시키지 않음)
-      return
+    try {
+      const target = sections.find(section => section.id === sid)
+      const directory = target?.items.find(path => findTreeNode(tree, path)?.type === 'dir')
+      const destDir = sid === UNASSIGNED_ID ? '' : directory
+      if (destDir !== undefined && parentOf(src) !== destDir) {
+        const source = await saveDocumentsBeforeMove(src)
+        const result = await api.move(source, destDir)
+        useAppStore.getState().relocateDocuments({ from: source, to: result.path })
+        if (selectedPath === src) setSelectedPath(result.path)
+        if (destDir) setExpanded(previous => new Set(previous).add(destDir))
+        await refreshTree()
+        await refreshSections()
+      } else if (!src.includes('/')) {
+        await moveToSection(src, sid === UNASSIGNED_ID ? null : sid)
+      }
+    } catch (error) {
+      void dialog.alert((error as Error).message)
     }
-    await moveToSection(src, sid === UNASSIGNED_ID ? null : sid)
   }
 
   const renderNodes = (nodes: TreeNode[], depth: number) => (

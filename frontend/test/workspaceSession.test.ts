@@ -1,5 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { remapDocumentPath, relocateWorkspaceDocuments } from '../src/documentPaths.ts'
 import { parseWorkspaceSession, serializeWorkspaceSession, workspaceSessionKey, type WorkspaceSession } from '../src/workspaceSession.ts'
 
 const documentTab = { id:'file:한글.md', kind:'file' as const, target:'한글.md', title:'한글', icon:'📄' }
@@ -12,6 +13,16 @@ const state: WorkspaceSession = {
     first:{kind:'panel',id:'left',tabIds:[documentTab.id],activeTabId:documentTab.id},
     second:{kind:'panel',id:'right',tabIds:[aiTab.id],activeTabId:aiTab.id}}},
 }
+test('moving an open note preserves its split, selection and companion tabs', () => {
+  const child = {...documentTab, id:'file:한글/child.md', target:'한글/child.md'}
+  const moved = relocateWorkspaceDocuments({...state, openTabs:[documentTab,child,aiTab]}, {from:'한글.md',to:'project/새 제목.md'})
+  assert.deepEqual(moved.openTabs.map(tab=>tab.id), ['file:project/새 제목.md','file:project/새 제목/child.md','ai:one'])
+  assert.equal(moved.currentPath, 'project/새 제목.md')
+  assert.equal(moved.splitLayout?.activePanelId, 'right')
+  assert.equal(moved.splitLayout?.root.kind === 'split' && moved.splitLayout.root.first.kind === 'panel' && moved.splitLayout.root.first.activeTabId, 'file:project/새 제목.md')
+  assert.equal(remapDocumentPath('한글다른.md',{from:'한글.md',to:'new.md'}),'한글다른.md')
+  assert.equal(remapDocumentPath('project/child.md',{from:'project',to:'new'}),'new/child.md')
+})
 test('workspace session restores titles, selections, split ratio and dock dimensions',()=>{
   assert.deepEqual(parseWorkspaceSession(serializeWorkspaceSession(state)),state)
   assert.notEqual(workspaceSessionKey('/notes/one'),workspaceSessionKey('/notes/two'))

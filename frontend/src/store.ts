@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { DOCUMENT_RELOCATED, remapDocumentPath, relocateWorkspaceDocuments, type DocumentRelocation } from './documentPaths'
 import { useAiStore } from './aiStore'
 import { aiDocumentTab, aiDocumentTabId, sessionIdFromAiTab } from './aiTabs'
 import { api } from './api'
@@ -79,6 +80,7 @@ interface AppState {
   refreshSections: () => Promise<void>
   saveSections: (sections: Section[]) => Promise<void>
   openFile: (path: string) => void
+  relocateDocuments: (move: DocumentRelocation) => void
   restoreFromHistory: (path: string | null) => void
   closeFile: () => void
   setView: (view: ViewMode) => void
@@ -261,6 +263,27 @@ export const useAppStore = create<AppState>((set, get) => ({
     } catch {
       // 실패 시 원복
       await get().refreshSections()
+    }
+  },
+  relocateDocuments: (move) => {
+    if (move.from === move.to) return
+    const state = get()
+    const relocated = relocateWorkspaceDocuments(state, move)
+    const pinnedNotes = state.pinnedNotes.map(path => remapDocumentPath(path, move))
+    savePinnedNotes(state.root, pinnedNotes)
+    if (boardReturnState) {
+      for (const key of ['currentPath', 'dbDir', 'erdPath', 'erdDirectory'] as const) {
+        const value = boardReturnState[key]
+        if (value !== null) boardReturnState[key] = remapDocumentPath(value, move)
+      }
+    }
+    // Notify mounted editors before changing tab selection so pending saves follow the move.
+    window.dispatchEvent(new CustomEvent(DOCUMENT_RELOCATED, { detail: move }))
+    set({ ...relocated, pinnedNotes,
+      sections: state.sections.map(section => ({ ...section, items: section.items.map(path => remapDocumentPath(path, move)) })),
+      dbRowFilter: state.dbRowFilter?.map(path => remapDocumentPath(path, move)) ?? null })
+    if (relocated.currentPath && relocated.currentPath !== state.currentPath) {
+      window.history.replaceState({ notePath: relocated.currentPath }, '', '#' + encodeURIComponent(relocated.currentPath))
     }
   },
   openFile: (path) => {

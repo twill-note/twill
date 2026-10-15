@@ -1,4 +1,5 @@
 import DocumentFind from './DocumentFind'
+import { DOCUMENT_RELOCATED, remapDocumentPath, registerDocumentSave, type DocumentRelocation } from '../documentPaths'
 import { registerRestartGuard } from '../restartGuards'
 import { exportDocumentPdf } from '../exportPdf'
 import { markdownWithoutSnapshot, preserveBlocks, restoreBlocks } from '../blockPersistence'
@@ -645,12 +646,30 @@ export default function Editor({ path }: { path?: string }) {
   const [content, setContent] = useState<FileContent | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
+  const [documentKey, setDocumentKey] = useState(0)
+  const loadedContentRef = useRef<{ content: FileContent; reloadKey: number } | null>(null)
   // 이 Editor 는 분할 패널마다 하나씩 유지된다. 탭을 전환하면 NoteEditor 는 새 문서를
   // 다시 그리므로, 패널 안에서 문서별 스크롤 위치를 따로 기억해 두었다가 복원한다.
   const scrollPositionsRef = useRef(new Map<string, number>())
 
   const rememberScrollPosition = useCallback((notePath: string, scrollTop: number) => {
     scrollPositionsRef.current.set(notePath, scrollTop)
+  }, [])
+
+  useEffect(() => {
+    const relocate = (event: Event) => {
+      const move = (event as CustomEvent<DocumentRelocation>).detail
+      const loaded = loadedContentRef.current
+      if (!loaded) return
+      const path = remapDocumentPath(loaded.content.path, move)
+      if (path === loaded.content.path) return
+      const position = scrollPositionsRef.current.get(loaded.content.path)
+      if (position !== undefined) scrollPositionsRef.current.set(path, position)
+      loaded.content = { ...loaded.content, path }
+      setContent(loaded.content)
+    }
+    window.addEventListener(DOCUMENT_RELOCATED, relocate)
+    return () => window.removeEventListener(DOCUMENT_RELOCATED, relocate)
   }, [])
 
   // 현재 열린 노트가 orchestrator 가 스트리밍 중인 run log 파일이면,
@@ -664,11 +683,20 @@ export default function Editor({ path }: { path?: string }) {
 
   useEffect(() => {
     if (!currentPath) return
+    if (loadedContentRef.current?.content.path === currentPath && loadedContentRef.current.reloadKey === reloadKey) return
+    let cancelled = false
+    loadedContentRef.current = null
     setContent(null)
     setError(null)
     const isExternal = currentPath.startsWith('/')
     const loader = isExternal ? api.getContentExternal(currentPath) : api.getContent(currentPath)
-    loader.then(setContent).catch((e) => setError((e as Error).message))
+    loader.then(content => {
+      if (cancelled) return
+      loadedContentRef.current = { content, reloadKey }
+      setDocumentKey(key => key + 1)
+      setContent(content)
+    }).catch((e) => { if (!cancelled) setError((e as Error).message) })
+    return () => { cancelled = true }
   }, [currentPath, reloadKey])
 
   if (!currentPath) return null
@@ -684,7 +712,7 @@ export default function Editor({ path }: { path?: string }) {
 
   return (
     <NoteEditor
-      key={`${content.path}:${reloadKey}`}
+      key={documentKey}
       content={content}
       onReload={() => setReloadKey((k) => k + 1)}
       initialScrollTop={scrollPositionsRef.current.get(content.path) ?? 0}
@@ -705,6 +733,8 @@ function NoteEditor({
   onScrollPositionChange: (scrollTop: number) => void
 }) {
   const isExternal = content.path.startsWith('/')
+  const pathRef = useRef(content.path)
+  pathRef.current = content.path
   // 다크 테마(노르드)일 때 BlockNote 도 다크로 — 나머지 테마는 라이트 유지
   const appTheme = useThemeStore((s) => s.theme)
   const editorTheme = isDarkTheme(appTheme) ? ('dark' as const) : ('light' as const)
@@ -759,12 +789,12 @@ function NoteEditor({
       setLinks(null)
       return
     }
-    api.backlinks(content.path).then(setLinks).catch(() => setLinks(null))
-  }, [content.path, isExternal])
+    api.backlinks(pathRef.current).then(setLinks).catch(() => setLinks(null))
+  }, [isExternal])
 
   useEffect(() => {
     loadLinks()
-  }, [loadLinks])
+  }, [loadLinks, content.path])
 
   // 새 노트 생성·이동·삭제로 트리가 바뀌면 다음 `[[` 검색에서 목록을 새로 읽는다.
   useEffect(() => {
@@ -805,9 +835,10 @@ function NoteEditor({
           const blocks = editor.document
           const markdown = await editor.blocksToMarkdownLossy(toMarkdownBlocks(blocks))
           const body = isExternal ? markdown : await preserveBlocks(markdown, blocks)
+          const savingPath = pathRef.current
           const res = isExternal
-            ? await api.saveContentExternal(content.path, fmRef.current, body, mtimeRef.current, force)
-            : await api.saveContent(content.path, fmRef.current, body, mtimeRef.current, force)
+            ? await api.saveContentExternal(savingPath, fmRef.current, body, mtimeRef.current, force)
+            : await api.saveContent(savingPath, fmRef.current, body, mtimeRef.current, force)
           mtimeRef.current = res.mtime
           setSaveStatus('saved')
           if (!isExternal) {
@@ -824,8 +855,17 @@ function NoteEditor({
       saveChainRef.current = operation.then(() => {}, () => {})
       return operation
     },
-    [editor, content.path, isExternal, setSaveStatus, refreshTags, loadLinks],
+    [editor, isExternal, setSaveStatus, refreshTags, loadLinks],
   )
+
+  useEffect(() => registerDocumentSave(() => pathRef.current, () => save()), [save])
+  useEffect(() => {
+    const relocate = (event: Event) => {
+      pathRef.current = remapDocumentPath(pathRef.current, (event as CustomEvent<DocumentRelocation>).detail)
+    }
+    window.addEventListener(DOCUMENT_RELOCATED, relocate)
+    return () => window.removeEventListener(DOCUMENT_RELOCATED, relocate)
+  }, [])
 
   useEffect(() => registerRestartGuard(async () => {
     if (!loadedRef.current) return

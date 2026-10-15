@@ -87,7 +87,7 @@ export default function DocumentFind({ scope, body, scroll }: {
   }, [matches, index, open, id, scroll])
 
   const move = (direction: number) => setIndex(value => matches.length ? (value + direction + matches.length) % matches.length : 0)
-  if (!open) return <button type="button" className="self-end px-3 py-1 text-[11px] text-[#9b9a97] hover:text-[#37352f]" onClick={() => { setOpen(true); requestAnimationFrame(() => input.current?.focus()) }}>{tr('문서에서 찾기')} ⌘/Ctrl+F</button>
+  if (!open) return null
   return <div role="search" aria-label={tr('문서에서 찾기')} className="flex shrink-0 flex-wrap items-center gap-2 border-b border-[#e3e2e0] bg-[#fbfbfa] px-3 py-2 text-[12px] text-[#37352f]"
     onKeyDown={event => {
       if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close() }

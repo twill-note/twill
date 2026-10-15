@@ -12,6 +12,19 @@ class CodexAppServerProcessTests(unittest.TestCase):
 
 
 class WindowsShellTests(unittest.TestCase):
+    def test_frozen_environment_preserves_git_ssh_and_removes_bundled_dll_paths(self):
+        import sys
+        from unittest.mock import patch
+        from app.plugins.codex_assistant.cli import codex_process_options
+        env = {'Path': r'C:\Twill\_internal;C:\Git\cmd;C:\Twill\_internal\lib;C:\Windows\System32\OpenSSH',
+               'SSH_AUTH_SOCK': 'agent-pipe', 'TWILL_DESKTOP_PARENT_PIPE': '1'}
+        with patch('app.plugins.codex_assistant.cli.os.name', 'nt'), patch.dict('os.environ', env, clear=True), \
+             patch.object(sys, 'frozen', True, create=True), patch.object(sys, '_MEIPASS', r'C:\Twill\_internal', create=True):
+            result = codex_process_options()['env']
+        self.assertEqual(result['Path'], r'C:\Git\cmd;C:\Windows\System32\OpenSSH')
+        self.assertEqual(result['SSH_AUTH_SOCK'], 'agent-pipe')
+        self.assertNotIn('TWILL_DESKTOP_PARENT_PIPE', result)
+
     def test_store_alias_uses_builtin_without_mutating_parent(self):
         from app.plugins.codex_assistant.cli import _windows_shell_environment
         alias = r"C:\Users\한 글\AppData\Local\Microsoft\WindowsApps"

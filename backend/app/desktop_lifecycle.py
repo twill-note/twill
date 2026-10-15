@@ -6,11 +6,30 @@ import ctypes
 import os
 import secrets
 import threading
+import sys
 from ctypes import wintypes
 
 from fastapi import APIRouter, HTTPException, Request
 
 router = APIRouter(prefix="/api/desktop", include_in_schema=False)
+
+
+def configure_frozen_subprocesses():
+    """Avoid leaking PyInstaller's DLL search directory into Git/SSH/PowerShell.
+
+    Python extension modules keep their explicit DLL directory handle; external
+    child processes inherit the normal Windows loader search order instead.
+    """
+    if sys.platform != "win32" or not getattr(sys, "frozen", False):
+        return None
+    directory = os.add_dll_directory(sys._MEIPASS)
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel.SetDllDirectoryW.argtypes = [wintypes.LPCWSTR]
+    kernel.SetDllDirectoryW.restype = wintypes.BOOL
+    if not kernel.SetDllDirectoryW(None):
+        directory.close()
+        raise ctypes.WinError(ctypes.get_last_error())
+    return directory
 
 
 def watch_desktop_parent(stream, request_shutdown, *, timeout=12.0, force_exit=os._exit):

@@ -374,6 +374,18 @@ def _merge_config(base: dict[str, Any], override: dict[str, Any] | None) -> dict
     return cfg
 
 
+def _permission_instructions(approval: str | None) -> str:
+    return (
+        "\n\n# 명령 실행 권한\n"
+        "명령 실행이 거부되면 실제 오류를 확인해 샌드박스 제한, 실행 파일 누락, "
+        "SSH 인증 실패, 원격 서버 권한 오류를 구분한다. 관리자 권한이 없다고 추측하지 않는다. "
+        + ("추가 권한이 필요한 Git 또는 SSH 명령은 승인 요청으로 실행하고 사용자의 결정을 기다린다."
+           if approval == "on-request" else
+           "자동 모드에서는 추가 권한을 요청할 수 없다. 샌드박스 때문에 명령을 실행할 수 없으면 "
+           "실패한 명령과 원인을 알리고, 사용자가 대화의 승인 모드로 전환해 재시도할 수 있음을 안내한다.")
+    )
+
+
 class CodexEngine:
     """AIEngine 인터페이스를 구현하는 codex 어댑터."""
 
@@ -388,6 +400,7 @@ class CodexEngine:
         # 리스너도 이 ID를 알아야, 이전 턴의 completed 알림으로 이어지는 작업을 끝내지
         # 않는다. (Codex CLI와 같은 steer 수명 처리)
         self._active_turn_ids: dict[str, str] = {}
+        self._sandbox_policies: dict[str, dict[str, Any]] = {}
         app_server.register_dynamic_tool("list_skillbook", list_skillbook_tool)
         app_server.register_dynamic_tool("read_skillbook", read_skillbook_tool)
         app_server.register_dynamic_tool("search_memories", search_memories_tool)
@@ -416,22 +429,30 @@ class CodexEngine:
         developer_instructions = (config or {}).get("developer_instructions")
         if isinstance(developer_instructions, str) and developer_instructions:
             params["developerInstructions"] = developer_instructions
+        params["developerInstructions"] = params.get("developerInstructions", "") + _permission_instructions(approval)
         result = await app_server.request("thread/start", params, timeout=20)
         tid = (result.get("thread") or {}).get("id")
         if not isinstance(tid, str):
             raise AppServerError("thread/start 응답에 threadId가 없습니다")
+        if isinstance(result.get("sandbox"), dict):
+            self._sandbox_policies[tid] = dict(result["sandbox"])
         return tid
 
     async def resume_thread(self, *, thread_id: str, cwd: str, config: dict[str, Any] | None = None) -> str:
         merged = _merge_config(_BASE_CONFIG, config)
-        params: dict[str, Any] = {"threadId": thread_id, "cwd": cwd, "config": merged}
+        params: dict[str, Any] = {"threadId": thread_id, "cwd": cwd, "config": merged, "sandbox": "workspace-write"}
+        if (config or {}).get("approval"):
+            params["approvalPolicy"] = config["approval"]
         developer_instructions = (config or {}).get("developer_instructions")
         if isinstance(developer_instructions, str) and developer_instructions:
             params["developerInstructions"] = developer_instructions
+        params["developerInstructions"] = params.get("developerInstructions", "") + _permission_instructions((config or {}).get("approval"))
         result = await app_server.request("thread/resume", params, timeout=20)
         tid = (result.get("thread") or {}).get("id")
         if not isinstance(tid, str):
             raise AppServerError("thread/resume 응답에 threadId가 없습니다")
+        if isinstance(result.get("sandbox"), dict):
+            self._sandbox_policies[tid] = dict(result["sandbox"])
         return tid
 
     async def run_turn(
@@ -506,12 +527,15 @@ class CodexEngine:
         if isinstance(writable_roots, list):
             roots = [str(path) for path in writable_roots if isinstance(path, str) and path]
             if roots:
-                # scope cwd 밖의 Notes 워크스페이스에도 문서를 저장할 수 있게 한다. 이 정책은
-                # 현재 turn과 이후 turn에 적용되며, 허용 목록 밖 쓰기는 여전히 sandbox가 막는다.
-                turn_params["sandboxPolicy"] = {
-                    "type": "workspaceWrite",
-                    "writableRoots": list(dict.fromkeys(roots)),
-                }
+                # Preserve the effective CLI network and temp-directory policy.
+                # Replacing it with only writableRoots reset networkAccess to false,
+                # so SSH/fetch failed even when the user's CLI enabled networking.
+                policy = self._sandbox_policies.get(thread_id, {"type": "workspaceWrite"})
+                if policy.get("type") == "workspaceWrite":
+                    turn_params["sandboxPolicy"] = {
+                        **policy,
+                        "writableRoots": list(dict.fromkeys([*policy.get("writableRoots", []), *roots])),
+                    }
         if (config or {}).get("output_schema"):
             turn_params["outputSchema"] = config["output_schema"]
 

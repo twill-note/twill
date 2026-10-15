@@ -5,11 +5,20 @@ import json
 from pathlib import Path
 import shutil
 import signal
+import sys
 
 
 def codex_process_options() -> dict:
     env = dict(os.environ)
     env.pop("TWILL_DESKTOP_SHUTDOWN_TOKEN", None)
+    env.pop("TWILL_DESKTOP_PARENT_PIPE", None)
+    if os.name == "nt" and getattr(sys, "frozen", False):
+        bundled = ntpath.normcase(ntpath.normpath(sys._MEIPASS))
+        for key in list(env):
+            if key.lower() == "path":
+                env[key] = ";".join(entry for entry in env[key].split(";")
+                    if not (ntpath.normcase(ntpath.normpath(entry.strip('"'))) == bundled
+                            or ntpath.normcase(ntpath.normpath(entry.strip('"'))).startswith(bundled + "\\")))
     return {"env": env, **({"creationflags": 0x08000200} if os.name == "nt" else {"start_new_session": True})}
 
 

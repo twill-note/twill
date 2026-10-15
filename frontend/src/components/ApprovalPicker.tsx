@@ -21,7 +21,10 @@ export default function ApprovalPicker({ value, onChange, disabled, label, title
   const trigger = useRef<HTMLButtonElement>(null)
   const menu = useRef<HTMLDivElement>(null)
   const id = useId()
-  const options = [{ value: 'never' as const, label: t('자동 모드') }, { value: 'on-request' as const, label: t('승인 모드') }]
+  const options = [
+    { value: 'never' as const, label: t('자동 모드'), description: t('허용된 범위에서 실행하며 추가 권한은 요청하지 않습니다.') },
+    { value: 'on-request' as const, label: t('승인 모드'), description: t('Git·SSH 등 추가 권한이 필요한 명령은 승인을 요청합니다.') },
+  ]
   useEffect(() => {
     if (!open || disabled) return
     const rect = trigger.current!.getBoundingClientRect()
@@ -41,7 +44,7 @@ export default function ApprovalPicker({ value, onChange, disabled, label, title
     }
   }, [open, disabled])
   return <>
-    <button ref={trigger} type="button" aria-label={label} title={title} disabled={disabled || saving} aria-haspopup="listbox" aria-expanded={open && !disabled} aria-controls={open ? id : undefined}
+    <button ref={trigger} type="button" aria-label={label} title={title ?? options.find(option => option.value === value)?.description} disabled={disabled || saving} aria-haspopup="listbox" aria-expanded={open && !disabled} aria-controls={open ? id : undefined}
       className="flex items-center gap-2 whitespace-nowrap rounded border border-[#e3e2e0] bg-white px-2 py-1 text-[11px] text-[#37352f] hover:bg-[#f7f7f5] disabled:opacity-50"
       onClick={event => { event.stopPropagation(); setOpen(!open) }}
       onKeyDown={event => { if (event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); setOpen(true) } }}>
@@ -58,7 +61,7 @@ export default function ApprovalPicker({ value, onChange, disabled, label, title
           buttons[event.key === 'Home' ? 0 : event.key === 'End' ? 1 : (current + 1) % 2]?.focus()
         }
       }}>
-      {options.map(option => <button type="button" key={option.value} role="option" aria-selected={value === option.value}
+      {options.map(option => <button type="button" key={option.value} role="option" title={option.description} aria-selected={value === option.value}
         className="flex w-full items-center gap-2 rounded px-2 py-2 text-left text-[12px] hover:bg-[#f7f7f5] focus:bg-[#f1f1ef] focus:outline-none"
         onClick={async event => {
           event.stopPropagation(); setOpen(false); trigger.current?.focus()

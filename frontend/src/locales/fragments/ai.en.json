@@ -222,6 +222,8 @@
     "저장 완료": "Saved",
     "저장 실패": "Save failed",
     "모드 설정을 저장했습니다.": "Mode setting saved.",
-    "모드 설정을 저장하지 못했습니다. 다시 시도해주세요.": "Could not save the mode setting. Please try again."
+    "모드 설정을 저장하지 못했습니다. 다시 시도해주세요.": "Could not save the mode setting. Please try again.",
+    "허용된 범위에서 실행하며 추가 권한은 요청하지 않습니다.": "Runs within current permissions without requesting additional access.",
+    "Git·SSH 등 추가 권한이 필요한 명령은 승인을 요청합니다.": "Requests approval when commands such as Git or SSH need additional access."
   }
 }

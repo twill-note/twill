@@ -235,6 +235,17 @@ class DocumentStorageRoutingTests(unittest.TestCase):
 
 class CodexSandboxRoutingTests(unittest.IsolatedAsyncioTestCase):
     async def test_turn_policy_keeps_scope_and_notes_workspace_writable(self):
+        await self.check_policy(None, {"type": "workspaceWrite", "writableRoots": ["/notes", "/project/csmsp"]})
+
+    async def test_cli_network_and_temp_policy_survives_app_writable_roots(self):
+        policy = {"type": "workspaceWrite", "networkAccess": True, "excludeSlashTmp": True,
+                  "excludeTmpdirEnvVar": True, "writableRoots": ["/cli-root"]}
+        await self.check_policy(policy, {**policy, "writableRoots": ["/cli-root", "/notes", "/project/csmsp"]})
+
+    async def test_restricted_cli_policy_is_not_replaced_by_workspace_write(self):
+        await self.check_policy({"type": "readOnly"}, None)
+
+    async def check_policy(self, policy, expected):
         engine = CodexEngine()
         requests = []
         callbacks = []
@@ -252,6 +263,8 @@ class CodexSandboxRoutingTests(unittest.IsolatedAsyncioTestCase):
 
         async def request(method, params, timeout):
             requests.append((method, params))
+            if method in {"thread/start", "thread/resume"}:
+                return {"thread": {"id": "thread-1"}, "sandbox": policy}
             if method == "turn/start":
                 for callback in list(callbacks):
                     callback("turn/completed", {"threadId": "thread-1", "turn": {"id": "turn-1"}})
@@ -262,6 +275,8 @@ class CodexSandboxRoutingTests(unittest.IsolatedAsyncioTestCase):
             patch("app.plugins.codex_assistant.codex_engine.app_server.subscribe", subscribe),
             patch("app.plugins.codex_assistant.codex_engine.app_server.request", request),
         ):
+            await engine.start_thread(cwd="/project/csmsp")
+            await engine.resume_thread(thread_id="thread-1", cwd="/project/csmsp", config={"approval": "on-request"})
             events = [
                 event
                 async for event in engine.run_turn(
@@ -274,10 +289,9 @@ class CodexSandboxRoutingTests(unittest.IsolatedAsyncioTestCase):
             ]
 
         turn_params = next(params for method, params in requests if method == "turn/start")
-        self.assertEqual(
-            {"type": "workspaceWrite", "writableRoots": ["/notes", "/project/csmsp"]},
-            turn_params["sandboxPolicy"],
-        )
+        self.assertEqual(expected, turn_params.get("sandboxPolicy"))
+        resume_params = next(params for method, params in requests if method == "thread/resume")
+        self.assertEqual("on-request", resume_params["approvalPolicy"])
         self.assertTrue(any(event.get("type") == "turn_done" for event in events))
 
 

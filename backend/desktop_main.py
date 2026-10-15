@@ -11,12 +11,13 @@ import sys
 def main() -> None:
     import uvicorn
     from app.main import app as twill_app
-    from app.desktop_lifecycle import own_windows_process_tree, watch_desktop_parent
+    from app.desktop_lifecycle import own_windows_process_tree, watch_desktop_parent, configure_frozen_subprocesses
 
     parser = argparse.ArgumentParser(description="Twill local backend")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8000)
     args = parser.parse_args()
+    dll_directory = configure_frozen_subprocesses()
     job = own_windows_process_tree() if os.environ.get("NOTE_APP_DESKTOP") == "1" else None
     server = uvicorn.Server(uvicorn.Config(
         twill_app, host=args.host, port=args.port, log_level="info", timeout_graceful_shutdown=3,
@@ -30,6 +31,7 @@ def main() -> None:
             parent_watch.set()
     # Process exit closes the retained job handle and reaps Windows descendants.
     _ = job
+    _ = dll_directory
 
 
 if __name__ == "__main__":

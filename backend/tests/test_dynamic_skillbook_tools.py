@@ -95,7 +95,8 @@ class DynamicSkillBookToolTests(unittest.TestCase):
              "list_calendar_events", "create_calendar_event", "update_calendar_event", "delete_calendar_event",
              "list_todos", "create_todo", "complete_todo"],
         )
-        self.assertEqual(call.args[1]["developerInstructions"], "짧은 공통 지시")
+        self.assertTrue(call.args[1]["developerInstructions"].startswith("짧은 공통 지시\n"))
+        self.assertIn("자동 모드에서는 추가 권한을 요청할 수 없다", call.args[1]["developerInstructions"])
 
 
 if __name__ == "__main__":

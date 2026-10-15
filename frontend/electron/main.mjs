@@ -111,6 +111,7 @@ const windowResizeSampleMs = 16
 const windowResizeAckTimeoutMs = 32
 let windowsScreenInfoPromise = null
 let backendLog = ''
+let backendStartError = null
 let frontendRevision = null
 
 function rendererUrl(relativePath = '/') {
@@ -191,7 +192,8 @@ async function probeBackendCodexProfile(baseUrl) {
 async function waitForBackend(baseUrl, timeoutMs = 30_000) {
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
-    if (backendProcess?.exitCode !== null) {
+    if (backendStartError) throw new Error(`백엔드를 실행하지 못했습니다: ${backendStartError.message}`)
+    if (backendProcess?.exitCode !== null || backendProcess?.signalCode) {
       throw new Error(`백엔드가 시작 중 종료되었습니다.\n\n${backendLog.trim()}`)
     }
     if (await probe(`${baseUrl}/api/workspace`)) return
@@ -218,7 +220,7 @@ async function startOrReuseBackend() {
     const candidate = `http://${options.backendHost}:${port}`
     if (!await canListenOnPort(options.backendHost, port)) {
       if (
-        !process.argv.includes('--fresh-backend') &&
+        !app.isPackaged && process.argv.includes('--reuse-backend') && !process.argv.includes('--fresh-backend') &&
         await probe(`${candidate}/api/workspace`) &&
         await probeNoteFrontend(candidate, expectedFrontendHtml) &&
         await probeBackendCodexProfile(candidate)
@@ -247,6 +249,8 @@ async function startOrReuseBackend() {
 
 async function startBackendAtPort(baseUrl, port) {
   backendLog = ''
+  backendStartError = null
+  backendReady = false
   const command = app.isPackaged ? packagedBackend : resolvePython()
   const commandArgs = app.isPackaged
     ? ['--host', options.backendHost, '--port', String(port)]
@@ -278,9 +282,10 @@ async function startBackendAtPort(baseUrl, port) {
         NOTE_APP_FRONTEND_DIST: frontendDist,
         NOTE_APP_DESKTOP: '1',
         TWILL_DESKTOP_SHUTDOWN_TOKEN: backendShutdownToken,
+        TWILL_DESKTOP_PARENT_PIPE: '1',
         PYTHONUNBUFFERED: '1',
       },
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: ['pipe', 'pipe', 'pipe'],
       windowsHide: true,
       detached: process.platform !== 'win32',
     },
@@ -290,7 +295,10 @@ async function startBackendAtPort(baseUrl, port) {
   backendStopPromise = null
   backendProcess.stdout.on('data', appendBackendLog)
   backendProcess.stderr.on('data', appendBackendLog)
-  backendProcess.once('error', (error) => appendBackendLog(error.stack || error.message))
+  backendProcess.once('error', (error) => { backendStartError = error; appendBackendLog(error.stack || error.message) })
+  backendProcess.stdin.on('error', (error) => {
+    if (error.code !== 'EPIPE') appendBackendLog(error.message)
+  })
   backendProcess.once('exit', (code, signal) => {
     if (!quitting && backendReady) {
       dialog.showErrorBox(

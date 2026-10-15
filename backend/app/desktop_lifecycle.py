@@ -5,11 +5,36 @@ import asyncio
 import ctypes
 import os
 import secrets
+import threading
 from ctypes import wintypes
 
 from fastapi import APIRouter, HTTPException, Request
 
 router = APIRouter(prefix="/api/desktop", include_in_schema=False)
+
+
+def watch_desktop_parent(stream, request_shutdown, *, timeout=12.0, force_exit=os._exit):
+    """Electron owns the pipe; EOF also arrives after a crash or forced exit.
+
+    The watchdog runs independently of the ASGI loop so a stuck Windows backend
+    still exits and its kill-on-close Job Object reaps all descendants.
+    """
+    finished = threading.Event()
+
+    def watch():
+        try:
+            while stream.read(1):
+                pass
+        except (OSError, ValueError):
+            pass
+        if finished.is_set():
+            return
+        request_shutdown()
+        if not finished.wait(timeout):
+            force_exit(1)
+
+    threading.Thread(target=watch, name="desktop-parent", daemon=True).start()
+    return finished
 
 
 @router.post("/shutdown")

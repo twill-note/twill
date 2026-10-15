@@ -5,14 +5,30 @@ import subprocess
 import sys
 from types import SimpleNamespace
 import unittest
+import io
+import threading
 from unittest.mock import patch
 
 from fastapi import HTTPException
-from app.desktop_lifecycle import shutdown
+from app.desktop_lifecycle import shutdown, watch_desktop_parent
 from app.plugins.codex_assistant.cli import codex_process_options
 
 
 class DesktopShutdownTests(unittest.IsolatedAsyncioTestCase):
+    async def test_parent_pipe_close_requests_shutdown_and_does_not_force_clean_exit(self):
+        stopped = threading.Event()
+        forced = []
+        finished = watch_desktop_parent(io.BytesIO(b''), stopped.set, timeout=.1, force_exit=forced.append)
+        self.assertTrue(await asyncio.to_thread(stopped.wait, 1))
+        finished.set()
+        await asyncio.sleep(.15)
+        self.assertEqual(forced, [])
+
+    async def test_parent_pipe_close_forces_stuck_backend_exit(self):
+        forced = threading.Event()
+        watch_desktop_parent(io.BytesIO(b''), lambda: None, timeout=.01, force_exit=lambda _: forced.set())
+        self.assertTrue(await asyncio.to_thread(forced.wait, 1))
+
     async def test_shutdown_requires_the_desktop_token_and_managed_server(self):
         request = SimpleNamespace(headers={}, app=SimpleNamespace(state=SimpleNamespace()))
         with patch.dict(os.environ, {"TWILL_DESKTOP_SHUTDOWN_TOKEN": "test-secret"}):

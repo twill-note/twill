@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useShallow } from 'zustand/react/shallow'
 import { api } from '../api'
 import { useAppStore } from '../store'
 import type { NoteMeta } from '../types'
@@ -14,7 +15,9 @@ const MIN_WIDTH = 256
 
 export default function Sidebar() {
   const { setPaletteOpen, tags, refreshTags, refreshTree, tagFilter, setTagFilter, openFile, root, loadWorkspace } =
-    useAppStore()
+    useAppStore(useShallow(s => ({ setPaletteOpen: s.setPaletteOpen, tags: s.tags,
+      refreshTags: s.refreshTags, refreshTree: s.refreshTree, tagFilter: s.tagFilter,
+      setTagFilter: s.setTagFilter, openFile: s.openFile, root: s.root, loadWorkspace: s.loadWorkspace })))
   const [tagNotes, setTagNotes] = useState<NoteMeta[]>([])
   const [reindexing, setReindexing] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)

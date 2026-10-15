@@ -1,9 +1,19 @@
 import type { AiSession } from '../src/aiStore.ts'
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { sessionProjectId } from '../src/aiProjectGroups.ts'
+import { sessionProjectId, createSessionListSelector } from '../src/aiProjectGroups.ts'
 
 const sections = [{ id: 'a', scope_id: 'shared' }, { id: 'b', scope_id: 'shared' }, { id: 'c', scope_id: 'c-scope' }]
+
+test('conversation navigation ignores streaming text but updates status and titles', () => {
+  const select = createSessionListSelector()
+  const session = {id:'one',title:'Chat',busy:true,queued:false,kind:'chat',updatedAt:1} as AiSession
+  const first = select({sessions:[session]})
+  for (let i=0; i<1000; i++) {
+    assert.equal(select({sessions:[{...session,messages:[{role:'assistant',content:'x'.repeat(i)}]}]}), first)
+  }
+  assert.notEqual(select({sessions:[{...session,busy:false}]}), first)
+})
 
 test('explicit project wins when projects share the same scope', () => {
   assert.equal(sessionProjectId({ sectionId: 'b', scopeId: 'shared' }, sections), 'b')

@@ -6,6 +6,7 @@ import shutil
 import tempfile
 import time
 from pathlib import Path
+from functools import lru_cache
 from urllib.parse import unquote, urlsplit, parse_qs
 
 import frontmatter
@@ -129,7 +130,34 @@ def rel_str(p: Path) -> str:
 def _special_note_kind(path: Path) -> str | None:
     """자동 관리 메모리/지시사항은 트리에서도 일반 노트와 구분해 보여준다."""
     try:
-        note_type = str(frontmatter.load(path).metadata.get("type") or "")
+        stat = path.stat()
+        return _cached_special_note_kind(path, stat.st_mtime_ns, stat.st_size)
+    except OSError:
+        return None
+
+
+@lru_cache(maxsize=4096)
+def _cached_special_note_kind(path: Path, mtime_ns: int, size: int) -> str | None:
+    # Cache metadata only. Reading each document body on every AI filesystem event
+    # made a tree refresh proportional to the total size of the workspace.
+    try:
+        with path.open(encoding="utf-8-sig") as source:
+            first = source.readline(65536)
+            if first.strip() != "---":
+                return None
+            lines = [first]
+            length = len(first)
+            while length < 65536:
+                line = source.readline(65536 - length)
+                if not line:
+                    return None
+                lines.append(line)
+                length += len(line)
+                if line.strip() == "---":
+                    break
+            else:
+                return None
+        note_type = str(frontmatter.loads("".join(lines)).metadata.get("type") or "")
     except Exception:  # noqa: BLE001
         return None
     return note_type if note_type in {"agents", "memories"} else None

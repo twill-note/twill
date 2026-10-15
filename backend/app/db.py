@@ -56,6 +56,8 @@ def get_conn() -> sqlite3.Connection:
             conn.close()
         conn = sqlite3.connect(path)
         conn.row_factory = sqlite3.Row
+        # AI indexing writes must not block concurrent tree/tag reads.
+        conn.execute("PRAGMA journal_mode=WAL")
         conn.executescript(SCHEMA)
         # 기존 DB 마이그레이션 (컬럼이 이미 있으면 무시)
         for stmt in (

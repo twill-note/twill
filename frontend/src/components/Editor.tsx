@@ -1,4 +1,5 @@
 import DocumentFind from './DocumentFind'
+import { useShallow } from 'zustand/react/shallow'
 import { DOCUMENT_RELOCATED, remapDocumentPath, registerDocumentSave, type DocumentRelocation } from '../documentPaths'
 import { registerRestartGuard } from '../restartGuards'
 import { exportDocumentPdf } from '../exportPdf'
@@ -641,8 +642,7 @@ export function toMarkdownBlocks(blocks: any[]): any[] {
 export default function Editor({ path }: { path?: string }) {
   const storeCurrentPath = useAppStore((s) => s.currentPath)
   const currentPath = path ?? storeCurrentPath
-  const runLogPath = useAiStore((s) => s.runLogPath)
-  const runLogVersion = useAiStore((s) => s.runLogVersion)
+  const runLogVersion = useAiStore((s) => s.runLogPath === currentPath ? s.runLogVersion : 0)
   const [content, setContent] = useState<FileContent | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
@@ -675,7 +675,7 @@ export default function Editor({ path }: { path?: string }) {
   // 현재 열린 노트가 orchestrator 가 스트리밍 중인 run log 파일이면,
   // run 이벤트가 발생할 때마다 자동으로 최신 상태를 다시 불러옴.
   useEffect(() => {
-    if (currentPath && runLogPath && currentPath === runLogPath) {
+    if (currentPath && runLogVersion) {
       setReloadKey((k) => k + 1)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -738,7 +738,10 @@ function NoteEditor({
   // 다크 테마(노르드)일 때 BlockNote 도 다크로 — 나머지 테마는 라이트 유지
   const appTheme = useThemeStore((s) => s.theme)
   const editorTheme = isDarkTheme(appTheme) ? ('dark' as const) : ('light' as const)
-  const { setSaveStatus, saveStatus, refreshTags, openFile, refreshTree, tree } = useAppStore()
+  const { setSaveStatus, saveStatus, refreshTags, openFile, refreshTree, tree } = useAppStore(useShallow(s => ({
+    setSaveStatus: s.setSaveStatus, saveStatus: s.saveStatus, refreshTags: s.refreshTags,
+    openFile: s.openFile, refreshTree: s.refreshTree, tree: s.tree,
+  })))
   const [fm, setFm] = useState<Frontmatter>(content.frontmatter)
   const [tagInput, setTagInput] = useState('')
   const [links, setLinks] = useState<NoteLinks | null>(null)

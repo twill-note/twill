@@ -1,9 +1,10 @@
-import { useEffect, useLayoutEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useAppStore } from '../store'
 import ByeoriPanel from './ByeoriPanel'
 import { useAiStore } from '../aiStore'
 import { sessionIdFromAiTab } from '../aiTabs'
+import { createSessionListSelector } from '../aiProjectGroups'
 
 const containers = new Map<string, HTMLDivElement>()
 function panelContainer(tabId: string) {
@@ -57,7 +58,8 @@ export default function AiPlacement() {
   const tabs = useAppStore((s) => s.openTabs)
   const dockedId = useAppStore((s) => s.dockedAiTabId)
   const dockedTabs = useAppStore((s) => s.dockedAiTabs)
-  const sessions = useAiStore((s) => s.sessions)
+  const sessionListSelector = useMemo(createSessionListSelector, [])
+  const sessions = useAiStore(sessionListSelector)
   const loaded = useAiStore((s) => s.sessionsLoaded)
   useEffect(() => {
     const open = new Set(tabs.filter((tab) => tab.kind === 'ai').map((tab) => tab.id))

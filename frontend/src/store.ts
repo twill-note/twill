@@ -246,10 +246,11 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   refreshTree: async () => {
     const { children } = await api.tree()
-    set({ tree: children })
+    if (JSON.stringify(get().tree) !== JSON.stringify(children)) set({ tree: children })
   },
   refreshTags: async () => {
-    set({ tags: await api.tags() })
+    const tags = await api.tags()
+    if (JSON.stringify(get().tags) !== JSON.stringify(tags)) set({ tags })
   },
   refreshSections: async () => {
     const { sections } = await api.workspaceSettings.getSections()

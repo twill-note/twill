@@ -10,6 +10,20 @@ export function sessionProjectId(session: Pick<AiSession, 'sectionId' | 'scopeId
 
 export type ProjectSession = Pick<AiSession, 'id' | 'title' | 'sectionId' | 'scopeId' | 'busy' | 'queued'>
 
+const sessionListKeys = ['id', 'title', 'kind', 'taskPath', 'scopeId', 'lastScopeLabel', 'model', 'effort', 'busy', 'queued', 'updatedAt'] as const
+export type SessionListItem = Pick<AiSession, typeof sessionListKeys[number]>
+
+/** Hidden conversation panels subscribe to list metadata, never other chats' text. */
+export function createSessionListSelector() {
+  let previous: SessionListItem[] = []
+  return (state: { sessions: AiSession[] }): SessionListItem[] => {
+    if (state.sessions.length === previous.length && state.sessions.every((item, index) =>
+      sessionListKeys.every(key => item[key] === previous[index][key]))) return previous
+    previous = state.sessions.map(session => Object.fromEntries(sessionListKeys.map(key => [key, session[key]])) as SessionListItem)
+    return previous
+  }
+}
+
 /** Keep the file tree independent of token streams and tool output. */
 export function createProjectSessionSelector() {
   let previous: ProjectSession[] = []

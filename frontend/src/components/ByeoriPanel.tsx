@@ -28,6 +28,7 @@ import {
 import { aiBus } from '../aiBus'
 import { clearAiDraft, initialAiDraft, seedAiDraft } from '../aiDrafts'
 import { useAiStore, type AiSession, type AiMessage, type ChatImage } from '../aiStore'
+import { createSessionListSelector, type SessionListItem } from '../aiProjectGroups'
 import { isMemorySavedForRun } from '../aiMemory'
 import { useAppStore } from '../store'
 import { dialog } from '../dialog'
@@ -834,7 +835,7 @@ function shouldOfferCodexUpdate(recovery: NonNullable<AiSession['recovery']>): b
   return /401|unauthorized|model.+not supported|app-server|종료 코드\s*2|codex cli/i.test(recovery.message)
 }
 
-function sessionContextLabel(session: AiSession, scopes: WorkspaceScopeEntry[] = []): string {
+function sessionContextLabel(session: SessionListItem, scopes: WorkspaceScopeEntry[] = []): string {
   if (session.kind === 'task') return `태스크 · ${pathLabel(session.taskPath || session.title)}`
   const project = session.scopeId
     ? `프로젝트 · ${scopes.find((scope) => scope.id === session.scopeId)?.label ?? session.scopeId}`
@@ -906,7 +907,8 @@ export default function ByeoriPanel({
   const openFile = onOpenFile ?? storeOpenFile
   const openErdDesigner = onOpenErd ?? storeOpenErdDesigner
 
-  const sessions = useAiStore((s) => s.sessions)
+  const sessionListSelector = useMemo(createSessionListSelector, [])
+  const sessions = useAiStore(sessionListSelector)
   const selectedSessionId = useAiStore((s) => s.activeSessionId)
   const activeSessionId = sessionId === undefined ? selectedSessionId : sessionId
   const [initialDraft] = useState(() => initialAiDraft(sessionId))
@@ -932,7 +934,7 @@ export default function ByeoriPanel({
   const setSessionModel = useAiStore((s) => s.setSessionModel)
   const confirmRunOrder = useAiStore((s) => s.confirmRunOrder)
   const dismissRunOrder = useAiStore((s) => s.dismissRunOrder)
-  const active: AiSession | null = sessions.find((s) => s.id === activeSessionId) ?? null
+  const active = useAiStore(s => s.sessions.find(session => session.id === activeSessionId) ?? null)
   const taskScopeMismatch = Boolean(active?.sourceTaskStatus?.scope_mismatch)
   const hasRecoverableWork = sessions.some((s) => s.busy || s.queued)
 
@@ -1160,7 +1162,7 @@ export default function ByeoriPanel({
   const allFilteredSessionsSelected =
     filteredSessions.length > 0 && filteredSelectedCount === filteredSessions.length
 
-  const sessionModelLabel = (session: AiSession): string => {
+  const sessionModelLabel = (session: SessionListItem): string => {
     const model = session.model ? models.find((item) => item.id === session.model) : defaultModel
     const modelLabel = model?.displayName ?? (session.model ? session.model : '기본 모델')
     const effort =
@@ -1231,7 +1233,7 @@ export default function ByeoriPanel({
     }
   }
 
-  const requestRename = async (session: AiSession) => {
+  const requestRename = async (session: SessionListItem) => {
     const title = await dialog.prompt('대화 이름 변경', {
       defaultValue: session.title,
       placeholder: '대화 제목',
@@ -1243,7 +1245,7 @@ export default function ByeoriPanel({
     catch (error) { setUiError('대화 이름을 저장하지 못했습니다: ' + (error as Error).message) }
   }
 
-  const requestDelete = (session: AiSession) => {
+  const requestDelete = (session: SessionListItem) => {
     setSessionDeleteRequest({
       kind: 'single',
       sessionId: session.id,

@@ -154,8 +154,8 @@ export const api = {
   getContent: (path: string) =>
     request<FileContent>(`/api/files/content?path=${encodeURIComponent(path)}`),
 
-  saveContent: (path: string, frontmatter: Frontmatter, body: string, mtime: number | null, force = false) =>
-    request<{ mtime: number }>('/api/files/content', json('PUT', { path, frontmatter, body, mtime, force })),
+  saveContent: (path: string, frontmatter: Frontmatter, body: string, mtime: number | null, force = false, syncTitle = false) =>
+    request<{ path: string; mtime: number }>('/api/files/content', json('PUT', { path, frontmatter, body, mtime, force, sync_title: syncTitle })),
 
   rename: (path: string, newName: string) =>
     request<{ path: string }>('/api/files/rename', json('POST', { path, new_name: newName })),

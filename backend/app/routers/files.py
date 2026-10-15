@@ -296,6 +296,27 @@ class SaveRequest(BaseModel):
     body: str
     mtime: float | None = None  # 마지막으로 읽은 시점의 mtime (충돌 감지용)
     force: bool = False
+    sync_title: bool = False  # Document editor title changes also rename the Markdown file.
+
+
+def _title_destination(path: Path, title: str) -> Path:
+    # A title is free text; filenames must remain portable across macOS/Windows.
+    name = re.sub(r'[<>:"/\\|?*\x00-\x1f]', " ", title).strip().rstrip(". ") or "제목 없음"
+    if name.lower().endswith(".md"):
+        name = name[:-3].rstrip(". ") or "제목 없음"
+    if re.match(r"^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\.|$)", name, re.I):
+        name = "_" + name
+    # Keep enough room for UTF-8 filenames, the suffix, and collision numbering.
+    while len(name.encode("utf-8")) > 200:
+        name = name[:-1]
+    candidate = path.with_name(name + ".md")
+    suffix = 2
+    while candidate != path and (candidate.exists() or candidate.with_suffix("").exists()):
+        if candidate.is_file() and candidate.samefile(path):
+            break  # Case-only changes on Windows and default macOS filesystems.
+        candidate = path.with_name(f"{name} ({suffix}).md")
+        suffix += 1
+    return candidate
 
 
 @router.put("/content")
@@ -313,6 +334,10 @@ def save_content(req: SaveRequest):
             )
 
     fm = dict(req.frontmatter)
+    previous_title = indexer.parse_note(p)["title"] if req.sync_title else None
+    title = str(fm.get("title") or "").strip() or "제목 없음"
+    managed = p.name.upper() == "AGENTS.MD" or rel_str(p).split("/")[0] in TREE_HIDDEN_ROOT_DIRS
+    destination = _title_destination(p, title) if req.sync_title and not managed and title != previous_title else p
     extra = fm.pop("extra", None)
     if isinstance(extra, dict):
         fm = {**extra, **fm}  # 앱이 모르는 키 보존, 알려진 키가 우선
@@ -321,8 +346,11 @@ def save_content(req: SaveRequest):
         fm["tags"] = [str(t) for t in fm["tags"]]
     post = frontmatter.Post(req.body, **fm)
     p.write_text(frontmatter.dumps(post) + "\n", encoding="utf-8")
+    if destination.name != p.name:
+        result = rename_entry(RenameRequest(path=rel_str(p), new_name=destination.name))
+        p = resolve_path(result["path"])
     indexer.index_file(rel_str(p))
-    return {"mtime": p.stat().st_mtime}
+    return {"path": rel_str(p), "mtime": p.stat().st_mtime}
 
 
 def _project_agents_target(path: str) -> tuple[Path, set[str]]:
@@ -459,7 +487,7 @@ def rename_entry(req: RenameRequest):
         # 기타 문서는 사용자가 새 확장자를 명시하지 않았을 때만 기존 확장자를 보존한다.
         new_name += src.suffix
     dst = src.with_name(new_name)
-    if dst == src:
+    if dst.name == src.name:
         return {"path": rel_str(src)}
     if dst.exists() and not dst.samefile(src):
         raise HTTPException(status_code=409, detail="같은 이름이 이미 존재합니다")

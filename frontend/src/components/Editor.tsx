@@ -767,6 +767,7 @@ function NoteEditor({
     })
   }
   const mtimeRef = useRef<number | null>(content.mtime)
+  const savedTitleRef = useRef(content.frontmatter.title)
   const loadedRef = useRef(false)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const noteChoicesRef = useRef<Promise<NoteRow[]> | null>(null)
@@ -836,10 +837,17 @@ function NoteEditor({
           const markdown = await editor.blocksToMarkdownLossy(toMarkdownBlocks(blocks))
           const body = isExternal ? markdown : await preserveBlocks(markdown, blocks)
           const savingPath = pathRef.current
+          const savingFm = fmRef.current
           const res = isExternal
-            ? await api.saveContentExternal(savingPath, fmRef.current, body, mtimeRef.current, force)
-            : await api.saveContent(savingPath, fmRef.current, body, mtimeRef.current, force)
+            ? await api.saveContentExternal(savingPath, savingFm, body, mtimeRef.current, force)
+            : await api.saveContent(savingPath, savingFm, body, mtimeRef.current, force, savingFm.title !== savedTitleRef.current)
           mtimeRef.current = res.mtime
+          savedTitleRef.current = savingFm.title
+          if ('path' in res && typeof res.path === 'string' && res.path !== savingPath) {
+            pathRef.current = res.path
+            useAppStore.getState().relocateDocuments({ from: savingPath, to: res.path })
+            void refreshTree()
+          }
           setSaveStatus('saved')
           if (!isExternal) {
             refreshTags()
@@ -855,7 +863,7 @@ function NoteEditor({
       saveChainRef.current = operation.then(() => {}, () => {})
       return operation
     },
-    [editor, isExternal, setSaveStatus, refreshTags, loadLinks],
+    [editor, isExternal, setSaveStatus, refreshTags, refreshTree, loadLinks],
   )
 
   useEffect(() => registerDocumentSave(() => pathRef.current, () => save()), [save])
@@ -920,7 +928,8 @@ function NoteEditor({
     const name = await dialog.prompt('하위 노트 이름', { confirmLabel: '만들기' })
     if (!name?.trim()) return
     try {
-      const dir = content.path.replace(/\.md$/, '')
+      if (await save() === false) return
+      const dir = pathRef.current.replace(/\.md$/, '')
       const res = await api.createEntry(`${dir}/${name.trim()}`, 'file')
       const stem = res.path.split('/').pop()!.replace(/\.md$/, '')
       insertOrUpdateBlockForSlashMenu(editor, { type: 'page', props: { target: stem } })

@@ -20,8 +20,8 @@ class WindowsShellTests(unittest.TestCase):
                'SSH_AUTH_SOCK': 'agent-pipe', 'TWILL_DESKTOP_PARENT_PIPE': '1'}
         with patch('app.plugins.codex_assistant.cli.os.name', 'nt'), patch.dict('os.environ', env, clear=True), \
              patch.object(sys, 'frozen', True, create=True), patch.object(sys, '_MEIPASS', r'C:\Twill\_internal', create=True):
-            result = codex_process_options()['env']
-        self.assertEqual(result['Path'], r'C:\Git\cmd;C:\Windows\System32\OpenSSH')
+            result = {key.upper(): value for key, value in codex_process_options()['env'].items()}
+        self.assertEqual(result['PATH'], r'C:\Git\cmd;C:\Windows\System32\OpenSSH')
         self.assertEqual(result['SSH_AUTH_SOCK'], 'agent-pipe')
         self.assertNotIn('TWILL_DESKTOP_PARENT_PIPE', result)
 

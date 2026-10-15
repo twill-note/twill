@@ -71,6 +71,13 @@ class DocumentRenameTests(unittest.TestCase):
         self.assertTrue((self.root / 'original.md').exists())
         self.assertFalse((self.root / 'new.md').exists())
 
+    def test_retry_after_rename_failure_still_synchronizes_filename(self):
+        with patch.object(files, 'rename_entry', side_effect=HTTPException(status_code=409, detail='File is busy')):
+            with self.assertRaises(HTTPException):
+                self.save('new')
+        self.assertEqual(files.get_content('original.md')['frontmatter']['title'], 'new')
+        self.assertEqual(self.save('new')['path'], 'new.md')
+
     def test_metadata_only_save_preserves_existing_contract(self):
         self.assertEqual(self.save('new', sync_title=False)['path'], 'original.md')
 

@@ -362,10 +362,11 @@ def save_content(req: SaveRequest):
             )
 
     fm = dict(req.frontmatter)
-    previous_title = indexer.parse_note(p)["title"] if req.sync_title else None
     title = str(fm.get("title") or "").strip() or "제목 없음"
     managed = p.name.upper() == "AGENTS.MD" or rel_str(p).split("/")[0] in TREE_HIDDEN_ROOT_DIRS
-    destination = _title_destination(p, title) if req.sync_title and not managed and title != previous_title else p
+    # The editor explicitly requests a title sync. Retry it even if a previous
+    # attempt wrote the frontmatter but the filesystem rename then failed.
+    destination = _title_destination(p, title) if req.sync_title and not managed else p
     extra = fm.pop("extra", None)
     if isinstance(extra, dict):
         fm = {**extra, **fm}  # 앱이 모르는 키 보존, 알려진 키가 우선

@@ -15,9 +15,13 @@ app.whenReady().then(async () => {
       const body = await wait(()=>document.querySelector('.bn-editor[contenteditable="true"]'))
       await wait(()=>body.textContent.includes('Testing'))
       const before = body.innerHTML
+      assert(!document.querySelector('[role="search"]'),'find must be hidden initially')
       body.focus()
       body.dispatchEvent(new KeyboardEvent('keydown',{key:'f',ctrlKey:true,bubbles:true,cancelable:true}))
       const input = await wait(()=>document.querySelector('[aria-label="문서 검색어"]'))
+      const search = input.closest('[role="search"]')
+      assert(search.previousElementSibling?.tagName === 'HEADER','find must follow document header')
+      assert(search.getBoundingClientRect().top >= search.previousElementSibling.getBoundingClientRect().bottom,'find overlaps header')
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'testing')
       input.dispatchEvent(new Event('input',{bubbles:true}))
       await wait(()=>document.querySelector('[role="search"] [role="status"]')?.textContent==='1 / 1')

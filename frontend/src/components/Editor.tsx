@@ -942,7 +942,7 @@ function NoteEditor({
     } catch (e) {
       dialog.alert((e as Error).message)
     }
-  }, [content.path, editor, save, refreshTree, openFile])
+  }, [editor, save, refreshTree, openFile])
 
   // 본문의 [[링크]]/페이지 블록으로 이미 참조된 하위 노트는 중복 표시하지 않음.
   // 또한 이 노트가 인라인 DB 를 포함하고 있으면(=companion 폴더가 DB 폴더) 그 아래 노트들은

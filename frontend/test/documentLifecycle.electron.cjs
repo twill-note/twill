@@ -94,9 +94,36 @@ app.whenReady().then(async () => {
       assert((await api.getContent(atRoot)).frontmatter.title === finalTitle + '-saved', 'saved title mismatch')
       assert(store.getState().openTabs.length === tabCount, 'root move duplicated tab')
       assert(!store.getState().openTabs.some(tab => tab.target === original + '.md'), 'stale tab remains')
+
+      // Root context-menu creation must work even when the root is collapsed.
+      rootSection.querySelector('button').click()
+      rootSection.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 100, clientY: 200 }))
+      const newNote = await wait(() => [...document.querySelectorAll('button')].find(button => button.textContent === '📄 새 노트'), 'root context menu missing')
+      newNote.click()
+      const contextInput = await wait(() => sidebar.querySelector('input[placeholder="새 노트 이름"]'), 'collapsed root input missing')
+      setInput(contextInput, original + '-context')
+      enter(contextInput)
+      await wait(() => store.getState().currentPath === original + '-context.md', 'context menu note creation failed')
+
+      const childPath = atRoot.slice(0, -3) + '/child.md'
+      store.getState().openFile(childPath)
+      const parentId = 'file:' + atRoot, childId = 'file:' + childPath
+      store.setState({ openTabs: store.getState().openTabs.filter(tab => [parentId, childId].includes(tab.id)),
+        splitLayout: { activePanelId: 'qa-child', root: { kind: 'split', id: 'qa-split', direction: 'horizontal', ratio: 55,
+          first: { kind: 'panel', id: 'qa-parent', tabIds: [parentId], activeTabId: parentId },
+          second: { kind: 'panel', id: 'qa-child', tabIds: [childId], activeTabId: childId } } } })
+      await wait(() => document.querySelectorAll('.bn-editor[contenteditable="true"]').length === 2, 'split editors missing')
+      const editors = [...document.querySelectorAll('.bn-editor[contenteditable="true"]')]
+      await pause(200)
+      await drag(atRoot, projectSection)
+      await wait(() => store.getState().currentPath === directory + '/' + childPath, 'child viewer path stale after parent move')
+      assert(store.getState().openTabs.length === 2, 'split move changed tab count')
+      assert(editors.every(editor => editor.isConnected), 'split move replaced editors')
+      assert(store.getState().splitLayout.root.ratio === 55, 'split proportions lost')
       return { rootAboveProjects: true, rootCreationDuringStream: true, streamChunks: chunks,
         titleRenamesFile: true, childNotesPreserved: true, focusPreserved: true,
-        pendingSaveThenMove: true, editorPreserved: true, moveBackToRoot: true }
+        pendingSaveThenMove: true, editorPreserved: true, moveBackToRoot: true,
+        collapsedRootContextCreation: true, splitParentAndChildMove: true }
     })()`)
     console.log(JSON.stringify(result))
   } catch (error) {

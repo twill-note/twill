@@ -107,6 +107,7 @@ export default function MentionPopover({ state, onSelect, onDismiss }: Props) {
   useEffect(() => {
     if (!state.active) return
     const onKey = (e: KeyboardEvent) => {
+      if (e.isComposing || e.keyCode === 229) return
       if (e.key === 'ArrowDown') {
         e.preventDefault()
         setHighlighted((h) => Math.min(h + 1, results.length - 1))

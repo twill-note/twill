@@ -1,4 +1,6 @@
-import { chatUrlTransform, remarkDocumentPaths } from '../chatDocumentLinks'
+import { chatUrlTransform, documentMentionQuery, hasDocumentMention, remarkDocumentMentions, remarkDocumentPaths } from '../chatDocumentLinks'
+import type { TreeNode } from '../types'
+import type { PluggableList } from 'unified'
 import { AiApprovalMode, AiApprovalRequests } from './AiApprovalControls'
 import { notifyAiEngineChanged, offerAppRestart, subscribeAiEngineChanged } from '../aiMaintenance'
 import {
@@ -196,7 +198,7 @@ function ChatDocumentLink({
 }: AnchorHTMLAttributes<HTMLAnchorElement> & {
   root: string | null
   /** 파일 생성·삭제와 루트 전환 뒤에 검증을 다시 요청하는 갱신 신호. */
-  workspaceTree: readonly unknown[]
+  workspaceTree: readonly TreeNode[]
   openFile: (path: string) => void
   openErdDesigner: (path?: string | null, directory?: string | null) => void
 }) {
@@ -414,7 +416,7 @@ const MessageBubble = memo(function MessageBubble({
 }: {
   m: AiMessage
   root: string | null
-  workspaceTree: readonly unknown[]
+  workspaceTree: readonly TreeNode[]
   openFile: (path: string) => void
   openErdDesigner: (path?: string | null, directory?: string | null) => void
   onPreviewImage: (image: ChatImage) => void
@@ -424,6 +426,17 @@ const MessageBubble = memo(function MessageBubble({
   // 스트리밍 Markdown 파싱은 낮은 우선순위로 미뤄 입력 이벤트가 먼저 화면에 반영되게 한다.
   const content = displayContent ?? m.content
   const deferredContent = useDeferredValue(content)
+  const userRemarkPlugins = useMemo<PluggableList>(() => {
+    const paths: string[] = []
+    const collect = (nodes: readonly TreeNode[]) => {
+      for (const node of nodes) {
+        if (node.type === 'file' || node.type === 'erd') paths.push(node.path)
+        if (node.children) collect(node.children)
+      }
+    }
+    if (m.role === 'user') collect(workspaceTree)
+    return [...MARKDOWN_REMARK_PLUGINS, [remarkDocumentMentions, { paths }]]
+  }, [m.role, workspaceTree])
   const markdownComponents = useMemo(
     () => ({
       a: ({ node: _node, ...props }: { node?: unknown } & AnchorHTMLAttributes<HTMLAnchorElement>) => (
@@ -473,7 +486,7 @@ const MessageBubble = memo(function MessageBubble({
       </div>
     )
   }
-  // 사용자 메시지는 입력한 원문 그대로 (pre-wrap)
+  // 사용자 메시지의 문서 링크도 답변과 같은 경로 검증을 거쳐 연다.
   const deliveryStyle =
     m.delivery === 'pending'
       ? 'bg-[#1f1e1a]'
@@ -492,10 +505,12 @@ const MessageBubble = memo(function MessageBubble({
       {(m.content || m.streaming) && (
         <div
           // break-words 필수: 긴 URL·코드 경로 같은 공백 없는 토큰이 말풍선 밖으로 넘치지 않게
-          className={`inline-block max-w-[92%] whitespace-pre-wrap break-words rounded-lg px-3 py-2 text-left text-[13px] text-white ${deliveryStyle}`}
+          className={`chat-md chat-user-bubble inline-block max-w-[92%] break-words rounded-lg px-3 py-2 text-left text-[13px] text-white ${deliveryStyle}`}
           title={deliveryLabel}
         >
-          {m.content}
+          <ReactMarkdown remarkPlugins={userRemarkPlugins} urlTransform={chatUrlTransform} components={markdownComponents}>
+            {m.content}
+          </ReactMarkdown>
           {m.streaming && <span className="ml-0.5 inline-block h-3 w-1 animate-pulse bg-[#37352f] align-middle" />}
           {deliveryLabel && <span className="sr-only">{deliveryLabel}</span>}
         </div>
@@ -579,7 +594,7 @@ const ChatMessageList = memo(function ChatMessageList({
   messages: AiMessage[]
   isPlanSession: boolean
   root: string | null
-  workspaceTree: readonly unknown[]
+  workspaceTree: readonly TreeNode[]
   openFile: (path: string) => void
   openErdDesigner: (path?: string | null, directory?: string | null) => void
   onPreviewImage: (image: ChatImage) => void
@@ -1302,14 +1317,8 @@ export default function ByeoriPanel({
 
   // ── mention (@ 파일 참조) ──
   const detectMention = (value: string, caret: number): MentionState => {
-    const upto = value.slice(0, caret)
-    const at = upto.lastIndexOf('@')
-    if (at < 0) return { active: false, query: '', anchor: inputRef.current }
-    const prev = at > 0 ? upto[at - 1] : ' '
-    if (!/\s/.test(prev)) return { active: false, query: '', anchor: inputRef.current }
-    const query = upto.slice(at + 1)
-    if (/\s/.test(query)) return { active: false, query: '', anchor: inputRef.current }
-    return { active: true, query, anchor: inputRef.current }
+    const query = documentMentionQuery(value, caret, mentionedPaths)
+    return { active: query !== null, query: query ?? '', anchor: inputRef.current }
   }
 
   const insertMention = (path: string) => {
@@ -1336,7 +1345,7 @@ export default function ByeoriPanel({
     setPrompt(value)
     // 자동완성에서 선택한 @ 토큰을 사용자가 지우거나 고치면 본문 첨부도 함께 제거한다.
     setMentionedPaths((paths) => {
-      const retained = paths.filter((path) => value.includes(`@${path}`))
+      const retained = paths.filter((path) => hasDocumentMention(value, path))
       return retained.length === paths.length ? paths : retained
     })
     const nextMention = detectMention(value, caret)

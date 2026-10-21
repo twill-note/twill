@@ -7,11 +7,28 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const source = PNG.sync.read(fs.readFileSync(path.join(root, 'electron/assets/twill-icon.png')))
 if (source.width !== source.height || source.width < 256) throw new Error('Twill icon must be square and at least 256px.')
 
+// The shared macOS artwork has ~10% padding on each side. Windows adds its
+// own spacing, so crop only transparent outer pixels before generating ICOs.
+let left = source.width, top = source.height, right = -1, bottom = -1
+for (let y = 0; y < source.height; y++) {
+  for (let x = 0; x < source.width; x++) {
+    if (source.data[(y * source.width + x) * 4 + 3] <= 8) continue
+    left = Math.min(left, x); top = Math.min(top, y)
+    right = Math.max(right, x); bottom = Math.max(bottom, y)
+  }
+}
+if (right < left) throw new Error('Twill icon is fully transparent.')
+const artworkSize = Math.max(right - left + 1, bottom - top + 1)
+// 3% total breathing room preserves antialiasing at the outer edge.
+const cropSize = Math.min(source.width, Math.ceil(artworkSize / 0.97))
+const cropX = Math.max(0, Math.min(source.width - cropSize, Math.floor((left + right + 1 - cropSize) / 2)))
+const cropY = Math.max(0, Math.min(source.height - cropSize, Math.floor((top + bottom + 1 - cropSize) / 2)))
+
 // Area resampling uses premultiplied alpha to keep transparent edge pixels
 // from producing black fringes in Explorer's small icons.
 function resize(size) {
   const result = new PNG({ width: size, height: size })
-  const scale = source.width / size
+  const scale = cropSize / size
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       let alpha = 0
@@ -20,7 +37,7 @@ function resize(size) {
         const wy = Math.min(sy + 1, (y + 1) * scale) - Math.max(sy, y * scale)
         for (let sx = Math.floor(x * scale); sx < Math.ceil((x + 1) * scale); sx++) {
           const weight = wy * (Math.min(sx + 1, (x + 1) * scale) - Math.max(sx, x * scale))
-          const position = (sy * source.width + sx) * 4
+          const position = ((sy + cropY) * source.width + sx + cropX) * 4
           const a = source.data[position + 3] * weight
           alpha += a
           for (let channel = 0; channel < 3; channel++) rgb[channel] += source.data[position + channel] * a

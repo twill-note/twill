@@ -472,7 +472,9 @@ export default function FileTree() {
         const visibleChildren = node.children ?? []
         const hasChildren = visibleChildren.length > 0
         const isExpanded = expanded.has(node.path)
-        const creatingHere = creating && creating.dir === childDirOf(node)
+        // ERD/attachment rows use their parent as childDirOf, but cannot host
+        // child inputs: root attachments otherwise mount competing root inputs.
+        const creatingHere = creating && (node.type === 'dir' || node.type === 'file') && creating.dir === childDirOf(node)
         return (
           <div key={node.path}>
             {renaming === node.path ? (

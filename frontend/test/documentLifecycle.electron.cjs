@@ -29,6 +29,12 @@ app.whenReady().then(async () => {
       const original = 'UI-' + stamp
       const renamed = original + '-renamed'
       const sidebar = document.querySelector('#workspace-sidebar')
+      // Attachments and ERD rows used to mount additional root inputs, whose
+      // autofocus cancelled the real input before the user could enter a name.
+      await api.importFiles([
+        new File(['<svg xmlns="http://www.w3.org/2000/svg"/>'], 'root-' + stamp + '.svg', { type: 'image/svg+xml' }),
+        new File(['{}'], 'root-' + stamp + '.erd.json', { type: 'application/json' }),
+      ], '')
       const project = (await api.workspaceSettings.createProjectSection('Project-' + stamp)).section
       await store.getState().refreshSections()
       await store.getState().refreshTree()
@@ -47,6 +53,9 @@ app.whenReady().then(async () => {
       try {
         sidebar.querySelector('[title="루트에 새 노트"]').click()
         const input = await wait(() => sidebar.querySelector('input[placeholder="새 노트 이름"]'), 'root input missing')
+        await pause(150)
+        assert(input.isConnected && document.activeElement === input, 'root input lost focus to an attachment row')
+        assert(sidebar.querySelectorAll('input[placeholder="새 노트 이름"]').length === 1, 'duplicate root creation inputs')
         assert(input.getBoundingClientRect().top < projectSection.getBoundingClientRect().top, 'root input below projects')
         setInput(input, original)
         // Korean IME confirmation must not submit; the following Enter submits once.
@@ -57,6 +66,14 @@ app.whenReady().then(async () => {
         await wait(() => document.querySelector('input[placeholder="제목 없음"]'), 'editor missing')
         assert(!document.querySelector('[role="dialog"]'), 'duplicate creation dialog')
       } finally { clearInterval(stream); ai.setState({ sessions }) }
+
+      sidebar.querySelector('[title="루트에 새 폴더"]').click()
+      const folderInput = await wait(() => sidebar.querySelector('input[placeholder="새 폴더 이름"]'), 'root folder input missing')
+      await pause(150)
+      assert(folderInput.isConnected && document.activeElement === folderInput, 'root folder input lost focus')
+      setInput(folderInput, original + '-folder')
+      enter(folderInput)
+      await wait(() => store.getState().tree.some(node => node.path === original + '-folder' && node.type === 'dir'), 'root folder not created')
 
       await api.createEntry(original + '/child', 'file')
       await store.getState().refreshTree()
@@ -123,7 +140,7 @@ app.whenReady().then(async () => {
       return { rootAboveProjects: true, rootCreationDuringStream: true, streamChunks: chunks,
         titleRenamesFile: true, childNotesPreserved: true, focusPreserved: true,
         pendingSaveThenMove: true, editorPreserved: true, moveBackToRoot: true,
-        collapsedRootContextCreation: true, splitParentAndChildMove: true }
+        collapsedRootContextCreation: true, splitParentAndChildMove: true, rootWithAttachments: true, rootFolderCreation: true }
     })()`)
     console.log(JSON.stringify(result))
   } catch (error) {

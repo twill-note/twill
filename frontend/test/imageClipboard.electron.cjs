@@ -37,7 +37,7 @@ app.whenReady().then(async () => {
       const { createRoot } = reactDom.default ?? reactDom
       const { default: TaskCardPopup } = await import(url('/src/components/TaskCardPopup.tsx'))
       for (let i = 0; !store.getState().workspaceReady && i < 100; i++) await new Promise(r => setTimeout(r, 100))
-      if (!store.getState().root.endsWith('/twill-qa-notes')) throw Error('isolated workspace required')
+      if (!store.getState().root.replaceAll('\\', '/').endsWith('/twill-qa-notes')) throw Error('isolated workspace required')
       const canvas = document.createElement('canvas'); canvas.width = 8; canvas.height = 6
       const ctx = canvas.getContext('2d'); ctx.fillStyle = '#ff0000'; ctx.fillRect(0, 0, 8, 6)
       const png = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'))

@@ -24,7 +24,7 @@ app.whenReady().then(async () => {
       }
       const enter = input => input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }))
       await wait(() => store.getState().workspaceReady, 'workspace loading')
-      assert(store.getState().root.endsWith('/twill-qa-notes'), 'isolated workspace required')
+      assert(store.getState().root.replaceAll('\\', '/').endsWith('/twill-qa-notes'), 'isolated workspace required')
       const stamp = String(Date.now())
       const original = 'UI-' + stamp
       const renamed = original + '-renamed'

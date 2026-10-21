@@ -19,7 +19,7 @@ app.whenReady().then(async () => {
       const assert = (ok, label) => { if (!ok) throw Error(label) }
       const wait = async (fn, label) => { for (let i = 0; i < 100; i++) { if (fn()) return fn(); await pause(100) } throw Error(label) }
       await wait(() => store.getState().workspaceReady, 'workspace missing')
-      assert(store.getState().root.endsWith('/twill-qa-notes'), 'isolated workspace required')
+      assert(store.getState().root.replaceAll('\\', '/').endsWith('/twill-qa-notes'), 'isolated workspace required')
       const name = '공백 문서 ' + Date.now() + '.md'
       await api.createEntry(name, 'file')
       await store.getState().refreshTree()

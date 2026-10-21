@@ -38,11 +38,16 @@ app.whenReady().then(async () => {
       const { default: TaskCardPopup } = await import(url('/src/components/TaskCardPopup.tsx'))
       for (let i = 0; !store.getState().workspaceReady && i < 100; i++) await new Promise(r => setTimeout(r, 100))
       if (!store.getState().root.replaceAll('\\', '/').endsWith('/twill-qa-notes')) throw Error('isolated workspace required')
-      const canvas = document.createElement('canvas'); canvas.width = 8; canvas.height = 6
-      const ctx = canvas.getContext('2d'); ctx.fillStyle = '#ff0000'; ctx.fillRect(0, 0, 8, 6)
+      window.qaCopyEvents = []
+      document.addEventListener('copy', event => queueMicrotask(() => window.qaCopyEvents.push({
+        target: event.target?.className, handled: event.defaultPrevented,
+        viewer: event.target?.closest('.note-body-editor') ? 'task' : 'document',
+      })), true)
+      const canvas = document.createElement('canvas'); canvas.width = 160; canvas.height = 120
+      const ctx = canvas.getContext('2d'); ctx.fillStyle = '#ff0000'; ctx.fillRect(0, 0, 160, 120)
       const png = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'))
       const pngUrl = await api.uploadAsset(new File([png], 'copy.png', { type: 'image/png' }))
-      const svgUrl = await api.uploadAsset(new File(['<svg xmlns="http://www.w3.org/2000/svg" width="16" height="12"><rect width="16" height="12" fill="#00ff00"/></svg>'], 'copy.svg', { type: 'image/svg+xml' }))
+      const svgUrl = await api.uploadAsset(new File(['<svg xmlns="http://www.w3.org/2000/svg" width="192" height="144"><rect width="192" height="144" fill="#00ff00"/></svg>'], 'copy.svg', { type: 'image/svg+xml' }))
       const name = '이미지 복사 ' + Date.now() + '.md'
       await api.createEntry(name, 'file')
       const content = await api.getContent(name)
@@ -59,17 +64,21 @@ app.whenReady().then(async () => {
     for (const viewer of ['document', 'task']) {
       if (viewer === 'task') await run('window.qaTaskPopup()')
       const prefix = viewer === 'task' ? '.note-body-editor ' : ''
-      await wait(() => run(`document.querySelectorAll('${prefix}.bn-editor img').length === 2`), viewer + ' images missing')
-      for (const [index, size, color] of [[0, { width: 8, height: 6 }, [0, 0, 255]], [1, { width: 16, height: 12 }, [0, 255, 0]]]) {
+      await wait(() => run(`(() => { const images = [...document.querySelectorAll('${prefix}.bn-editor img')]; return images.length === 2 && images.every(img => img.complete && img.naturalWidth > 0) })()`), viewer + ' images missing')
+      for (const [index, size, color] of [[0, { width: 160, height: 120 }, [0, 0, 255]], [1, { width: 192, height: 144 }, [0, 255, 0]]]) {
         clipboard.clear()
-        const point = await run(`(() => {
+        const point = await run(`(async () => {
           const img = document.querySelectorAll('${prefix}.bn-editor img')[${index}]
           img.scrollIntoView({ block: 'center' })
-          const r = img.getBoundingClientRect(); return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) }
+          await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+          const r = img.getBoundingClientRect(), x = Math.round(r.x + r.width / 2), y = Math.round(r.y + r.height / 2)
+          const hit = document.elementFromPoint(x, y)
+          if (hit !== img) throw Error('Image click obstructed: ' + hit?.outerHTML.slice(0, 300))
+          return { x, y }
         })()`)
         win.webContents.sendInputEvent({ type: 'mouseDown', button: 'left', clickCount: 1, ...point })
         win.webContents.sendInputEvent({ type: 'mouseUp', button: 'left', clickCount: 1, ...point })
-        await pause(100)
+        await wait(() => run(`(() => { const img = document.querySelectorAll('${prefix}.bn-editor img')[${index}]; return !!img.closest('.ProseMirror-selectednode') && img.closest('.bn-editor') === document.activeElement })()`), viewer + ' image selection missing')
         // Chromium's native copy command follows the same DOM copy event as Cmd/Ctrl+C.
         win.webContents.copy()
         await wait(() => !clipboard.readImage().isEmpty(), viewer + ' image ' + index + ' not copied')
@@ -103,7 +112,7 @@ app.whenReady().then(async () => {
   } catch (error) {
     failed = true; console.error(error)
     fs.writeFileSync(path.join(os.tmpdir(), 'twill-image-copy-failed.png'), (await win.webContents.capturePage()).toPNG())
-    console.error(await run(`JSON.stringify({selected:[...document.querySelectorAll('.ProseMirror-selectednode')].map(e=>e.outerHTML.slice(0,700)),focus:document.activeElement?.outerHTML.slice(0,300),dialogs:[...document.querySelectorAll('[role="dialog"]')].map(e=>e.textContent)})`))
+    console.error(await run(`JSON.stringify({copies:window.qaCopyEvents,selected:[...document.querySelectorAll('.ProseMirror-selectednode')].map(e=>e.outerHTML.slice(0,700)),focus:document.activeElement?.outerHTML.slice(0,300),dialogs:[...document.querySelectorAll('[role="dialog"]')].map(e=>e.textContent)})`))
   } finally {
     clipboard.clear()
     for (const [format, data] of savedClipboard) clipboard.writeBuffer(format, data)

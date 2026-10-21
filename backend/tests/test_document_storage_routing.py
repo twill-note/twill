@@ -235,7 +235,13 @@ class DocumentStorageRoutingTests(unittest.TestCase):
 
 class CodexSandboxRoutingTests(unittest.IsolatedAsyncioTestCase):
     async def test_turn_policy_keeps_scope_and_notes_workspace_writable(self):
-        await self.check_policy(None, {"type": "workspaceWrite", "writableRoots": ["/notes", "/project/csmsp"]})
+        await self.check_policy(None, {"type": "workspaceWrite", "networkAccess": True, "writableRoots": ["/notes", "/project/csmsp"]})
+
+    async def test_cached_network_restriction_is_replaced_by_explicit_network_permission(self):
+        policy = {"type": "workspaceWrite", "networkAccess": False, "excludeSlashTmp": True,
+                  "excludeTmpdirEnvVar": True, "writableRoots": ["/cli-root"]}
+        await self.check_policy(policy, {**policy, "networkAccess": True,
+                                       "writableRoots": ["/cli-root", "/notes", "/project/csmsp"]})
 
     async def test_cli_network_and_temp_policy_survives_app_writable_roots(self):
         policy = {"type": "workspaceWrite", "networkAccess": True, "excludeSlashTmp": True,
@@ -275,7 +281,7 @@ class CodexSandboxRoutingTests(unittest.IsolatedAsyncioTestCase):
             patch("app.plugins.codex_assistant.codex_engine.app_server.subscribe", subscribe),
             patch("app.plugins.codex_assistant.codex_engine.app_server.request", request),
         ):
-            await engine.start_thread(cwd="/project/csmsp")
+            await engine.start_thread(cwd="/project/csmsp", config={"approval": "never"})
             await engine.resume_thread(thread_id="thread-1", cwd="/project/csmsp", config={"approval": "on-request"})
             events = [
                 event
@@ -283,6 +289,7 @@ class CodexSandboxRoutingTests(unittest.IsolatedAsyncioTestCase):
                     thread_id="thread-1",
                     input_text="분석 문서를 작성",
                     config={
+                        "approval": "never",
                         "workspace_write_roots": ["/notes", "/project/csmsp", "/notes"],
                     },
                 )
@@ -290,8 +297,14 @@ class CodexSandboxRoutingTests(unittest.IsolatedAsyncioTestCase):
 
         turn_params = next(params for method, params in requests if method == "turn/start")
         self.assertEqual(expected, turn_params.get("sandboxPolicy"))
+        start_params = next(params for method, params in requests if method == "thread/start")
         resume_params = next(params for method, params in requests if method == "thread/resume")
+        for params in (start_params, resume_params):
+            self.assertIs(params["config"]["sandbox_workspace_write.network_access"], True)
+            self.assertEqual("workspace-write", params["sandbox"])
+        self.assertEqual("never", start_params["approvalPolicy"])
         self.assertEqual("on-request", resume_params["approvalPolicy"])
+        self.assertEqual("never", turn_params["approvalPolicy"])
         self.assertTrue(any(event.get("type") == "turn_done" for event in events))
 
 

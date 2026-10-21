@@ -338,6 +338,7 @@ def _classify(method: str, params: dict) -> dict | None:
 # 기본 config: reasoning summary 켜기 (사고 과정 스트리밍 강제)
 _BASE_CONFIG = {
     "model_reasoning_summary": "detailed",
+    "sandbox_workspace_write.network_access": True,
 }
 
 # 이벤트가 이 시간 동안 전혀 없으면 스트림이 죽은 것으로 판단 (긴 사고·도구 실행도 델타는 흘러온다)
@@ -527,13 +528,14 @@ class CodexEngine:
         if isinstance(writable_roots, list):
             roots = [str(path) for path in writable_roots if isinstance(path, str) and path]
             if roots:
-                # Preserve the effective CLI network and temp-directory policy.
-                # Replacing it with only writableRoots reset networkAccess to false,
-                # so SSH/fetch failed even when the user's CLI enabled networking.
+                # Twill permits command networking inside workspace-write. Request
+                # it explicitly even when a resumed thread cached networkAccess=false.
+                # Keep the effective filesystem and temporary-directory restrictions.
                 policy = self._sandbox_policies.get(thread_id, {"type": "workspaceWrite"})
                 if policy.get("type") == "workspaceWrite":
                     turn_params["sandboxPolicy"] = {
                         **policy,
+                        "networkAccess": True,
                         "writableRoots": list(dict.fromkeys([*policy.get("writableRoots", []), *roots])),
                     }
         if (config or {}).get("output_schema"):

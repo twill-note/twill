@@ -92,6 +92,7 @@ contextBridge.exposeInMainWorld('noteDesktop', Object.freeze({
     return () => ipcRenderer.removeListener('desktop:prepare-restart', listener)
   },
   exportPdf: (title) => ipcRenderer.invoke('desktop:export-pdf', title),
+  copyImage: (png) => ipcRenderer.invoke('desktop:copy-image', png),
   openQuickMemo: () => ipcRenderer.invoke('desktop:open-quick-memo'),
   openByeoriWindow: (point) => ipcRenderer.invoke('desktop:open-byeori-window', point),
   focusByeoriWindow: () => ipcRenderer.invoke('desktop:focus-byeori-window'),

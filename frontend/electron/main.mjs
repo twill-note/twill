@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
 import { desktopRelaunchArgs, stopDesktopBackend } from './lifecycle.mjs'
+import { registerImageClipboard } from './image-clipboard.mjs'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -1556,6 +1557,7 @@ if (!hasSingleInstanceLock) {
         if (!window || window.isDestroyed() || typeof color !== 'string' || !/^#[0-9a-f]{6}$/i.test(color)) return
         window.setBackgroundColor(color)
       })
+      registerImageClipboard(appUrl)
       ipcMain.handle('desktop:export-pdf', async (event, title) => {
         const window = BrowserWindow.fromWebContents(event.sender)
         if (!window || window.isDestroyed() || new URL(event.senderFrame.url).origin !== new URL(appUrl).origin) {

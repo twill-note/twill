@@ -93,6 +93,10 @@ jobs:
         working-directory: frontend
         timeout-minutes: 3
         run: npm run test:desktop-shutdown
+      - name: Verify document and clipboard UI
+        working-directory: frontend
+        timeout-minutes: 5
+        run: node test/viewerRegressions.cjs
 
   installers:
     if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.build_installers)
@@ -140,6 +144,18 @@ jobs:
         working-directory: frontend
         timeout-minutes: 3
         run: npm run test:desktop-shutdown
+      - name: Verify network fix in packaged backend
+        shell: python {0}
+        run: |
+          import os
+          import subprocess
+          from pathlib import Path
+          pattern = 'win-unpacked/resources/backend/twill-backend/twill-backend.exe' if os.name == 'nt' else 'mac*/Twill.app/Contents/Resources/backend/twill-backend/twill-backend'
+          binaries = list(Path('frontend/release').glob(pattern))
+          if len(binaries) != 1:
+              raise RuntimeError(f'Expected one packaged backend, found {binaries}')
+          python = Path('backend/.venv') / ('Scripts/python.exe' if os.name == 'nt' else 'bin/python')
+          subprocess.run([str(python), 'scripts/verify_packaged_backend.py', str(binaries[0])], check=True)
       - uses: actions/upload-artifact@v7
         with:
           name: Twill-${{ runner.os }}-${{ runner.arch }}

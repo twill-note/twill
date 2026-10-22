@@ -1,6 +1,7 @@
 import { chatUrlTransform, documentMentionQuery, hasDocumentMention, remarkDocumentMentions, remarkDocumentPaths } from '../chatDocumentLinks'
 import type { TreeNode } from '../types'
 import type { PluggableList } from 'unified'
+import DocumentFind from './DocumentFind'
 import { AiApprovalMode, AiApprovalRequests } from './AiApprovalControls'
 import { notifyAiEngineChanged, offerAppRestart, subscribeAiEngineChanged } from '../aiMaintenance'
 import {
@@ -1011,6 +1012,8 @@ export default function ByeoriPanel({
   }, [root])
 
   const scrollRef = useRef<HTMLDivElement>(null)
+  const findScopeRef = useRef<HTMLDivElement>(null)
+  const [findOpen, setFindOpen] = useState(false)
   const stickBottomRef = useRef(true)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const sessionDeleteConfirmRef = useRef<HTMLButtonElement>(null)
@@ -1129,10 +1132,10 @@ export default function ByeoriPanel({
     stickBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 60
   }
   useEffect(() => {
-    if (stickBottomRef.current) {
+    if (stickBottomRef.current && !findOpen) {
       scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight })
     }
-  }, [active?.messages, active?.id])
+  }, [active?.messages, active?.id, findOpen])
 
   // 실행 시간은 서버 이벤트 도착 여부와 독립적으로 1초마다 갱신한다. 멈춘 연결도 "진행 중"처럼
   // 보이지 않게, busy가 해제되면 타이머도 바로 정리한다.
@@ -1648,7 +1651,10 @@ export default function ByeoriPanel({
         : '실행 요약'
 
   return (
-    <div className="relative flex h-full flex-col bg-white" data-ai-conversation={activeSessionId ?? 'new'}>
+    <div ref={findScopeRef} tabIndex={-1} className="relative flex h-full flex-col bg-white outline-none" data-ai-conversation={activeSessionId ?? 'new'}
+      onPointerDown={event => {
+        if (event.target instanceof Element && !event.target.closest('input, textarea, button, a, [contenteditable="true"]')) event.currentTarget.focus({ preventScroll: true })
+      }}>
       {/* 헤더에는 선택한 대화 하나만 두고, 목록·수정은 드롭다운에서 처리한다. */}
       <div className="relative flex h-8 shrink-0 items-center gap-2 border-b border-[#e9e9e7] bg-[#f7f7f5] px-3 text-[12px] text-[#5f5e5b]">
         <button
@@ -1936,6 +1942,7 @@ export default function ByeoriPanel({
 
       {active?.sourceTask && <div className="shrink-0 border-b border-[#e9e9e7] px-3 py-2"><TaskSourceBanner session={active} openFile={openFile} /></div>}
       {/* 메시지 스트림 */}
+      <DocumentFind key={activeSessionId ?? 'new'} scope={findScopeRef} body={scrollRef} scroll={scrollRef} kind="chat" onOpenChange={setFindOpen} />
       <div ref={scrollRef} onScroll={onScroll} data-ai-message-scroll className="min-h-0 flex-1 space-y-2.5 overflow-y-auto p-3">
         {!active && sessionsLoaded && (
           <div className="mt-10 flex flex-col items-center gap-2 text-center text-[12px] text-[#9b9a97]">

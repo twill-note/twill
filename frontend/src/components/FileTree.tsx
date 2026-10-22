@@ -13,6 +13,7 @@ import ProjectAiTasks from './ProjectAiTasks'
 import { createProjectSessionSelector, sessionProjectId } from '../aiProjectGroups'
 import { tr } from '../i18n'
 import { remapDocumentPath, saveDocumentsBeforeMove } from '../documentPaths'
+import { useTreeExpansion } from '../useTreeExpansion'
 
 interface MenuState {
   x: number
@@ -78,12 +79,7 @@ export default function FileTree() {
     saveSections: s.saveSections, openDatabase: s.openDatabase,
   })))
   const rootName = root?.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || root || tr('문서')
-  const [expanded, setExpanded] = useState<Set<string>>(new Set())
-  const [rootExpanded, setRootExpandedState] = useState<boolean>(() => localStorage.getItem('filetree.root-expanded') !== '0')
-  const setRootExpanded = (v: boolean) => {
-    setRootExpandedState(v)
-    localStorage.setItem('filetree.root-expanded', v ? '1' : '0')
-  }
+  const { expanded, setExpanded, rootExpanded, setRootExpanded } = useTreeExpansion(root)
   const [menu, setMenu] = useState<MenuState | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
   const treeRef = useRef<HTMLDivElement>(null)

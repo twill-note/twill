@@ -57,6 +57,10 @@ app.whenReady().then(async () => {
       store.getState().openFile(note)
       store.getState().togglePinnedNote(note)
       const body = await wait(() => [...document.querySelectorAll('.bn-editor')].find(node => node.textContent.includes('마지막 결과')), 'document missing')
+      // Korean web fonts can finish after the initial layout on Windows CI.
+      // Measure search scrolling only after that independent layout change.
+      await document.fonts.ready
+      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
       body.focus(); key(body, 'f', { ctrlKey: true })
       const search = await wait(() => document.querySelector('[aria-label="문서 검색어"]'), 'document find missing')
       input(search, 'needle')
@@ -66,10 +70,11 @@ app.whenReady().then(async () => {
       let scroller = body.parentElement
       while (scroller && getComputedStyle(scroller).overflowY !== 'auto') scroller = scroller.parentElement
       assert(scroller && scroller.scrollTop > 100, 'search did not reveal last result')
-      scroller.scrollTop = 100; await pause(100)
+      scroller.scrollTop = 100; await pause(200)
+      const beforeMutation = { top: scroller.scrollTop, height: scroller.scrollHeight, status: status(), fonts: document.fonts.status }
       const toolbar = document.createElement('span'); toolbar.textContent = 'temporary image toolbar'
       body.parentElement.append(toolbar); await pause(300)
-      assert(Math.abs(scroller.scrollTop - 100) < 3 && status() === '2 / 2', 'DOM update reset the selected match or manual scroll')
+      assert(Math.abs(scroller.scrollTop - beforeMutation.top) < 3 && status() === '2 / 2', 'DOM update reset the selected match or manual scroll: ' + JSON.stringify({ before: beforeMutation, after: { top: scroller.scrollTop, height: scroller.scrollHeight, status: status(), fonts: document.fonts.status } }))
       toolbar.remove(); await pause(200)
       scroller.scrollTop = 600; await pause(100)
       key(search, 'Enter'); await wait(() => status() === '1 / 2', 'wrap navigation failed')

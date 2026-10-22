@@ -47,7 +47,9 @@ const ready = async (url, child) => {
       const code = await new Promise(resolve => child.once('exit', resolve))
       clearTimeout(timer)
       process.stdout.write(child.output)
-      if (code !== 0) throw Error(file + ' failed: ' + code + '\n' + child.output)
+      if (code !== 0) throw Error(file + ' failed: ' + code + '\n' + child.output +
+        '\nBackend (exit ' + backend.exitCode + '):\n' + backend.output.slice(-16000) +
+        '\nVite (exit ' + vite.exitCode + '):\n' + vite.output.slice(-8000))
     }
   } finally {
     for (const child of children.reverse()) {

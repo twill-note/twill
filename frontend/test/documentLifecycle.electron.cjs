@@ -8,6 +8,13 @@ app.whenReady().then(async () => {
   let failed = false
   const win = new BrowserWindow({ show: false, width: 1500, height: 1000,
     webPreferences: { contextIsolation: true, backgroundThrottling: false } })
+  const networkEvents = []
+  win.webContents.on('did-start-navigation', (_event, url, inPlace, mainFrame) => {
+    if (mainFrame) networkEvents.push({ navigation: url, inPlace })
+  })
+  win.webContents.session.webRequest.onErrorOccurred(details => {
+    networkEvents.push({ url: details.url, error: details.error, method: details.method })
+  })
   try {
     const url = process.env.TWILL_QA_URL || 'http://127.0.0.1:18766'
     const { root } = await (await fetch(url + '/api/workspace')).json()
@@ -164,6 +171,7 @@ app.whenReady().then(async () => {
   } catch (error) {
     failed = true
     console.error(error)
+    console.error(JSON.stringify({ networkEvents }))
     console.error(await win.webContents.executeJavaScript('JSON.stringify({ operations: window.qaDocumentOperations, state: window.qaDocumentState?.() })'))
     fs.writeFileSync(path.join(os.tmpdir(), 'twill-document-ui-failed.png'), (await win.webContents.capturePage()).toPNG())
   } finally { app.exit(failed ? 1 : 0) }

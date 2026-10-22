@@ -9,7 +9,13 @@ app.whenReady().then(async () => {
   const win = new BrowserWindow({ show: false, width: 1500, height: 1000,
     webPreferences: { contextIsolation: true, backgroundThrottling: false } })
   try {
-    await win.loadURL(process.env.TWILL_QA_URL || 'http://127.0.0.1:18766')
+    const url = process.env.TWILL_QA_URL || 'http://127.0.0.1:18766'
+    const { root } = await (await fetch(url + '/api/workspace')).json()
+    if (!root.replaceAll('\\', '/').endsWith('/twill-qa-notes')) throw Error('isolated workspace required')
+    // The Markdown importer intentionally skips these types; create real fixtures.
+    fs.writeFileSync(path.join(root, 'root-attachment.svg'), '<svg xmlns="http://www.w3.org/2000/svg"/>')
+    fs.writeFileSync(path.join(root, 'root-diagram.erd.json'), '{}')
+    await win.loadURL(url)
     const result = await win.webContents.executeJavaScript(String.raw`(async () => {
       const moduleUrl = p => performance.getEntriesByType('resource').find(e => new URL(e.name).pathname === p)?.name ?? p
       const { useAppStore: store } = await import(moduleUrl('/src/store.ts'))
@@ -42,15 +48,14 @@ app.whenReady().then(async () => {
       const original = 'UI-' + stamp
       const renamed = original + '-renamed'
       const sidebar = document.querySelector('#workspace-sidebar')
+      const settings = await api.workspaceSettings.get()
+      await api.workspaceSettings.put({ ...settings, explorer: { ...settings.explorer, show_all_files: true } })
       // Attachments and ERD rows used to mount additional root inputs, whose
       // autofocus cancelled the real input before the user could enter a name.
-      await api.importFiles([
-        new File(['<svg xmlns="http://www.w3.org/2000/svg"/>'], 'root-' + stamp + '.svg', { type: 'image/svg+xml' }),
-        new File(['{}'], 'root-' + stamp + '.erd.json', { type: 'application/json' }),
-      ], '')
       const project = (await api.workspaceSettings.createProjectSection('Project-' + stamp)).section
       await store.getState().refreshSections()
       await store.getState().refreshTree()
+      assert(store.getState().tree.some(node => node.type === 'other') && store.getState().tree.some(node => node.type === 'erd'), 'attachment fixtures absent from root')
       const section = name => [...sidebar.querySelectorAll('button')].find(button => button.querySelector('.truncate')?.textContent === name)?.parentElement
       const rootSection = await wait(() => section('twill-qa-notes'), 'root section missing')
       const projectSection = await wait(() => section(project.name), 'project section missing')

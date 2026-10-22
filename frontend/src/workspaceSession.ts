@@ -49,7 +49,9 @@ function restorePane(value: unknown, validIds: Set<string>, seen: Set<string>, n
       seen.add(id)
       return true
     })
-    return tabIds.length ? { kind: 'panel', id: node.id, tabIds, activeTabId: tabIds.includes(node.activeTabId ?? '') ? node.activeTabId : tabIds[0] } : null
+    return tabIds.length || (node.tabIds.length === 0 && node.activeTabId === null)
+      ? { kind: 'panel', id: node.id, tabIds, activeTabId: node.activeTabId === null ? null : tabIds.includes(node.activeTabId) ? node.activeTabId : tabIds[0] }
+      : null
   }
   if (node.kind !== 'split' || !['horizontal','vertical'].includes(node.direction)) return null
   const first = restorePane(node.first, validIds, seen, nodes, depth + 1)

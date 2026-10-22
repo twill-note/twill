@@ -1,9 +1,10 @@
 import { create } from 'zustand'
-import { DOCUMENT_RELOCATED, remapDocumentPath, relocateWorkspaceDocuments, type DocumentRelocation } from './documentPaths'
+import { DOCUMENT_DELETED, DOCUMENT_RELOCATED, documentIsWithin, forgetWorkspaceDocuments, remapDocumentPath, relocateWorkspaceDocuments, saveDocumentsBeforeMove, type DocumentRelocation } from './documentPaths'
 import { useAiStore } from './aiStore'
 import { aiDocumentTab, aiDocumentTabId, sessionIdFromAiTab } from './aiTabs'
 import { api } from './api'
 import { TERMINAL_ENABLED } from './features'
+import { discardErdTabSession } from './plugins/erd-designer/session'
 import type { PluginInfo } from './api'
 import type { SaveStatus, Section, TagCount, TreeNode, ViewMode } from './types'
 import { parseWorkspaceSession, serializeWorkspaceSession, workspaceSessionKey, type SplitLayout } from './workspaceSession'
@@ -81,6 +82,8 @@ interface AppState {
   saveSections: (sections: Section[]) => Promise<void>
   openFile: (path: string) => void
   relocateDocuments: (move: DocumentRelocation) => void
+  deleteDocument: (path: string) => Promise<void>
+  forgetDocuments: (path: string) => void
   restoreFromHistory: (path: string | null) => void
   closeFile: () => void
   setView: (view: ViewMode) => void
@@ -244,6 +247,26 @@ export const useAppStore = create<AppState>((set, get) => ({
     get().openFile(path)
   },
 
+  deleteDocument: async (path) => {
+    const source = await saveDocumentsBeforeMove(path)
+    const { deleted } = await api.remove(source)
+    get().forgetDocuments(deleted)
+    await Promise.all([get().refreshTree(), get().refreshTags(), get().refreshSections()])
+  },
+  forgetDocuments: (path) => {
+    window.dispatchEvent(new CustomEvent(DOCUMENT_DELETED, { detail: path }))
+    const state = get()
+    const pinnedNotes = state.pinnedNotes.filter(note => !documentIsWithin(note, path))
+    savePinnedNotes(state.root, pinnedNotes)
+    const next = forgetWorkspaceDocuments(state, path)
+    if (boardReturnState) {
+      const deletedReturn = documentIsWithin(boardReturnState.currentPath, path) || documentIsWithin(boardReturnState.dbDir, path) || documentIsWithin(boardReturnState.erdPath, path)
+      if (deletedReturn) boardReturnState = { view: 'editor', currentPath: null, dbDir: null, pluginViewId: null, erdPath: null, erdDirectory: null, erdTabId: null }
+    }
+    for (const tab of state.openTabs) if (tab.kind === 'erd' && !next.openTabs.some(remaining => remaining.id === tab.id)) discardErdTabSession(tab.id)
+    set({ ...next, pinnedNotes, dbRowFilter: state.dbRowFilter?.filter(note => !documentIsWithin(note, path)) ?? null })
+    if (state.currentPath && next.currentPath === null) window.history.replaceState({ notePath: null }, '', window.location.pathname)
+  },
   refreshTree: async () => {
     const { children } = await api.tree()
     if (JSON.stringify(get().tree) !== JSON.stringify(children)) set({ tree: children })
@@ -504,6 +527,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     boardReturnState = null
     if (back && !isToggleViewState(back.view, back.dbDir)) {
       if (back.view === 'ai') return get().moveAi('editor')
+      if (back.view === 'editor' && back.currentPath === null) { set({ view: 'editor', currentPath: null }); return }
       if (back.view === 'editor' && back.currentPath) return get().openFile(back.currentPath)
       if (back.view === 'database' && back.dbDir != null) return get().openDatabase(back.dbDir)
       if (back.view === 'calendar' || back.view === 'todos' || back.view === 'skillbook') return get().setView(back.view)

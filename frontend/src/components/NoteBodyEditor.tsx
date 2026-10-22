@@ -1,4 +1,5 @@
 import { registerRestartGuard } from '../restartGuards'
+import { DOCUMENT_DELETED, documentIsWithin } from '../documentPaths'
 import { markdownWithoutSnapshot, preserveBlocks, restoreBlocks } from '../blockPersistence'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useCreateBlockNote } from '@blocknote/react'
@@ -33,6 +34,7 @@ export default function NoteBodyEditor({
   const [status, setStatus] = useState<NoteBodySaveStatus>('idle')
   const appTheme = useThemeStore((s) => s.theme)
   const loadedRef = useRef(false)
+  const deletedRef = useRef(false)
   const wrapperRef = useRef<HTMLDivElement>(null)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -64,7 +66,7 @@ export default function NoteBodyEditor({
   const saveChainRef = useRef<Promise<void>>(Promise.resolve())
   const save = useCallback(() => {
     const operation = saveChainRef.current.then(async () => {
-      if (!loadedRef.current) return
+      if (!loadedRef.current || deletedRef.current) return
       if (timerRef.current) {
         clearTimeout(timerRef.current)
         timerRef.current = null
@@ -86,6 +88,17 @@ export default function NoteBodyEditor({
     saveChainRef.current = operation.then(() => {}, () => {})
     return operation
   }, [editor, content.path])
+
+  useEffect(() => {
+    const deleted = (event: Event) => {
+      if (!documentIsWithin(content.path, (event as CustomEvent<string>).detail)) return
+      deletedRef.current = true
+      if (timerRef.current) clearTimeout(timerRef.current)
+      timerRef.current = null
+    }
+    window.addEventListener(DOCUMENT_DELETED, deleted)
+    return () => window.removeEventListener(DOCUMENT_DELETED, deleted)
+  }, [content.path])
 
   useEffect(() => registerRestartGuard(async () => {
     if (!loadedRef.current) return

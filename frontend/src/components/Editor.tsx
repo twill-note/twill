@@ -1,7 +1,7 @@
 import DocumentFind from './DocumentFind'
 import { useImageClipboard } from '../imageClipboard'
 import { useShallow } from 'zustand/react/shallow'
-import { DOCUMENT_RELOCATED, remapDocumentPath, registerDocumentSave, type DocumentRelocation } from '../documentPaths'
+import { DOCUMENT_DELETED, DOCUMENT_RELOCATED, documentIsWithin, remapDocumentPath, registerDocumentSave, type DocumentRelocation } from '../documentPaths'
 import { registerRestartGuard } from '../restartGuards'
 import { exportDocumentPdf } from '../exportPdf'
 import { markdownWithoutSnapshot, preserveBlocks, restoreBlocks } from '../blockPersistence'
@@ -773,6 +773,7 @@ function NoteEditor({
   const mtimeRef = useRef<number | null>(content.mtime)
   const savedTitleRef = useRef(content.frontmatter.title)
   const loadedRef = useRef(false)
+  const deletedRef = useRef(false)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const noteChoicesRef = useRef<Promise<NoteRow[]> | null>(null)
   const fmRef = useRef(fm)
@@ -830,7 +831,7 @@ function NoteEditor({
   const save = useCallback(
     (force = false) => {
       const operation = saveChainRef.current.then(async () => {
-        if (!loadedRef.current) return
+        if (!loadedRef.current || deletedRef.current) return
         if (timerRef.current) {
           clearTimeout(timerRef.current)
           timerRef.current = null
@@ -871,6 +872,16 @@ function NoteEditor({
   )
 
   useEffect(() => registerDocumentSave(() => pathRef.current, () => save()), [save])
+  useEffect(() => {
+    const deleted = (event: Event) => {
+      if (!documentIsWithin(pathRef.current, (event as CustomEvent<string>).detail)) return
+      deletedRef.current = true
+      if (timerRef.current) clearTimeout(timerRef.current)
+      timerRef.current = null
+    }
+    window.addEventListener(DOCUMENT_DELETED, deleted)
+    return () => window.removeEventListener(DOCUMENT_DELETED, deleted)
+  }, [])
   useEffect(() => {
     const relocate = (event: Event) => {
       pathRef.current = remapDocumentPath(pathRef.current, (event as CustomEvent<DocumentRelocation>).detail)

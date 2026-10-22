@@ -70,13 +70,12 @@ export default function FileTree() {
     refreshTags,
     refreshSections,
     saveSections,
-    closeFile,
     openDatabase,
   } = useAppStore(useShallow(s => ({
     tree: s.tree, sections: s.sections, currentPath: s.currentPath, erdPath: s.erdPath, root: s.root,
     openFile: s.openFile, openErdDesigner: s.openErdDesigner, createErdDiagram: s.createErdDiagram,
     refreshTree: s.refreshTree, refreshTags: s.refreshTags, refreshSections: s.refreshSections,
-    saveSections: s.saveSections, closeFile: s.closeFile, openDatabase: s.openDatabase,
+    saveSections: s.saveSections, openDatabase: s.openDatabase,
   })))
   const rootName = root?.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || root || tr('문서')
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
@@ -278,25 +277,15 @@ export default function FileTree() {
   }
 
   const handleDelete = async (node: TreeNode) => {
-    const ok = await dialog.confirm(`"${node.name}"을(를) 휴지통으로 이동할까요?`, {
+    const ok = await dialog.confirm(`"${node.name}"을(를) 영구 삭제할까요?`, {
       danger: true,
-      confirmLabel: '휴지통으로 이동',
+      detail: '하위 문서도 함께 삭제되며 복구할 수 없습니다.',
+      confirmLabel: '영구 삭제',
     })
     if (!ok) return
     try {
-      await api.remove(node.path)
-      // 프로젝트에서도 제거
-      const updated = sections.map((s) => ({
-        ...s,
-        items: s.items.filter((p) => p !== node.path),
-      }))
-      if (updated.some((s, i) => s.items.length !== sections[i].items.length)) {
-        await saveSections(updated)
-      }
-      await refreshTree()
-      await refreshTags()
+      await useAppStore.getState().deleteDocument(node.path)
       if (selectedPath === node.path) setSelectedPath(null)
-      if (currentPath === node.path || currentPath?.startsWith(node.path + '/')) closeFile()
     } catch (e) {
       dialog.alert((e as Error).message)
     }
@@ -914,7 +903,7 @@ export default function FileTree() {
                     }}
                   />
                   <MenuItem
-                    label={tr("🗑️ 삭제 (휴지통)")}
+                    label={tr("🗑️ 영구 삭제")}
                     danger
                     onClick={() => {
                       handleDelete(menu.node!)

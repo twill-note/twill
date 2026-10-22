@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { remapDocumentPath, relocateWorkspaceDocuments } from '../src/documentPaths.ts'
+import { forgetWorkspaceDocuments, remapDocumentPath, relocateWorkspaceDocuments } from '../src/documentPaths.ts'
 import { parseWorkspaceSession, serializeWorkspaceSession, workspaceSessionKey, type WorkspaceSession } from '../src/workspaceSession.ts'
 
 const documentTab = { id:'file:한글.md', kind:'file' as const, target:'한글.md', title:'한글', icon:'📄' }
@@ -26,6 +26,18 @@ test('moving an open note preserves its split, selection and companion tabs', ()
 test('workspace session restores titles, selections, split ratio and dock dimensions',()=>{
   assert.deepEqual(parseWorkspaceSession(serializeWorkspaceSession(state)),state)
   assert.notEqual(workspaceSessionKey('/notes/one'),workspaceSessionKey('/notes/two'))
+})
+test('deleting a note closes its child tabs and preserves an empty pane and unrelated conversations', () => {
+  const child = { ...documentTab, id: 'file:한글/child.md', target: '한글/child.md' }
+  const sibling = { ...documentTab, id: 'file:한글다른.md', target: '한글다른.md' }
+  const source = { ...state, view: 'editor' as const, openTabs: [documentTab, child, sibling, aiTab] }
+  const result = { ...source, ...forgetWorkspaceDocuments(source, '한글.md') }
+  assert.deepEqual(result.openTabs.map(tab => tab.id), [sibling.id, aiTab.id])
+  assert.equal(result.currentPath, null)
+  assert.equal(result.splitLayout?.root.kind === 'split' && result.splitLayout.root.first.kind === 'panel' && result.splitLayout.root.first.activeTabId, null)
+  const restored = parseWorkspaceSession(serializeWorkspaceSession(result))!
+  assert.deepEqual(restored.splitLayout, result.splitLayout)
+  assert.equal(restored.currentPath, null)
 })
 test('unsaved ERD tabs are not restored as empty documents; their empty split is removed',()=>{
   const unsaved={id:'erd:unsaved',kind:'erd' as const,target:'unsaved',title:'미저장 ERD',icon:'',erdPath:null}

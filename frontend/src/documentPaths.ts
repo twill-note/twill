@@ -3,6 +3,30 @@ import type { PaneNode, WorkspaceSession } from './workspaceSession'
 
 export type DocumentRelocation = { from: string; to: string }
 export const DOCUMENT_RELOCATED = 'twill:document-relocated'
+export const DOCUMENT_DELETED = 'twill:document-deleted'
+
+export const documentIsWithin = (path: string | null, from: string) => path !== null && (
+  path === from || path.startsWith(from + '/') || (from.endsWith('.md') && path.startsWith(from.slice(0, -3) + '/'))
+)
+
+/** Deleted active documents leave their pane empty; unrelated tabs retain their state. */
+export function forgetWorkspaceDocuments(state: WorkspaceSession, from: string) {
+  const removed = new Set(state.openTabs.filter(tab => ['file', 'db', 'erd'].includes(tab.kind) &&
+    documentIsWithin(tab.kind === 'erd' ? tab.erdPath ?? tab.target : tab.target, from)).map(tab => tab.id))
+  const pane = (node: PaneNode): PaneNode => node.kind === 'panel'
+    ? { ...node, tabIds: node.tabIds.filter(id => !removed.has(id)), activeTabId: node.activeTabId && removed.has(node.activeTabId) ? null : node.activeTabId }
+    : { ...node, first: pane(node.first), second: pane(node.second) }
+  const currentDeleted = documentIsWithin(state.currentPath, from)
+  const erdDeleted = documentIsWithin(state.erdPath, from)
+  const dbDeleted = documentIsWithin(state.dbDir, from)
+  return { openTabs: state.openTabs.filter(tab => !removed.has(tab.id)),
+    currentPath: currentDeleted ? null : state.currentPath,
+    erdPath: erdDeleted ? null : state.erdPath, erdTabId: erdDeleted ? null : state.erdTabId,
+    erdDirectory: documentIsWithin(state.erdDirectory, from) ? null : state.erdDirectory,
+    dbDir: dbDeleted ? null : state.dbDir,
+    view: (currentDeleted && state.view === 'editor') || (erdDeleted && state.view === 'erd') || (dbDeleted && state.view === 'database') ? 'editor' as const : state.view,
+    splitLayout: state.splitLayout ? { ...state.splitLayout, root: pane(state.splitLayout.root) } : null }
+}
 
 /** Markdown moves include the companion directory used for child notes. */
 export function remapDocumentPath(path: string, { from, to }: DocumentRelocation): string {

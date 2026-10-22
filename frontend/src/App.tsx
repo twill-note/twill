@@ -115,7 +115,11 @@ export default function App() {
       ws = new WebSocket(`${proto}://${window.location.host}/api/events/ws`)
       ws.onmessage = (message) => {
         try {
-          window.dispatchEvent(new CustomEvent('twill:data-changed', { detail: JSON.parse(message.data) }))
+          const data = JSON.parse(message.data)
+          if (data.type === 'documents-deleted' && Array.isArray(data.paths)) {
+            for (const path of data.paths) if (typeof path === 'string') useAppStore.getState().forgetDocuments(path)
+          }
+          window.dispatchEvent(new CustomEvent('twill:data-changed', { detail: data }))
         } catch {
           // Older backends may send a non-JSON ping; filesystem refresh below remains safe.
         }

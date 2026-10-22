@@ -389,7 +389,7 @@ interface BoardProps extends CommonProps {
   cardAction?: (row: NoteRow, groupValue: string) => React.ReactNode
   /** 카드 제목 아래의 상태·메타 배지. 버튼을 반환해도 카드 열기 이벤트와 충돌하지 않는다. */
   cardBadge?: (row: NoteRow, groupValue: string) => React.ReactNode
-  /** 카드 삭제(휴지통 이동). 지정하면 카드 우클릭 메뉴와 컬럼 ⋯ 메뉴의 정리 항목이 활성화된다. */
+  /** 카드 영구 삭제. 지정하면 카드 우클릭 메뉴와 컬럼 정리 항목이 활성화된다. */
   onDeleteRow?: (path: string) => void | Promise<void>
   /** 카드 우클릭 메뉴에 DB 종류별 전용 동작을 더한다. */
   rowMenuItems?: (row: NoteRow) => DbRowMenuItem[]
@@ -446,9 +446,9 @@ export function DbBoard({ rows, config, groupBy, onOpen, onOpenDocument, onCellC
 
   const cleanupColumn = async (label: string, items: NoteRow[]) => {
     if (!onDeleteRow || items.length === 0) return
-    const ok = await dialog.confirm(`'${label}' 컬럼의 카드 ${items.length}개를 모두 휴지통으로 이동할까요?`, {
-      detail: '휴지통(.trash)으로 이동하므로 필요하면 복구할 수 있습니다.',
-      confirmLabel: '모두 이동',
+    const ok = await dialog.confirm(`'${label}' 컬럼의 카드 ${items.length}개를 모두 영구 삭제할까요?`, {
+      detail: '하위 문서도 함께 삭제되며 복구할 수 없습니다.',
+      confirmLabel: '모두 삭제',
       danger: true,
     })
     if (!ok) return
@@ -583,7 +583,7 @@ export function DbBoard({ rows, config, groupBy, onOpen, onOpenDocument, onCellC
         <p className="w-full px-2 py-6 text-center text-[13px] text-[#9b9a97]">{tr("노트가 없습니다")}</p>
       )}
 
-      {/* 컬럼 ⋯ 메뉴 — 정리(휴지통) + 컬럼별 추가 액션(예: '실행'의 전체 실행) */}
+      {/* 컬럼 ⋯ 메뉴 — 카드 삭제 + 컬럼별 추가 액션 */}
       {colMenu &&
         (() => {
           const items = groups.find(([v]) => v === colMenu.value)?.[1] ?? []
@@ -628,7 +628,7 @@ export function DbBoard({ rows, config, groupBy, onOpen, onOpenDocument, onCellC
                       setColMenu(null)
                       void cleanupColumn(colMenu.label, items)
                     }}
-                    title={tr("휴지통(.trash)으로 이동 — 필요하면 복구 가능")}
+                    title={tr("문서를 영구 삭제합니다")}
                   >
                     <span>🗑</span>  {tr("카드 모두 정리")}
                   </button>
@@ -684,13 +684,16 @@ export function DbBoard({ rows, config, groupBy, onOpen, onOpenDocument, onCellC
             {onDeleteRow && (
               <button
                 className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[12px] text-[#c92a2a] hover:bg-[#fdf2f2]"
-                onClick={() => {
-                  void onDeleteRow(ctxMenu.row.path)
+                onClick={async () => {
+                  const row = ctxMenu.row
                   setCtxMenu(null)
+                  if (await dialog.confirm(`"${row.title}"을(를) 영구 삭제할까요?`, {
+                    danger: true, detail: '하위 문서도 함께 삭제되며 복구할 수 없습니다.', confirmLabel: '영구 삭제',
+                  })) await onDeleteRow(row.path)
                 }}
-                title={tr("휴지통(.trash)으로 이동 — 필요하면 복구 가능")}
+                title={tr("문서를 영구 삭제합니다")}
               >
-                <span>🗑</span>  {tr("삭제 (휴지통 이동)")}
+                <span>🗑</span>  {tr("영구 삭제")}
               </button>
             )}
           </div>

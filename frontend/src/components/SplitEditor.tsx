@@ -177,7 +177,9 @@ export default function SplitEditor() {
       const root = pruneClosedTabs(previous.root, openDocumentTabIds, () => {
         changed = true
       })
-      let compacted = removeEmptyPanels(root) ?? createPanel()
+      // An explicitly cleared pane (document deletion) stays blank. Ordinary
+      // tab closing still prunes newly empty panels through the changed path.
+      let compacted = changed ? removeEmptyPanels(root) ?? createPanel() : root
       if (compacted !== root) changed = true
       // A displaced dock conversation also needs a tab, without stealing focus.
       const placed = new Set(leafPanels(compacted).flatMap((panel) => panel.tabIds))
@@ -414,7 +416,7 @@ export default function SplitEditor() {
 function pruneClosedTabs(node: PaneNode, validTabIds: Set<string>, changed: () => void): PaneNode {
   if (node.kind === 'panel') {
     const tabIds = node.tabIds.filter((id) => validTabIds.has(id))
-    const activeTabId = node.activeTabId && validTabIds.has(node.activeTabId) ? node.activeTabId : tabIds[tabIds.length - 1] ?? null
+    const activeTabId = node.activeTabId === null ? null : validTabIds.has(node.activeTabId) ? node.activeTabId : tabIds[tabIds.length - 1] ?? null
     if (tabIds.length === node.tabIds.length && activeTabId === node.activeTabId) return node
     changed()
     return { ...node, tabIds, activeTabId }

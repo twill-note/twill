@@ -10,6 +10,7 @@ import NoteBodyEditor, { type NoteBodySaveStatus } from './NoteBodyEditor'
 import SpellcheckToggleButton from './SpellcheckToggleButton'
 import { useBackdropDismiss } from '../useBackdropDismiss'
 import { tr } from '../i18n'
+import { DOCUMENT_DELETED, documentIsWithin } from '../documentPaths'
 
 interface Props {
   row: NoteRow
@@ -51,6 +52,11 @@ export default function TaskCardPopup({ row, config, onClose, onCellChange, onRo
   const [spellcheck, setSpellcheck] = useState(false)
   const [bodySaveStatus, setBodySaveStatus] = useState<NoteBodySaveStatus>('idle')
   const [openingWork, setOpeningWork] = useState(false)
+  useEffect(() => {
+    const deleted = (event: Event) => { if (documentIsWithin(row.path, (event as CustomEvent<string>).detail)) onClose() }
+    window.addEventListener(DOCUMENT_DELETED, deleted)
+    return () => window.removeEventListener(DOCUMENT_DELETED, deleted)
+  }, [row.path, onClose])
   const dismissFromBackdrop = useBackdropDismiss<HTMLDivElement>(onClose, row.path)
   const runTask = useAiStore((s) => s.runTask)
   const loadSessions = useAiStore((s) => s.loadSessions)

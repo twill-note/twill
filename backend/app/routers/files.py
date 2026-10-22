@@ -4,7 +4,6 @@ import os
 import re
 import shutil
 import tempfile
-import time
 from pathlib import Path
 from functools import lru_cache
 from urllib.parse import unquote, urlsplit, parse_qs
@@ -14,7 +13,7 @@ from fastapi import APIRouter, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 
 from .. import db, indexer
-from ..config import EXCLUDED_DIRS, TREE_HIDDEN_ROOT_DIRS, notes_dir, trash_dir
+from ..config import EXCLUDED_DIRS, TREE_HIDDEN_ROOT_DIRS, notes_dir
 
 router = APIRouter(prefix="/api/files", tags=["files"])
 
@@ -578,27 +577,33 @@ def delete_entry(path: str):
     p = resolve_path(path)
     if not p.exists():
         raise HTTPException(status_code=404, detail="대상을 찾을 수 없습니다")
-    if p == notes_dir():
+    if p == notes_dir().resolve():
         raise HTTPException(status_code=400, detail="루트는 삭제할 수 없습니다")
-    trash = trash_dir()
-    trash.mkdir(parents=True, exist_ok=True)
-    stamp = time.strftime("%Y%m%d-%H%M%S")
-
-    def trash_one(target: Path) -> Path:
-        dst = trash / f"{stamp}-{target.name}"
-        n = 1
-        while dst.exists():
-            dst = trash / f"{stamp}-{n}-{target.name}"
-            n += 1
-        indexer.remove(rel_str(target))
-        shutil.move(str(target), str(dst))
-        return dst
-
+    from ..watcher import publish
+    from .workspace import _read_workspace_json, _write_workspace_json
+    deleted = rel_str(p)
     comp = _companion_dir(p)
-    dst = trash_one(p)
-    if comp is not None:
-        trash_one(comp)
-    return {"trashed_to": dst.relative_to(notes_dir()).as_posix()}
+    removed = []
+    for target in [p, *([comp] if comp is not None else [])]:
+        relative = rel_str(target)
+        if target.is_dir():
+            shutil.rmtree(target)
+        else:
+            target.unlink()
+        indexer.remove(relative)
+        removed.append(relative)
+        publish({"type": "documents-deleted", "paths": [relative]})
+    data = _read_workspace_json()
+    changed = False
+    for section in data.get("sections", []):
+        items = section.get("items", [])
+        retained = [item for item in items if not any(item == path or item.startswith(path + "/") for path in removed)]
+        if retained != items:
+            section["items"] = retained
+            changed = True
+    if changed:
+        _write_workspace_json(data)
+    return {"deleted": deleted}
 
 
 @router.post("/import")

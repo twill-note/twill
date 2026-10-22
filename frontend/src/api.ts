@@ -164,7 +164,7 @@ export const api = {
     request<{ path: string }>('/api/files/move', json('POST', { path, dest_dir: destDir })),
 
   remove: (path: string) =>
-    request<{ trashed_to: string }>(`/api/files?path=${encodeURIComponent(path)}`, { method: 'DELETE' }),
+    request<{ deleted: string }>(`/api/files?path=${encodeURIComponent(path)}`, { method: 'DELETE' }),
 
   calendar: (year: number, month: number) =>
     request<Record<string, number>>(`/api/notes/calendar?year=${year}&month=${month}`),

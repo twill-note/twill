@@ -449,10 +449,11 @@ export default function DatabaseView() {
     }
   }
 
-  /** 카드 삭제 — 실제 삭제가 아니라 휴지통(.trash) 이동이라 복구 가능. */
+  /** 일반 문서 카드를 영구 삭제하고 열려 있는 편집창도 정리한다. */
   const deleteRow = async (path: string) => {
     try {
-      await api.remove(path)
+      await useAppStore.getState().deleteDocument(path)
+      setPopupPath(current => current === path ? null : current)
       setReloadKey((k) => k + 1)
     } catch (e) {
       dialog.alert((e as Error).message)

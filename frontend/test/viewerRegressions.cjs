@@ -40,7 +40,7 @@ const ready = async (url, child) => {
     await ready('http://127.0.0.1:' + backendPort + '/api/workspace', backend)
     const vite = start(process.execPath, ['node_modules/vite/bin/vite.js', '--host', '127.0.0.1', '--port', String(frontendPort), '--strictPort'], env, 'vite')
     await ready(env.TWILL_QA_URL, vite)
-    for (const file of ['documentLifecycle.electron.cjs', 'userDocumentLinks.electron.cjs', 'imageClipboard.electron.cjs']) {
+    for (const file of ['documentLifecycle.electron.cjs', 'documentLifecycle.electron.cjs', 'documentLifecycle.electron.cjs', 'userDocumentLinks.electron.cjs', 'imageClipboard.electron.cjs']) {
       const child = start(require('electron'), [path.join(__dirname, file)], env, file)
       const timer = setTimeout(() => child.kill(), 90000)
       const code = await new Promise(resolve => child.once('exit', resolve))

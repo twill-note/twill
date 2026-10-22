@@ -15,6 +15,19 @@ app.whenReady().then(async () => {
       const { useAppStore: store } = await import(moduleUrl('/src/store.ts'))
       const { useAiStore: ai } = await import(moduleUrl('/src/aiStore.ts'))
       const { api } = await import(moduleUrl('/src/api.ts'))
+      window.qaDocumentOperations = []
+      for (const name of ['saveContent', 'move', 'rename']) {
+        const original = api[name]
+        api[name] = async (...args) => {
+          const operation = { name, path: args[0], target: name === 'saveContent' ? args[1].title : args[1] }
+          window.qaDocumentOperations.push(operation)
+          try { const result = await original(...args); operation.result = result; return result }
+          catch (error) { operation.error = error.message; throw error }
+        }
+      }
+      window.qaDocumentState = () => ({ path: store.getState().currentPath, tabs: store.getState().openTabs,
+        tree: store.getState().tree, sections: store.getState().sections,
+        dialogs: [...document.querySelectorAll('[role="dialog"]')].map(element => element.textContent) })
       const assert = (ok, message) => { if (!ok) throw Error(message) }
       const pause = ms => new Promise(resolve => setTimeout(resolve, ms))
       const wait = async (fn, message) => { for (let i = 0; i < 150; i++) { if (fn()) return fn(); await pause(100) } throw Error(message) }
@@ -146,6 +159,7 @@ app.whenReady().then(async () => {
   } catch (error) {
     failed = true
     console.error(error)
+    console.error(await win.webContents.executeJavaScript('JSON.stringify({ operations: window.qaDocumentOperations, state: window.qaDocumentState?.() })'))
     fs.writeFileSync(path.join(os.tmpdir(), 'twill-document-ui-failed.png'), (await win.webContents.capturePage()).toPNG())
   } finally { app.exit(failed ? 1 : 0) }
 })

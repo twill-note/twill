@@ -20,8 +20,10 @@ app.whenReady().then(async () => {
       const wait = async (fn, label) => { for (let i = 0; i < 100; i++) { if (fn()) return fn(); await pause(100) } throw Error(label) }
       await wait(() => store.getState().workspaceReady, 'workspace missing')
       assert(store.getState().root.replaceAll('\\', '/').endsWith('/twill-qa-notes'), 'isolated workspace required')
-      const name = '공백 문서 ' + Date.now() + '.md'
+      const name = 'UI API 공백 문서 ' + Date.now() + '.md'
       await api.createEntry(name, 'file')
+      const file = await api.getContent(name)
+      await api.saveContent(name, { ...file.frontmatter, title: '별도 표시 제목' }, '본문에는 검색어가 없습니다.', file.mtime)
       await store.getState().refreshTree()
       api.ai.status = async () => ({ engine: 'codex', available: true, logged_in: true })
       api.ai.models = async () => ({ models: [] })
@@ -34,7 +36,7 @@ app.whenReady().then(async () => {
       const panel = () => document.querySelector('[data-ai-conversation="' + id + '"]')
       const input = await wait(() => panel()?.querySelector('textarea'), 'chat input missing')
       input.focus()
-      const draft = '@공백 문서'
+      const draft = '@UI API 공백'
       Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(input, draft)
       input.setSelectionRange(draft.length, draft.length)
       input.dispatchEvent(new Event('input', { bubbles: true }))

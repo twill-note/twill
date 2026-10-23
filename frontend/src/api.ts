@@ -191,6 +191,7 @@ export const api = {
   notesDb: (dir: string) => request<NoteRow[]>(`/api/notes/db?dir=${encodeURIComponent(dir)}`),
 
   search: (q: string) => request<SearchResult[]>(`/api/search?q=${encodeURIComponent(q)}`),
+  searchDocuments: (q: string) => request<SearchResult[]>(`/api/documents/search?q=${encodeURIComponent(q)}`),
 
   tags: () => request<TagCount[]>('/api/tags'),
 

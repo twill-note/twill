@@ -29,61 +29,27 @@ interface Props {
 
 export default function MentionPopover({ state, onSelect, onDismiss }: Props) {
   const [results, setResults] = useState<SearchResult[]>([])
-  const [tree, setTree] = useState<string[] | null>(null)
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
   const [highlighted, setHighlighted] = useState(0)
   const [pos, setPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 })
   const popRef = useRef<HTMLDivElement>(null)
 
-  // 트리에서 모든 노트 경로를 한 번 수집 (빈 쿼리 fallback 용)
-  useEffect(() => {
-    let cancelled = false
-    api.tree().then((r) => {
-      if (cancelled) return
-      const acc: string[] = []
-      const walk = (nodes: typeof r.children): void => {
-        for (const n of nodes) {
-          if (n.type === 'file' && !n.db) acc.push(n.path)
-          if (n.children) walk(n.children)
-        }
-      }
-      walk(r.children)
-      setTree(acc)
-    }).catch(() => {})
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  // 쿼리 변경 시 결과 갱신
   useEffect(() => {
     if (!state.active) return
-    const q = state.query.trim()
-    if (!q) {
-      // 쿼리 없으면 트리에서 최근 20개
-      setResults((tree ?? []).slice(0, 20).map((path) => ({
-        path,
-        title: pathTitle(path),
-        snippet: '',
-      } as SearchResult)))
-      return
-    }
     let cancelled = false
-    api.search(q).then((r) => {
-      if (cancelled) return
-      setResults(r.slice(0, 20))
-    }).catch(() => {
-      // 검색 실패 시 트리에서 로컬 필터
-      const lower = q.toLowerCase()
-      const filtered = (tree ?? [])
-        .filter((p) => p.toLowerCase().includes(lower))
-        .slice(0, 20)
-        .map((path) => ({ path, title: pathTitle(path), snippet: '' } as SearchResult))
-      setResults(filtered)
-    })
-    return () => {
-      cancelled = true
-    }
-  }, [state.active, state.query, tree])
+    setResults([])
+    setError('')
+    setLoading(true)
+    const timer = setTimeout(() => {
+      api.searchDocuments(state.query).then(results => {
+        if (!cancelled) setResults(results.slice(0, 20))
+      }).catch((error: Error) => {
+        if (!cancelled) setError(error.message)
+      }).finally(() => { if (!cancelled) setLoading(false) })
+    }, 120)
+    return () => { cancelled = true; clearTimeout(timer) }
+  }, [state.active, state.query])
 
   useEffect(() => {
     setHighlighted(0)
@@ -110,7 +76,7 @@ export default function MentionPopover({ state, onSelect, onDismiss }: Props) {
       if (e.isComposing || e.keyCode === 229) return
       if (e.key === 'ArrowDown') {
         e.preventDefault()
-        setHighlighted((h) => Math.min(h + 1, results.length - 1))
+        setHighlighted((h) => Math.min(h + 1, Math.max(0, results.length - 1)))
       } else if (e.key === 'ArrowUp') {
         e.preventDefault()
         setHighlighted((h) => Math.max(h - 1, 0))
@@ -131,11 +97,12 @@ export default function MentionPopover({ state, onSelect, onDismiss }: Props) {
     return () => document.removeEventListener('keydown', onKey, true)
   }, [state.active, results, highlighted, onSelect, onDismiss])
 
-  if (!state.active || results.length === 0) return null
+  if (!state.active) return null
 
   return (
     <div
       ref={popRef}
+      role="listbox" aria-label={tr("문서 참조 검색")}
       className="fixed z-50 w-[340px] max-h-[300px] overflow-y-auto rounded-md border border-[#e3e2e0] bg-white shadow-lg"
       style={{
         top: pos.top,
@@ -146,9 +113,13 @@ export default function MentionPopover({ state, onSelect, onDismiss }: Props) {
       <div className="border-b border-[#efefed] px-2 py-1 text-[10px] text-[#9b9a97]">
         @{state.query || tr("검색어")} — 선택하면 노트 본문 첨부 · ↑↓ 이동 · Enter 선택 · Esc 취소
       </div>
+      {error ? <p role="alert" className="px-3 py-2 text-[12px] text-red-600">{error}</p>
+        : loading ? <p role="status" className="px-3 py-2 text-[12px]">{tr('검색 중…')}</p>
+          : !results.length && <p className="px-3 py-2 text-[12px]">{tr('검색 결과가 없습니다')}</p>}
       {results.map((r, i) => (
         <button
           key={r.path}
+          role="option" aria-selected={i === highlighted}
           className={`flex w-full flex-col items-start gap-0.5 px-2 py-1.5 text-left ${
             i === highlighted ? 'bg-[#f1f1ef]' : 'hover:bg-[#f7f7f5]'
           }`}

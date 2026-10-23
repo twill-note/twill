@@ -276,6 +276,11 @@ def search(q: str):
     return db.search(q)
 
 
+@router.get("/documents/search")
+def search_documents(q: str = ""):
+    return db.search_documents(q)
+
+
 @router.get("/tags")
 def tags():
     return db.all_tags()

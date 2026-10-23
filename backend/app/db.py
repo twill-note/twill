@@ -1,6 +1,7 @@
 import json
 import sqlite3
 import threading
+import unicodedata
 
 from . import config
 
@@ -314,6 +315,22 @@ def _make_snippet(body: str, q: str, radius: int = 60) -> str:
     if end < len(body):
         snippet = snippet + "…"
     return snippet
+
+
+def search_documents(q: str, limit: int = 50) -> list[dict]:
+    """Mention candidates match document titles and filenames, independent of body FTS."""
+    def normalize(value: str) -> str:
+        return " ".join(unicodedata.normalize("NFC", value).casefold().split())
+
+    terms = normalize(q).split()
+    results = []
+    for row in get_conn().execute("SELECT path, title, date, tags, icon FROM notes ORDER BY updated_at DESC, path"):
+        text = normalize(row["title"] + " " + row["path"])
+        if all(term in text for term in terms):
+            results.append({**dict(row), "tags": json.loads(row["tags"]), "snippet": ""})
+            if len(results) >= limit:
+                break
+    return results
 
 
 def search(q: str, limit: int = 50) -> list[dict]:

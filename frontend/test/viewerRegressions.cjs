@@ -41,7 +41,7 @@ const ready = async (url, child) => {
     const vite = start(process.execPath, ['node_modules/vite/bin/vite.js', '--host', '127.0.0.1', '--port', String(frontendPort), '--strictPort'], env, 'vite')
     await ready(env.TWILL_QA_URL, vite)
     const requested = process.argv.slice(2)
-    for (const file of requested.length ? requested : ['documentLifecycle.electron.cjs', 'documentLifecycle.electron.cjs', 'documentLifecycle.electron.cjs', 'userDocumentLinks.electron.cjs', 'imageClipboard.electron.cjs', 'documentInteraction.electron.cjs']) {
+    for (const file of requested.length ? requested : ['documentLifecycle.electron.cjs', 'documentLifecycle.electron.cjs', 'documentLifecycle.electron.cjs', 'userDocumentLinks.electron.cjs', 'imageClipboard.electron.cjs', 'documentInteraction.electron.cjs', 'erdNavigation.electron.cjs']) {
       const child = start(require('electron'), [path.join(__dirname, file)], env, file)
       const timer = setTimeout(() => child.kill(), 90000)
       const code = await new Promise(resolve => child.once('exit', resolve))

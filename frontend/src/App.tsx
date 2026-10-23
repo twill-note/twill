@@ -5,6 +5,7 @@ import { useEffect } from 'react'
 import AiToasts from './components/AiToasts'
 import CalendarView from './components/CalendarView'
 import CommandPalette from './components/CommandPalette'
+import OpenDocuments from './components/OpenDocuments'
 import DatabaseView from './components/DatabaseView'
 import DialogHost from './components/Dialog'
 import DesktopTitleBar from './components/DesktopTitleBar'
@@ -247,6 +248,7 @@ export default function App() {
       </div>
       {workspaceReady && <AiPlacement key={root} />}
       <CommandPalette />
+      <OpenDocuments />
       <DialogHost />
       <AiToasts />
       <DesktopTooltip />

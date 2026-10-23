@@ -6,7 +6,7 @@ import { TERMINAL_ENABLED } from './features'
  * 조합 표현: "Ctrl+Alt+Shift+Meta" 수식키 + KeyboardEvent.code, '+' 로 연결 (예: "Alt+KeyT").
  * localStorage 에 저장되며, 없는 항목은 기본값을 쓴다.
  */
-export type ShortcutAction = 'search' | 'taskBoard' | 'scopes' | 'todayNote' | 'calendar' | 'todos' | 'ai' | 'terminal'
+export type ShortcutAction = 'search' | 'openDocuments' | 'taskBoard' | 'scopes' | 'todayNote' | 'calendar' | 'todos' | 'ai' | 'terminal'
 
 export function isShortcutEnabled(action: ShortcutAction): boolean {
   return action !== 'terminal' || TERMINAL_ENABLED
@@ -15,6 +15,7 @@ export function isShortcutEnabled(action: ShortcutAction): boolean {
 export const AI_ICON = '🤖'
 
 export const SHORTCUT_ACTIONS: Array<{ id: ShortcutAction; label: string; icon: string }> = [
+  { id: 'openDocuments', label: '열린 문서', icon: '▤' },
   { id: 'search', label: '검색', icon: '🔍' },
   { id: 'taskBoard', label: '태스크 보드', icon: '📋' },
   { id: 'scopes', label: '프로젝트 관리', icon: '🌐' },
@@ -34,6 +35,7 @@ export const IS_MAC = /Mac|iPhone|iPad/.test(
 // 같은 설정이 맥에서는 ⌘D, 윈도우/리눅스에서는 Ctrl+D 로 동작·표시된다.
 export const DEFAULT_BINDINGS: Record<ShortcutAction, string> = {
   search: 'Mod+KeyK',
+  openDocuments: 'Mod+KeyE',
   taskBoard: 'Alt+KeyT',
   scopes: 'Alt+KeyP',
   todayNote: 'Mod+KeyD',

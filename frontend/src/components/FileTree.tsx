@@ -25,7 +25,7 @@ interface MenuState {
 /** 자동 미할당 프로젝트 id — 사용자가 만든 프로젝트와 충돌 없게 예약. */
 const UNASSIGNED_ID = '__unassigned__'
 const COPY_PATH_COMBO = 'Mod+Shift+KeyC'
-const REVEAL_IN_EXPLORER_COMBO = 'Mod+KeyE'
+const REVEAL_IN_EXPLORER_COMBO = 'Mod+Shift+KeyE'
 const COPY_PATH_SHORTCUT = displayCombo(COPY_PATH_COMBO)
 const REVEAL_IN_EXPLORER_SHORTCUT = displayCombo(REVEAL_IN_EXPLORER_COMBO)
 

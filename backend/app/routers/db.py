@@ -195,7 +195,7 @@ TASK_BOARD_PRESET: dict[str, Any] = {
         # 배치 인계(전체 실행) 메타 — 표에 노출하지 않음
         {"key": "batch_id", "label": "배치", "type": "text", "visible": False, "options": []},
         {"key": "batch_order", "label": "배치 순번", "type": "number", "visible": False, "options": []},
-        {"key": "run_log", "label": "최근 실행", "type": "url", "visible": True, "options": []},
+        {"key": "run_log", "label": "최근 실행", "type": "url", "visible": False, "options": []},
     ],
     "primarySort": None,
     "defaultView": "board",

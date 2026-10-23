@@ -1637,18 +1637,7 @@ export default function ByeoriPanel({
     active?.memoryError && active.memoryResultRunId && active.memoryResultRunId === active.runId,
   )
 
-  const showSummary =
-    active &&
-    !active.busy &&
-    !active.queued &&
-    (active.runLogPath || active.taskStatus || showMemorySaved || showMemoryError)
   const recovery = active?.recovery ? recoveryCopy(active.recovery.kind) : null
-  const summaryLabel =
-    active?.lastRun?.status === 'cancelled'
-      ? '중단된 실행 요약'
-      : active?.lastRun?.status === 'error'
-        ? '실패한 실행 요약'
-        : '실행 요약'
 
   return (
     <div ref={findScopeRef} tabIndex={-1} className="relative flex h-full flex-col bg-white outline-none" data-ai-conversation={activeSessionId ?? 'new'}
@@ -1980,30 +1969,8 @@ export default function ByeoriPanel({
           <WorkingStatus session={active} now={progressNow} onCancel={() => cancel(active.id)} />
         )}
 
-        {/* 완료 요약 — 최종 결과·검증 액션을 한 곳에 */}
-        {showSummary && active && (
-          <div className="space-y-1.5 rounded-lg border border-[#e9e9e7] bg-[#fbfbfa] p-2.5">
-            <p className="text-[10px] font-medium uppercase tracking-wide text-[#9b9a97]">{summaryLabel}</p>
-            {active.taskStatus && (
-              <div className="rounded-md border border-[#e7f5ef] bg-[#f0fdf4] px-3 py-1.5 text-[12px] text-[#0f7a48]">
-
-                {tr("태스크 상태 →")} <span className="font-medium">{active.taskStatus.status}</span>{' '}
-                <button className="underline" onClick={() => openFile(active.taskStatus!.path)}>
-
-                  {tr("카드 열기")}
-                </button>
-              </div>
-            )}
-            {active.runLogPath && (
-              <button
-                className="flex w-full items-center gap-2 rounded-md border border-[#e3e2e0] bg-white px-3 py-1.5 text-left text-[12px] text-[#37352f] hover:bg-[#f7f7f5]"
-                onClick={() => openFile(active.runLogPath!)}
-              >
-                <span>📋</span>
-                <span className="font-medium">{tr("실행 로그 열기")}</span>
-                <span className="truncate text-[11px] text-[#9b9a97]">{active.runLogPath}</span>
-              </button>
-            )}
+        {active && !active.busy && !active.queued && (showMemorySaved || showMemoryError) && (
+          <div className="space-y-1.5">
             {showMemorySaved && active.memoryBullets && active.memoryBullets.length > 0 && (
               <div className="rounded-md border-l-2 border-[#c8b6ff] bg-[#faf7ff] px-3 py-1.5 text-[11px] text-[#6f5aa8]">
                 <div className="mb-0.5 font-medium">

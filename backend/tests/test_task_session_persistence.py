@@ -5,6 +5,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
+import frontmatter
+
 from app.ai import sessions
 from app.ai.engine import registry as engine_registry
 from app.ai.orchestrator import (
@@ -12,6 +14,7 @@ from app.ai.orchestrator import (
     Orchestrator,
     RunRequest,
     _ActiveRun,
+    _collect_batch_handoff,
     _explicit_memory_extract_prompt,
     _is_explicit_memory_request,
     _resolve_run_context,
@@ -94,13 +97,28 @@ class TaskSessionPersistenceTests(unittest.TestCase):
             events = asyncio.run(collect())
         background.assert_not_awaited()
         saved = sessions.get_session(session["id"])
-        self.assertIn("태스크를 완료했습니다.", (self.root / self.task_path).read_text(encoding="utf-8"))
+        self.assertNotIn("태스크를 완료했습니다.", (self.root / self.task_path).read_text(encoding="utf-8"))
+        self.assertFalse((self.root / "runs").exists())
+        self.assertTrue(any(message["content"] == "태스크를 완료했습니다." for message in saved["messages"]))
+        self.assertFalse(any(event.get("type") in {"run_log", "run_log_updated", "task_report"} for event in events))
 
         self.assertTrue(any(event.get("type") == "session_updated" for event in events))
         self.assertEqual([], [message for message in saved["messages"] if message["role"] == "user"])
         self.assertEqual("completed", saved["last_run"]["status"])
         self.assertEqual("verify", saved["last_run"]["task_status"])
-        self.assertTrue((self.root / saved["last_run"]["run_log_path"]).is_file())
+        self.assertIsNone(saved["last_run"]["run_log_path"])
+
+    def test_batch_handoff_uses_saved_conversation_without_report_documents(self):
+        task = frontmatter.load(self.root / self.task_path)
+        task["batch_id"] = "batch-test"
+        task["batch_order"] = 1
+        (self.root / self.task_path).write_text(frontmatter.dumps(task), encoding="utf-8")
+        session = sessions.create_session(kind="task", title="첫 작업", task_path=self.task_path)
+        sessions.append_message(session["id"], "assistant", "설계 결과를 output/design.md에 작성했습니다.")
+        context = _collect_batch_handoff("tasks/next.md", {"batch_id": "batch-test", "batch_order": 2})
+        self.assertIn("output/design.md", context)
+        self.assertFalse((self.root / "runs").exists())
+        self.assertNotIn("Twill AI 실행 보고", (self.root / self.task_path).read_text(encoding="utf-8"))
 
     def test_chat_assistant_message_boundaries_survive_session_reload(self):
         session = sessions.create_session(kind="chat", title="말풍선 경계 보존")

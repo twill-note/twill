@@ -251,10 +251,8 @@ class TaskScopeExecutionTests(unittest.TestCase):
         saved = sessions.get_session(session["id"])
         self.assertEqual("scope-a", saved["scope_id"])
         self.assertEqual("section-a", saved["section_id"])
-        log_post = frontmatter.load(self.root / saved["last_run"]["run_log_path"])
-        self.assertEqual("scope-a", log_post.get("scope"))
-        self.assertEqual("section-a", log_post.get("section_id"))
-        self.assertEqual(str(self.project_a.resolve()), log_post.get("cwd"))
+        self.assertIsNone(saved["last_run"]["run_log_path"])
+        self.assertFalse((self.root / "runs").exists())
 
         self._write_task(scope_id="scope-b", section_id="section-b")
         before_start_count = len(self.engine.start_cwds)

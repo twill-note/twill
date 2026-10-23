@@ -89,10 +89,11 @@ app.whenReady().then(async () => {
       ai.setState({ loadSessions: async () => {} })
       const { notifyAiEngineChanged } = await import(url('/src/aiMaintenance.ts')); notifyAiEngineChanged()
       const id = await ai.getState().newChatSession({ title: '검색 검증' }); store.getState().openAiSession(id)
-      ai.setState(state => ({ sessions: state.sessions.map(session => session.id === id ? { ...session, messages: [
+      ai.setState(state => ({ sessions: state.sessions.map(session => session.id === id ? { ...session, runLogPath: 'runs/legacy.md', taskStatus: { path: note, status: 'verify' }, lastRun: { status: 'completed' }, messages: [
         { role: 'user', content: 'needle 질문' }, { role: 'assistant', content: Array.from({ length: 60 }, (_, i) => '응답 문단 ' + i).join('\n\n') + '\n\nneedle 답변' },
       ] } : session) }))
       const chat = await wait(() => document.querySelector('[data-ai-conversation="' + id + '"]'), 'conversation missing')
+      assert(!chat.textContent.includes('실행 요약') && !chat.textContent.includes('실행 로그 열기'), 'legacy execution summary remained below answer')
       const prompt = await wait(() => chat.querySelector('textarea'), 'prompt missing')
       prompt.focus(); key(prompt, 'f', { metaKey: true })
       const chatSearch = await wait(() => chat.querySelector('[aria-label="대화 검색어"]'), 'chat find missing')

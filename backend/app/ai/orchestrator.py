@@ -37,7 +37,6 @@ log = logging.getLogger("orchestrator")
 # 워크스페이스 루트 파일 이름
 DEFAULT_AGENTS = "AGENTS.md"
 DEFAULT_MEMORIES = "MEMORIES.md"
-RUNS_DIR = "runs"
 DEFAULT_TASK_BOARD_DIR = "tasks"
 MAX_GENERATED_IMAGE_BYTES = 25 * 1024 * 1024
 
@@ -142,81 +141,7 @@ def _new_run_id() -> str:
     return time.strftime("%Y%m%d-%H%M%S") + "-" + uuid.uuid4().hex[:6]
 
 
-def _write_run_log(
-    *,
-    run_id: str,
-    task_path: str | None,
-    engine_id: str,
-    thread_id: str,
-    scope: str | None,
-    section_id: str | None,
-    section_memories_ref: str | None,
-    context_note_path: str | None,
-    cwd: str,
-    skills: list[str],
-    mentions: list[str],
-    started_at: float,
-    completed_at: float,
-    status: str,
-    final_text: str,
-    reasoning_text: str,
-    tool_events: list[str],
-    error: str | None = None,
-) -> str:
-    """Run 완료 후 노트 하나 생성. 반환값은 워크스페이스 상대 경로."""
-    root = config.notes_dir()
-    runs_dir = root / RUNS_DIR
-    runs_dir.mkdir(parents=True, exist_ok=True)
-    filename = f"{run_id}.md"
-    p = runs_dir / filename
-
-    meta = {
-        "title": f"Run {run_id}",
-        "type": "run",
-        "task": task_path or "",
-        "engine": engine_id,
-        "thread_id": thread_id,
-        "scope": scope or "",
-        "section_id": section_id or "",
-        "section_memories_ref": section_memories_ref or "",
-        "context_note": context_note_path or "",
-        "cwd": cwd,
-        "skills": skills,
-        "mentions": mentions,
-        "started_at": started_at,
-        "completed_at": completed_at,
-        "status": status,
-    }
-    if error:
-        meta["error"] = error
-
-    body_parts: list[str] = []
-    body_parts.append(f"# Run {run_id}\n")
-    if task_path:
-        body_parts.append(f"태스크: [[{Path(task_path).stem}]]\n")
-    body_parts.append(f"## 최종 답변\n\n{final_text.strip() or '(없음)'}\n")
-    if reasoning_text.strip():
-        body_parts.append(f"## 사고 과정\n\n{reasoning_text.strip()}\n")
-    if tool_events:
-        body_parts.append("## 도구 호출\n\n" + "\n".join(f"- {t}" for t in tool_events) + "\n")
-    if error:
-        body_parts.append(f"## 오류\n\n{error}\n")
-
-    post = frontmatter.Post("\n".join(body_parts), **meta)
-    p.write_text(frontmatter.dumps(post) + "\n", encoding="utf-8")
-
-    # 인덱서 등록
-    rel = p.relative_to(root).as_posix()
-    try:
-        indexer.index_file(rel)
-    except Exception:  # noqa: BLE001
-        pass
-    return rel
-
-
-# '확인 필요' 로 넘기기 전, 사용자가 검증할 수 있게 실행 결과를 구조화 보고하도록 요구하는 프롬프트.
-# 태스크 카드 본문에 기록하는 실행 보고 섹션의 고정 헤딩 — 재실행 시 이 헤딩부터 끝까지 교체된다.
-# 이전 이름을 포함한 헤딩도 인식해, 기존 카드가 재실행될 때 보고가 중복되지 않게 한다.
+# 이전 버전의 실행 보고는 배치 인계 시 읽기만 한다. 새 보고 문서는 생성하지 않는다.
 TASK_REPORT_HEADING = "## 🤖 Twill AI 실행 보고"
 LEGACY_TASK_REPORT_HEADINGS = ("## 🤖 AI 실행 보고", "## 🤖 벼리 실행 보고")
 
@@ -227,64 +152,11 @@ def _task_report_location(body: str) -> tuple[int, str]:
     return min((match for match in matches if match[0] >= 0), default=(-1, ""))
 
 
-def _write_task_report(
-    task_path: str,
-    *,
-    run_id: str,
-    done: list[str],
-    verify: list[str],
-    issues: list[str],
-    error: str | None = None,
-) -> None:
-    """태스크 카드 본문 끝에 실행 보고 섹션을 기록 (이전 보고는 교체).
-
-    사용자가 '확인 필요' 카드를 열었을 때 — 무엇을 했고 / 무엇을 확인해야 하고 / 무슨 오류가
-    있었는지 — 를 명확히 구분해 보여주기 위한 것. 사용자 작성 본문(보고 헤딩 위쪽)은 보존한다.
-    """
-    p = config.notes_dir() / task_path
-    if not p.is_file():
-        return
-    try:
-        post = frontmatter.load(p)
-    except Exception:  # noqa: BLE001
-        return
-
-    body = post.content
-    idx, _ = _task_report_location(body)
-    if idx >= 0:
-        body = body[:idx].rstrip()
-
-    ts = time.strftime("%Y-%m-%d %H:%M")
-    lines: list[str] = ["", "", TASK_REPORT_HEADING, "", f"run:{run_id} · {ts}"]
-
-    def section(title: str, items: list[str], empty_text: str) -> None:
-        lines.append("")
-        lines.append(f"### {title}")
-        if items:
-            lines.extend(f"- {item}" for item in items)
-        else:
-            lines.append(f"- {empty_text}")
-
-    all_issues = list(issues)
-    if error:
-        all_issues.append(f"실행 중단/오류: {error}")
-    section("✅ 수행한 작업", done, "보고된 작업 없음 — 실행 로그(run_log)를 확인하세요")
-    section("🔎 확인이 필요한 사항", verify, "특별히 확인할 사항 없음")
-    section("⚠️ 오류·미해결 사항", all_issues, "없음")
-
-    post.content = (body.rstrip() + "\n".join(lines) + "\n").lstrip("\n")
-    p.write_text(frontmatter.dumps(post) + "\n", encoding="utf-8")
-    try:
-        indexer.index_file(task_path)
-    except Exception:  # noqa: BLE001
-        pass
-
-
 def _collect_batch_handoff(task_path: str | None, task_meta: dict, board_dir: str = "tasks") -> str:
     """같은 배치(전체 실행)의 선행 카드 실행 결과를 [선행 작업 결과] 블록으로 조립.
 
     '계획서 작성 → 구현' 같은 순차 업무에서 후속 세션이 선행 산출물을 모르는 문제 해결:
-    선행 카드의 실행 보고(수행 내용) + 변경/생성 파일 목록을 프롬프트에 자동 첨부해,
+    선행 카드의 대화 최종 답변(이전 버전은 실행 보고)과 산출물 정보를 프롬프트에 자동 첨부해,
     벼리가 산출물 파일을 직접 열어 이어서 작업할 수 있게 한다.
     """
     if not task_path or not isinstance(task_meta, dict):
@@ -302,6 +174,7 @@ def _collect_batch_handoff(task_path: str | None, task_meta: dict, board_dir: st
     if not board.is_dir():
         return ""
 
+    sessions = ai_sessions.list_sessions()
     predecessors: list[tuple[int, str, str, list[str], str]] = []
     for p in sorted(board.glob("*.md")):
         rel = p.relative_to(config.notes_dir()).as_posix()
@@ -323,6 +196,12 @@ def _collect_batch_handoff(task_path: str | None, task_meta: dict, board_dir: st
         body = post.content or ""
         idx, heading = _task_report_location(body)
         report = body[idx + len(heading):].strip()[:1200] if idx >= 0 else ""
+        previous_sessions = [session for session in sessions if session.get("task_path") == rel]
+        if previous_sessions:
+            latest = max(previous_sessions, key=lambda session: session.get("updated_at") or 0)
+            answers = [str(message.get("content") or "") for message in latest.get("messages", []) if message.get("role") == "assistant"]
+            if answers:
+                report = answers[-1][:4000]
         # 변경/생성 파일: run log 의 '파일 변경:' 기록에서 추출 (산출물 위치)
         changed: list[str] = []
         run_log = str(post.get("run_log") or "")
@@ -350,7 +229,7 @@ def _collect_batch_handoff(task_path: str | None, task_meta: dict, board_dir: st
     ]
     for order, title, report, changed, run_log in predecessors:
         parts.append(f"\n### 선행 {order}. {title}")
-        parts.append(report if report else "(아직 실행 보고가 없습니다 — 실행 로그를 참고하세요)")
+        parts.append(report if report else "(아직 저장된 최종 답변이 없습니다)")
         if changed:
             parts.append("변경/생성된 파일:\n" + "\n".join(f"- {c}" for c in changed))
         if run_log:
@@ -744,14 +623,6 @@ def prompt_runtime_info() -> dict[str, Any]:
             "source": memories_ref,
             "included": False,
             "content": memories_body,
-        },
-        {
-            "id": "verify-report",
-            "stage": "실행 후처리",
-            "title": "실행 보고서 저장",
-            "source": "내장 · 태스크 완료 후",
-            "included": False,
-            "content": "추가 AI 실행 없이 최종 답변을 태스크 실행 보고서에 저장합니다.",
         },
         {
             "id": "explicit-memory-extract",
@@ -1929,7 +1800,7 @@ class Orchestrator:
         if image_paths:
             turn_config["images"] = image_paths
 
-        # Run log 를 위한 이벤트 누적
+        # 최종 답변은 대화 세션에만 보관한다. 별도 로그·보고 노트는 만들지 않는다.
         run_id = _new_run_id()
         started_at = time.time()
         final_text_parts: list[str] = []
@@ -1940,16 +1811,12 @@ class Orchestrator:
         persisted_assistant_messages: set[str] = set()
         persisted_image_items: set[str] = set()
         active_assistant_message_id: str | None = None
-        reasoning_parts: list[str] = []
-        tool_events: list[str] = []
         error_msg: str | None = None
         error_seen = False
         tool_call_count = 0
         budget_hit: str | None = None
         stop_kind: str | None = None
         interrupted = False
-        log_path_partial: str | None = None
-        last_incremental_write = 0.0
 
         # Active run 등록 (steer/interrupt 용)
         active = _ActiveRun(
@@ -1981,43 +1848,6 @@ class Orchestrator:
             _update_task_frontmatter(req.task_path, {"status": "running", "current_run": run_id})
 
         yield {"type": "run_id", "run_id": run_id, "started_at": started_at}
-
-        # 실행 시작 즉시 run log 파일을 만들어서 프론트가 미리 열어두고 스트리밍 감상 가능하게.
-        # (챗 모드는 run log 를 만들지 않음 — 대화는 세션에 영속화된다.)
-        if is_task:
-            try:
-                log_path_partial = await asyncio.to_thread(_write_run_log,
-                    run_id=run_id,
-                    task_path=req.task_path,
-                    engine_id=engine.id,
-                    thread_id=thread_id,
-                    scope=scope_id,
-                    section_id=run_context.section_id,
-                    section_memories_ref=run_context.section_memories_ref,
-                    context_note_path=run_context.current_note_path,
-                    cwd=cwd,
-                    skills=skill_paths,
-                    mentions=mentions,
-                    started_at=started_at,
-                    completed_at=started_at,
-                    status="running",
-                    final_text="",
-                    reasoning_text="",
-                    tool_events=[],
-                )
-                if session:
-                    ai_sessions.update_session(
-                        session["id"],
-                        active_run={
-                            "run_id": run_id,
-                            "task_path": req.task_path,
-                            "started_at": started_at,
-                            "run_log_path": log_path_partial,
-                        },
-                    )
-                yield {"type": "run_log", "path": log_path_partial}
-            except Exception:  # noqa: BLE001
-                log.exception("initial run log write failed")
 
         max_time_sec = req.max_time_sec
         if not max_time_sec and isinstance(task_meta, dict) and task_meta.get("max_time_min"):
@@ -2167,12 +1997,7 @@ class Orchestrator:
                     ai_sessions.append_message(session["id"], "assistant", text.strip())
                     persisted_assistant_messages.add(message_id)
                 active_assistant_message_id = None
-            elif t == "reasoning_delta":
-                reasoning_parts.append(ev.get("text", ""))
             elif t == "status":
-                text = str(ev.get("text") or "")
-                if text:
-                    tool_events.append(text)
                 if ev.get("kind") == "tool_start":
                     tool_call_count += 1
             elif t == "error":
@@ -2180,39 +2005,6 @@ class Orchestrator:
                 error_msg = str(ev.get("message") or "unknown error")
                 ev = {**ev, "code": ev.get("code") or _error_code(error_msg)}
             yield ev
-
-            # 스트리밍 중 증분 저장: message_end 시점에 rewrite (편집기 라이브 감상용).
-            # delta 마다는 부하가 크므로 message_end · status(tool_done) · 1초 throttle.
-            now = time.time()
-            should_flush = (
-                (t == "message_end" or t == "reasoning_end")
-                or (t == "status" and ev.get("kind") == "tool_done")
-            ) and (now - last_incremental_write) > 0.5
-            if should_flush and log_path_partial:
-                try:
-                    await asyncio.to_thread(_write_run_log,
-                        run_id=run_id,
-                        task_path=req.task_path,
-                        engine_id=engine.id,
-                        thread_id=thread_id,
-                        scope=scope_id,
-                        section_id=run_context.section_id,
-                        section_memories_ref=run_context.section_memories_ref,
-                        context_note_path=run_context.current_note_path,
-                        cwd=cwd,
-                        skills=skill_paths,
-                        mentions=mentions,
-                        started_at=started_at,
-                        completed_at=now,
-                        status="running",
-                        final_text="".join(final_text_parts),
-                        reasoning_text="".join(reasoning_parts),
-                        tool_events=list(tool_events),
-                    )
-                    last_incremental_write = now
-                    yield {"type": "run_log_updated", "path": log_path_partial}
-                except Exception:  # noqa: BLE001
-                    pass
 
             if max_time_sec and (time.time() - started_at) > max_time_sec:
                 budget_hit = f"시간 한도 초과 ({int(time.time() - started_at)}s > {max_time_sec}s)"
@@ -2249,7 +2041,7 @@ class Orchestrator:
                 error_seen = True
                 error_msg = budget_hit
 
-        # 스트림 종료 후 로그 노트 생성 (태스크 실행만 — 챗은 세션에 영속화)
+        # 스트림 종료 후 실행 상태와 대화 메시지를 보존한다.
         completed_at = time.time()
         status = "cancelled" if stop_kind == "cancelled" else "error" if error_seen else "completed"
         separated_final_messages = [
@@ -2258,7 +2050,6 @@ class Orchestrator:
             if "".join(assistant_message_parts[message_id]).strip()
         ]
         final_text = ("\n\n".join(separated_final_messages) or "".join(final_text_parts)).strip()
-        reasoning_text = "".join(reasoning_parts).strip()
 
         if task_cards_before is not None and req.session_id:
             linked_cards = _link_new_task_cards_to_session(
@@ -2273,60 +2064,14 @@ class Orchestrator:
                     "session_id": req.session_id,
                 }
 
-        if is_task:
-            try:
-                log_path = await asyncio.to_thread(_write_run_log,
-                    run_id=run_id,
-                    task_path=req.task_path,
-                    engine_id=engine.id,
-                    thread_id=thread_id,
-                    scope=scope_id,
-                    section_id=run_context.section_id,
-                    section_memories_ref=run_context.section_memories_ref,
-                    context_note_path=run_context.current_note_path,
-                    cwd=cwd,
-                    skills=skill_paths,
-                    mentions=mentions,
-                    started_at=started_at,
-                    completed_at=completed_at,
-                    status=status,
-                    final_text=final_text,
-                    reasoning_text=reasoning_text,
-                    tool_events=tool_events,
-                    error=error_msg,
-                )
-                yield {"type": "run_log", "path": log_path}
-            except Exception as e:  # noqa: BLE001
-                log.exception("run log write failed")
-                yield {"type": "run_log_error", "message": str(e)}
-
         # 태스크 상태 → verify (오류 시 blocked)
         if req.task_path:
             next_status = "blocked" if error_seen or interrupted else "verify"
             _update_task_frontmatter(
                 req.task_path,
-                {"status": next_status, "run_log": log_path if "log_path" in locals() else ""},
+                {"status": next_status, "run_log": ""},
             )
             yield {"type": "task_status", "task_path": req.task_path, "status": next_status}
-
-        # 최종 답변을 그대로 보고서에 기록한다. 보고서만 만들기 위한 추가 AI 턴은
-        # 완료를 지연하고, 중단 대상과 승인 컨텍스트가 없는 숨은 실행을 만들었다.
-        if is_task and req.task_path:
-            report_done = [final_text] if final_text.strip() else []
-            report_verify = ["실행 로그(run_log)의 최종 답변과 변경 사항을 직접 확인하세요"]
-            report_issues: list[str] = []
-            try:
-                _write_task_report(
-                    req.task_path,
-                    run_id=run_id,
-                    done=report_done,
-                    verify=report_verify,
-                    issues=report_issues,
-                    error=error_msg,
-                )
-                yield {"type": "task_report", "task_path": req.task_path}
-            except Exception:  # noqa: BLE001
-                log.exception("task report write failed")
 
         # 세션 마무리: 최종 답변 저장 + 새 대화면 첫 프롬프트로 제목 자동 지정
         if session:
@@ -2344,7 +2089,7 @@ class Orchestrator:
                         "run_id": run_id,
                         "status": status,
                         "message": run_message,
-                        "run_log_path": log_path if "log_path" in locals() else log_path_partial,
+                        "run_log_path": None,
                         "task_path": req.task_path or "",
                         "task_status": next_status if req.task_path else "",
                         "completed_at": completed_at,

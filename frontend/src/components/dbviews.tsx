@@ -389,7 +389,7 @@ interface BoardProps extends CommonProps {
   cardAction?: (row: NoteRow, groupValue: string) => React.ReactNode
   /** 카드 제목 아래의 상태·메타 배지. 버튼을 반환해도 카드 열기 이벤트와 충돌하지 않는다. */
   cardBadge?: (row: NoteRow, groupValue: string) => React.ReactNode
-  /** 카드 영구 삭제. 지정하면 카드 우클릭 메뉴와 컬럼 정리 항목이 활성화된다. */
+  /** 카드 삭제. 지정하면 카드 우클릭 메뉴와 컬럼 정리 항목이 활성화된다. */
   onDeleteRow?: (path: string) => void | Promise<void>
   /** 카드 우클릭 메뉴에 DB 종류별 전용 동작을 더한다. */
   rowMenuItems?: (row: NoteRow) => DbRowMenuItem[]
@@ -446,7 +446,7 @@ export function DbBoard({ rows, config, groupBy, onOpen, onOpenDocument, onCellC
 
   const cleanupColumn = async (label: string, items: NoteRow[]) => {
     if (!onDeleteRow || items.length === 0) return
-    const ok = await dialog.confirm(`'${label}' 컬럼의 카드 ${items.length}개를 모두 영구 삭제할까요?`, {
+    const ok = await dialog.confirm(`'${label}' 컬럼의 카드 ${items.length}개를 모두 삭제할까요?`, {
       detail: '하위 문서도 함께 삭제되며 복구할 수 없습니다.',
       confirmLabel: '모두 삭제',
       danger: true,
@@ -628,7 +628,7 @@ export function DbBoard({ rows, config, groupBy, onOpen, onOpenDocument, onCellC
                       setColMenu(null)
                       void cleanupColumn(colMenu.label, items)
                     }}
-                    title={tr("문서를 영구 삭제합니다")}
+                    title={tr("문서를 삭제합니다")}
                   >
                     <span>🗑</span>  {tr("카드 모두 정리")}
                   </button>
@@ -687,13 +687,13 @@ export function DbBoard({ rows, config, groupBy, onOpen, onOpenDocument, onCellC
                 onClick={async () => {
                   const row = ctxMenu.row
                   setCtxMenu(null)
-                  if (await dialog.confirm(`"${row.title}"을(를) 영구 삭제할까요?`, {
-                    danger: true, detail: '하위 문서도 함께 삭제되며 복구할 수 없습니다.', confirmLabel: '영구 삭제',
+                  if (await dialog.confirm(`"${row.title}"을(를) 삭제할까요?`, {
+                    danger: true, detail: '하위 문서도 함께 삭제되며 복구할 수 없습니다.', confirmLabel: '삭제',
                   })) await onDeleteRow(row.path)
                 }}
-                title={tr("문서를 영구 삭제합니다")}
+                title={tr("문서를 삭제합니다")}
               >
-                <span>🗑</span>  {tr("영구 삭제")}
+                <span>🗑</span>  {tr("삭제")}
               </button>
             )}
           </div>

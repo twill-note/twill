@@ -273,10 +273,10 @@ export default function FileTree() {
   }
 
   const handleDelete = async (node: TreeNode) => {
-    const ok = await dialog.confirm(`"${node.name}"을(를) 영구 삭제할까요?`, {
+    const ok = await dialog.confirm(`"${node.name}"을(를) 삭제할까요?`, {
       danger: true,
       detail: '하위 문서도 함께 삭제되며 복구할 수 없습니다.',
-      confirmLabel: '영구 삭제',
+      confirmLabel: '삭제',
     })
     if (!ok) return
     try {
@@ -899,7 +899,7 @@ export default function FileTree() {
                     }}
                   />
                   <MenuItem
-                    label={tr("🗑️ 영구 삭제")}
+                    label={tr("🗑️ 삭제")}
                     danger
                     onClick={() => {
                       handleDelete(menu.node!)

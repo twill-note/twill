@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api } from '../../api'
 import { useAiStore } from '../../aiStore'
-import { dialog } from '../../dialog'
 import { type DocTab, useAppStore } from '../../store'
 import ErdDesigner from './Designer'
 import { emptyDiagram, type ErdDiagram } from './types'
@@ -27,6 +26,7 @@ function createNewDiagram(directory: string | null): ErdTabSession {
     // 저장 전까지 사용할 폴더를 보존하기 위한 제안 경로일 뿐이다.
     initialPath: `${targetDir ? `${targetDir}/` : ''}${title}.erd.json`,
     diagram: { ...diagram, meta: { ...diagram.meta, filenameMode: 'title' } },
+    savedDiagram: { ...diagram, meta: { ...diagram.meta, filenameMode: 'title' } },
   }
 }
 
@@ -46,6 +46,8 @@ export default function ErdWorkspace({ tab }: { tab: DocTab }) {
   const defaultDirectory = tab.erdDirectory ?? ''
   const [active, setActive] = useState<ErdTabSession | null>(() => getErdTabSession(tab.id) ?? null)
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [reload, setReload] = useState(0)
 
   useEffect(() => {
     let cancelled = false
@@ -65,6 +67,8 @@ export default function ErdWorkspace({ tab }: { tab: DocTab }) {
     }
 
     setLoading(true)
+    setActive(null)
+    setError('')
     api.erdDesigner
       .get(tab.erdPath)
       .then((loaded) => {
@@ -73,27 +77,31 @@ export default function ErdWorkspace({ tab }: { tab: DocTab }) {
           instanceId: `file-${loaded.path}-${Date.now()}`,
           filePath: loaded.path,
           diagram: loaded.diagram,
+          savedDiagram: loaded.diagram,
         }
         setErdTabSession(tab.id, next)
         setActive(next)
       })
       .catch((error) => {
-        if (!cancelled) dialog.alert((error as Error).message)
+        if (!cancelled) setError((error as Error).message)
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
       })
     return () => { cancelled = true }
-  }, [tab.id, tab.erdPath, defaultDirectory])
+  }, [tab.id, tab.erdPath, defaultDirectory, reload])
 
   const saveDiagram = useCallback(async (path: string, diagram: ErdDiagram, syncTitle: boolean) => {
+    const pending = getErdTabSession(tab.id)?.diagram
     const saved = await api.erdDesigner.save(path, diagram, syncTitle)
-    setActive((current) => {
-      if (!current) return current
-      const next = { ...current, filePath: saved.path, diagram: saved.diagram }
+    const current = getErdTabSession(tab.id)
+    if (current) {
+      // Complete the originating tab's save even if it was unmounted meanwhile.
+      const next = { ...current, filePath: saved.path, diagram: current.diagram === pending ? saved.diagram : current.diagram, savedDiagram: saved.diagram }
       setErdTabSession(tab.id, next)
-      return next
-    })
+      setErdTabDirty(tab.id, JSON.stringify(next.diagram) !== JSON.stringify(next.savedDiagram))
+      setActive(next)
+    }
     updateErdTab(tab.id, saved.path)
     await refreshTree()
     return saved.path
@@ -119,6 +127,15 @@ export default function ErdWorkspace({ tab }: { tab: DocTab }) {
     setErdTabDirty(tab.id, dirty)
   }, [tab.id])
 
+  const updateSavedDiagram = useCallback((savedDiagram: ErdDiagram) => {
+    setActive(current => {
+      if (!current) return current
+      const next = { ...current, savedDiagram }
+      setErdTabSession(tab.id, next)
+      return next
+    })
+  }, [tab.id])
+
   const registerCloseRequest = useCallback((request: (() => void) | null) => {
     registerErdTabCloseRequest(tab.id, request)
   }, [tab.id])
@@ -128,6 +145,7 @@ export default function ErdWorkspace({ tab }: { tab: DocTab }) {
     closeTab(tab.id)
   }, [closeTab, tab.id])
 
+  if (error) return <div role="alert" className="space-y-2 p-4 text-[13px] text-red-600"><p>{error}</p><button className="rounded border px-2 py-1" onClick={() => setReload(value => value + 1)}>{tr('다시 시도')}</button></div>
   if (loading || !active) {
     return <div className="flex h-full items-center justify-center text-[13px] text-[#9b9a97]">{tr("ERD를 불러오는 중…")}</div>
   }
@@ -136,6 +154,7 @@ export default function ErdWorkspace({ tab }: { tab: DocTab }) {
     <ErdDesigner
       key={active.instanceId}
       initial={active.diagram}
+      initialSavedDiagram={active.savedDiagram}
       filePath={active.filePath}
       initialPath={active.initialPath}
       onSave={saveDiagram}
@@ -144,6 +163,7 @@ export default function ErdWorkspace({ tab }: { tab: DocTab }) {
       onClose={closeCurrentTab}
       onDirtyChange={updateDirty}
       onDiagramChange={updateDiagram}
+      onSavedDiagramChange={updateSavedDiagram}
       registerCloseRequest={registerCloseRequest}
     />
   )

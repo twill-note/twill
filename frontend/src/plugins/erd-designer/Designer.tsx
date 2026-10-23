@@ -22,6 +22,7 @@ import { tr } from '../../i18n'
 
 interface Props {
   initial: ErdDiagram
+  initialSavedDiagram?: ErdDiagram
   /** 이미 저장된 워크스페이스 상대 경로. null 이면 아직 새 다이어그램이다. */
   filePath: string | null
   /** 새 다이어그램에 미리 제안할 저장 위치. 아직 저장된 경로로 취급하지 않는다. */
@@ -36,6 +37,7 @@ interface Props {
   onDirtyChange?: (dirty: boolean) => void
   /** 탭을 다른 분할 패널로 옮겨도 편집 상태를 보존할 수 있도록 최신 다이어그램을 알린다. */
   onDiagramChange?: (diagram: ErdDiagram) => void
+  onSavedDiagramChange?: (diagram: ErdDiagram) => void
   /** 탭의 닫기 버튼도 디자이너의 저장 확인 절차를 거치게 한다. */
   registerCloseRequest?: (request: (() => void) | null) => void
 }
@@ -78,6 +80,7 @@ function inferFilenameMode(diagram: ErdDiagram, path: string | null): FilenameMo
 
 export default function ErdDesigner({
   initial,
+  initialSavedDiagram,
   filePath,
   initialPath,
   onSave,
@@ -86,11 +89,12 @@ export default function ErdDesigner({
   onClose,
   onDirtyChange,
   onDiagramChange,
+  onSavedDiagramChange,
   registerCloseRequest,
 }: Props) {
   const [diagram, setDiagram] = useState<ErdDiagram>(() => normalizeMariaDbDiagram(initial))
   const [filenameMode] = useState<FilenameMode>(() => inferFilenameMode(normalizeMariaDbDiagram(initial), filePath))
-  const [originalSnapshot, setOriginalSnapshot] = useState<string>(() => JSON.stringify(normalizeMariaDbDiagram(initial)))
+  const [originalSnapshot, setOriginalSnapshot] = useState<string>(() => JSON.stringify(normalizeMariaDbDiagram(initialSavedDiagram ?? initial)))
   const [selectedTableId, setSelectedTableId] = useState<string | null>(null)
   const [selectedRelId, setSelectedRelId] = useState<string | null>(null)
   const [camera, setCamera] = useState<Camera>({ x: 0, y: 0, scale: 1 })
@@ -150,6 +154,10 @@ export default function ErdDesigner({
   useEffect(() => {
     onDiagramChange?.(diagram)
   }, [diagram, onDiagramChange])
+
+  useEffect(() => {
+    onSavedDiagramChange?.(JSON.parse(originalSnapshot) as ErdDiagram)
+  }, [originalSnapshot, onSavedDiagramChange])
 
   useEffect(() => {
     if (!titleEditing) setTitleDraft(diagram.meta.title)
@@ -218,7 +226,7 @@ export default function ErdDesigner({
       const saved = await onSave(path, toSave, filenameMode === 'title')
       const snapshot = JSON.stringify(toSave)
       snapshotRef.current = snapshot
-      setDiagram(toSave)
+      setDiagram(current => current === diagram ? toSave : current)
       setOriginalSnapshot(snapshot)
       setSavedPath(saved)
       setPathInput(saved)

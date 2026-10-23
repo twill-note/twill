@@ -885,7 +885,7 @@ function EditorPane({
           </div>
         ))}
         {activeTab ? (
-          activeTab.kind === 'ai' ? null : activeTab.kind === 'erd' ? <ErdWorkspace tab={activeTab} /> : <Editor path={activeTab.target} />
+          activeTab.kind === 'ai' ? null : activeTab.kind === 'erd' ? <ErdWorkspace key={activeTab.id} tab={activeTab} /> : <Editor path={activeTab.target} />
         ) : (
           <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center text-[#9b9a97]">
             <span className="text-2xl">▧</span>

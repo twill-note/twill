@@ -7,6 +7,7 @@ export type ErdTabSession = {
   filePath: string | null
   initialPath?: string
   diagram: ErdDiagram
+  savedDiagram?: ErdDiagram
 }
 
 /** 패널 사이 탭 이동 중에도 저장 전 편집 상태를 보관하는 탭별 세션. */

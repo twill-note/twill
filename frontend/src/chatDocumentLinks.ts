@@ -21,13 +21,13 @@ export function hasDocumentMention(text: string, path: string): boolean {
   return false
 }
 
-/** Spaces belong to filenames; only a completed selection or a new line ends a query. */
+/** Single spaces belong to filenames; two consecutive spaces end the current query. */
 export function documentMentionQuery(text: string, caret: number, selectedPaths: readonly string[]): string | null {
   const upto = text.slice(0, caret)
   const at = upto.lastIndexOf('@')
   if (at < 0 || !mentionStart(upto, at)) return null
   const query = upto.slice(at + 1)
-  if (/[\r\n\t]/.test(query)) return null
+  if (/[\r\n\t]| {2}/.test(query)) return null
   if (selectedPaths.some(path => query.startsWith(path) && query.length > path.length && mentionEnd(query, path.length))) return null
   return query
 }

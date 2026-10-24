@@ -21,6 +21,20 @@ test('mention completion keeps filename spaces and ends after a selected referen
   assert.equal(hasDocumentMention('user@설계 문서.md', '설계 문서.md'), false)
 })
 
+test('two spaces dismiss mention completion until a new reference or editing before the boundary', () => {
+  const query = (value: string) => documentMentionQuery(value, value.length, [])
+  assert.equal(query('@회의 자료 '), '회의 자료 ')
+  assert.equal(query('@회의 자료  '), null)
+  assert.equal(query('@  '), null)
+  assert.equal(query('@회의 자료   다음 질문'), null)
+  assert.equal(query('@회의 자료  다음 질문을 이어서 작성'), null)
+  assert.equal(query('@회의 자료  다음 질문 @설계 문서'), '설계 문서')
+  assert.equal(query('앞 문장  @설계 문서'), '설계 문서')
+  const text = '@회의 자료  다음 질문'
+  assert.equal(documentMentionQuery(text, '@회의 자료 '.length, []), '회의 자료 ')
+  assert.equal(query('@회의 자료  '.slice(0, -1)), '회의 자료 ')
+})
+
 test('user mentions become links with full spaced paths and retain non-reference text', () => {
   const tree = { type: 'root', children: [
     { type: 'text', value: '확인 @회의 자료/설계 문서.md 그리고 @회의.md 다음' },

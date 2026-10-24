@@ -37,12 +37,28 @@ app.whenReady().then(async () => {
       const input = await wait(() => panel()?.querySelector('textarea'), 'chat input missing')
       input.focus()
       const draft = '@UI API 공백'
-      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(input, draft)
-      input.setSelectionRange(draft.length, draft.length)
-      input.dispatchEvent(new Event('input', { bubbles: true }))
-      const pick = await wait(() => [...document.querySelectorAll('button')].find(b => b.textContent.includes(name)), 'spaced mention search missing')
+      const setDraft = value => {
+        Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(input, value)
+        input.setSelectionRange(value.length, value.length)
+        input.dispatchEvent(new Event('input', { bubbles: true }))
+      }
+      const mentionList = () => document.querySelector('[role="listbox"][aria-label="문서 참조 검색"]')
+      const candidate = () => [...(mentionList()?.querySelectorAll('button') ?? [])].find(b => b.textContent.includes(name))
+      setDraft(draft)
+      await wait(candidate, 'spaced mention search missing')
+      setDraft(draft + ' ')
+      await wait(candidate, 'single trailing space dismissed mention search')
+      setDraft(draft + '  ')
+      await wait(() => !mentionList(), 'double space did not dismiss mention search')
+      assert(input.value === draft + '  ' && document.activeElement === input, 'dismissal changed input or focus')
+      const prose = draft + '  다음 질문'
+      setDraft(prose)
+      await pause(250)
+      assert(!mentionList(), 'continued prose reopened dismissed mention search')
+      setDraft(prose + ' @UI API 공백')
+      const pick = await wait(candidate, 'new @ did not reopen mention search')
       pick.click()
-      await wait(() => input.value === '@' + name + ' ', 'selected path incomplete')
+      await wait(() => input.value === prose + ' @' + name + ' ', 'selected path incomplete')
       input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }))
       await wait(() => sends.length, 'mention not submitted')
       assert(sends[0].options.mentionPaths[0] === name, 'spaced document context lost')
@@ -56,7 +72,7 @@ app.whenReady().then(async () => {
       store.getState().closeTab('file:' + name)
       links[1].click()
       await wait(() => store.getState().currentPath === name, 'user Markdown link navigation failed')
-      return { spacedSearch: true, mentionContext: true, userMentionLink: true, userMarkdownLink: true, safeNavigation: true }
+      return { spacedSearch: true, doubleSpaceDismiss: true, continuedProse: true, freshMentionReopens: true, mentionContext: true, userMentionLink: true, userMarkdownLink: true, safeNavigation: true }
     })().catch(error => ({ error: error.stack }))`)
     if (result.error) throw Error(result.error)
     console.log(JSON.stringify(result))

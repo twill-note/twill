@@ -99,7 +99,6 @@ export default function ErdWorkspace({ tab }: { tab: DocTab }) {
       // Complete the originating tab's save even if it was unmounted meanwhile.
       const next = { ...current, filePath: saved.path, diagram: current.diagram === pending ? saved.diagram : current.diagram, savedDiagram: saved.diagram }
       setErdTabSession(tab.id, next)
-      setErdTabDirty(tab.id, JSON.stringify(next.diagram) !== JSON.stringify(next.savedDiagram))
       setActive(next)
     }
     updateErdTab(tab.id, saved.path)

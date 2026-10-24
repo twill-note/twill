@@ -44,6 +44,7 @@ app.whenReady().then(async () => {
       assert(hasUnsavedErdTab('erd:' + a), 'dirty edit treated as saved after remount')
       button('저장').click()
       await wait(async () => (await api.erdDesigner.get(a)).diagram.tables[0].name === 'alpha_edited', 'ERD save failed')
+      await wait(() => !button('저장').textContent.includes('저장 중'), 'initial save did not settle')
 
       button('SQL DDL 가져오기').click()
       const sql = await wait(() => document.querySelector('textarea[placeholder^="CREATE TABLE"]'), 'SQL import missing')
@@ -54,15 +55,27 @@ app.whenReady().then(async () => {
       const exported = await wait(() => document.querySelector('textarea[readonly]'), 'SQL export missing')
       assert(exported.value.includes('alpha_edited') && exported.value.includes('FOREIGN KEY') && exported.value.includes('customers'), 'SQL export lost table or relation')
       exported.parentElement.querySelectorAll('button')[2].click()
+      // The file can be saved before its tree refresh finishes. Editing during
+      // that interval must restore the tab's dirty flag and retain the new draft.
+      const originalTree = api.tree
+      let releaseTree
+      const treeGate = new Promise(resolve => { releaseTree = resolve })
+      api.tree = async () => { await treeGate; return originalTree() }
       button('저장').click()
       await wait(async () => (await api.erdDesigner.get(a)).diagram.relations.length === 1 && !hasUnsavedErdTab('erd:' + a), 'imported relation not saved')
+      input(table('alpha_edited'), 'alpha_during_save')
+      await wait(() => hasUnsavedErdTab('erd:' + a), 'edit during save lost dirty flag')
+      api.tree = originalTree
+      releaseTree()
+      await wait(() => !button('저장').textContent.includes('저장 중'), 'SQL save did not settle')
+      assert(table('alpha_during_save') && hasUnsavedErdTab('erd:' + a), 'save completion lost new edit')
 
       // A response to A's save must never overwrite B after switching tabs.
       const originalSave = api.erdDesigner.save
       let release, started = false
       const gate = new Promise(resolve => { release = resolve })
       api.erdDesigner.save = async (...args) => { started = true; await gate; return originalSave(...args) }
-      input(table('alpha_edited'), 'alpha_delayed')
+      input(table('alpha_during_save'), 'alpha_delayed')
       await wait(() => hasUnsavedErdTab('erd:' + a), 'second edit missing')
       button('저장').click(); await wait(() => started, 'delayed save not started')
       store.getState().activateErdTab('erd:' + b)
@@ -101,7 +114,7 @@ app.whenReady().then(async () => {
       await api.erdDesigner.save('missing-' + stamp + '.erd.json', diagram('recovered'), false)
       document.querySelector('[role="alert"] button').click()
       await wait(() => table('recovered'), 'retry did not load repaired diagram')
-      return { erdSwitch: true, cachedSwitch: true, dirtyPreserved: true, save: true, sqlImportExportAndRelation: true, inFlightSaveIsolation: true, loadError: true, openDocumentShortcut: true, titleFilter: true, clickAndEnter: true, escape: true }
+      return { erdSwitch: true, cachedSwitch: true, dirtyPreserved: true, save: true, sqlImportExportAndRelation: true, editDuringSavePreserved: true, inFlightSaveIsolation: true, loadError: true, openDocumentShortcut: true, titleFilter: true, clickAndEnter: true, escape: true }
     })().catch(error => ({ error: error.stack }))`)
     if (result.error) throw Error(result.error)
     console.log(JSON.stringify(result))

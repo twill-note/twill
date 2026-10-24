@@ -24,6 +24,8 @@ export function getErdTabSession(tabId: string): ErdTabSession | undefined {
 
 export function setErdTabSession(tabId: string, session: ErdTabSession) {
   diagramSessions.set(tabId, session)
+  // 저장 응답 뒤 후처리 중에도 추가 편집은 마지막 저장본과 다시 비교한다.
+  if (session.savedDiagram) dirtyTabs.set(tabId, JSON.stringify(session.diagram) !== JSON.stringify(session.savedDiagram))
 }
 
 /** 활성 ERD라면 디자이너가 자체 저장 확인 대화상자를 띄우도록 닫기를 위임한다. */
